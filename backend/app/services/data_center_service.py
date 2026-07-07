@@ -1,0 +1,263 @@
+from __future__ import annotations
+
+from datetime import datetime, timezone
+
+from backend.app.core.config import DB_PATH
+from backend.app.storage.live_map import list_source_health
+from backend.app.storage.sqlite import connect, initialize_database
+
+SOURCE_CATALOG = [
+    {
+        "source_id": "binance",
+        "name": "Binance",
+        "type": "market",
+        "status": "active",
+        "datasets": ["market_snapshots", "market_candles_future", "asset_features_future"],
+        "purpose": "Precios, cambio 24h, volumen y candles crypto.",
+    },
+    {
+        "source_id": "alternative_me",
+        "name": "Alternative.me",
+        "type": "sentiment",
+        "status": "active",
+        "datasets": ["market_snapshots"],
+        "purpose": "Fear & Greed Index para contexto de sentimiento.",
+    },
+    {
+        "source_id": "usgs",
+        "name": "USGS",
+        "type": "world_event",
+        "status": "active",
+        "datasets": ["live_events", "live_source_health"],
+        "purpose": "Terremotos en GeoJSON normalizados como eventos.",
+    },
+    {
+        "source_id": "gdacs",
+        "name": "GDACS",
+        "type": "world_event",
+        "status": "active",
+        "datasets": ["live_events", "live_source_health"],
+        "purpose": "Alertas globales de desastre.",
+    },
+    {
+        "source_id": "gdelt",
+        "name": "GDELT",
+        "type": "news",
+        "status": "degraded_possible",
+        "datasets": ["live_events", "live_source_health"],
+        "purpose": "Noticias geolocalizadas y eventos de mercado. Puede rate-limitear.",
+    },
+    {
+        "source_id": "sqlite",
+        "name": "SQLite Local",
+        "type": "storage",
+        "status": "active",
+        "datasets": ["all_local_tables"],
+        "purpose": "Base local para cache, auditoria y datasets analiticos.",
+    },
+]
+
+DATASET_CATALOG = [
+    {
+        "dataset_id": "market_snapshots",
+        "table": "market_snapshots",
+        "label": "Market Snapshots",
+        "category": "market",
+        "powerbi_ready": True,
+        "bot_ready": False,
+        "description": "Snapshots de precio, cambio 24h, volumen, Fear & Greed y lectura ABRAXAS.",
+    },
+    {
+        "dataset_id": "live_events",
+        "table": "live_events",
+        "label": "Live World Events",
+        "category": "world_intelligence",
+        "powerbi_ready": True,
+        "bot_ready": False,
+        "description": "Eventos normalizados con coordenadas, severidad, fuente y activos relacionados.",
+    },
+    {
+        "dataset_id": "live_source_health",
+        "table": "live_source_health",
+        "label": "Live Source Health",
+        "category": "data_health",
+        "powerbi_ready": True,
+        "bot_ready": False,
+        "description": "Estado, latencia, errores y frescura de fuentes del mapa vivo.",
+    },
+    {
+        "dataset_id": "market_candles",
+        "table": "market_candles",
+        "label": "Market Candles",
+        "category": "market",
+        "powerbi_ready": True,
+        "bot_ready": False,
+        "status": "planned",
+        "description": "Candles persistidas por symbol/timeframe para estadistica y bots.",
+    },
+    {
+        "dataset_id": "asset_features",
+        "table": "asset_features",
+        "label": "Asset Features",
+        "category": "bot_feature_store",
+        "powerbi_ready": True,
+        "bot_ready": True,
+        "status": "planned",
+        "description": "Features numericas listas para bots: retornos, volatilidad, z-score, drawdown, tendencia, volumen y riesgo.",
+    },
+    {
+        "dataset_id": "statistics_runs",
+        "table": "statistics_runs",
+        "label": "Statistics Runs",
+        "category": "analytics",
+        "powerbi_ready": True,
+        "bot_ready": False,
+        "status": "planned",
+        "description": "Resultados auditables de estadistica, distribuciones y Monte Carlo.",
+    },
+    {
+        "dataset_id": "regime_snapshots",
+        "table": "regime_snapshots",
+        "label": "Regime Snapshots",
+        "category": "regime_engine",
+        "powerbi_ready": True,
+        "bot_ready": True,
+        "status": "planned",
+        "description": "Clasificaciones auditables de regimen, riesgo, sesgo, tendencia y volatilidad.",
+    },
+]
+
+
+def utc_now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def get_table_stats(table_name: str) -> dict:
+    initialize_database()
+    with connect() as connection:
+        exists = connection.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name = ?",
+            (table_name,),
+        ).fetchone()
+        if not exists:
+            return {
+                "exists": False,
+                "row_count": 0,
+                "last_timestamp": None,
+                "columns": [],
+            }
+
+        row_count = connection.execute(f"SELECT COUNT(*) AS count FROM {table_name}").fetchone()["count"]
+        columns = [
+            dict(row)
+            for row in connection.execute(f"PRAGMA table_info({table_name})").fetchall()
+        ]
+        timestamp_column = first_existing_column(
+            columns,
+            ["timestamp", "published_at", "checked_at", "fetched_at", "open_time", "close_time", "created_at"],
+        )
+        last_timestamp = None
+        if timestamp_column:
+            result = connection.execute(f"SELECT MAX({timestamp_column}) AS last_timestamp FROM {table_name}").fetchone()
+            last_timestamp = result["last_timestamp"] if result else None
+
+    return {
+        "exists": True,
+        "row_count": int(row_count or 0),
+        "last_timestamp": last_timestamp,
+        "columns": [
+            {
+                "name": column["name"],
+                "type": column["type"],
+                "required": not bool(column["notnull"] == 0),
+            }
+            for column in columns
+        ],
+    }
+
+
+def first_existing_column(columns: list[dict], candidates: list[str]) -> str | None:
+    names = {column["name"] for column in columns}
+    for candidate in candidates:
+        if candidate in names:
+            return candidate
+    return None
+
+
+def get_data_catalog() -> dict:
+    return {
+        "generated_at": utc_now_iso(),
+        "db_path": str(DB_PATH),
+        "sources": SOURCE_CATALOG,
+        "datasets": build_datasets(),
+        "principle": "APIs externas -> normalizacion -> SQLite/cache -> datasets analiticos -> frontend/bots/PowerBI",
+    }
+
+
+def get_data_sources() -> dict:
+    health_by_source = {record["source"].lower(): record for record in list_source_health()}
+    sources = []
+    for source in SOURCE_CATALOG:
+        source_health = health_by_source.get(source["source_id"]) or health_by_source.get(source["name"].lower())
+        sources.append(
+            {
+                **source,
+                "health": source_health,
+            }
+        )
+    return {"generated_at": utc_now_iso(), "sources": sources}
+
+
+def get_data_health() -> dict:
+    datasets = build_datasets()
+    source_health = list_source_health()
+    existing = [dataset for dataset in datasets if dataset["exists"]]
+    missing = [dataset for dataset in datasets if not dataset["exists"]]
+    stale_or_empty = [
+        dataset
+        for dataset in existing
+        if dataset["row_count"] == 0 or not dataset.get("last_timestamp")
+    ]
+
+    return {
+        "generated_at": utc_now_iso(),
+        "database": {
+            "path": str(DB_PATH),
+            "exists": DB_PATH.exists(),
+            "size_bytes": DB_PATH.stat().st_size if DB_PATH.exists() else 0,
+        },
+        "summary": {
+            "datasets_total": len(datasets),
+            "datasets_existing": len(existing),
+            "datasets_missing_or_planned": len(missing),
+            "datasets_empty_or_without_time": len(stale_or_empty),
+            "sources_with_health": len(source_health),
+        },
+        "sources": source_health,
+        "datasets": datasets,
+    }
+
+
+def get_data_datasets() -> dict:
+    return {"generated_at": utc_now_iso(), "datasets": build_datasets()}
+
+
+def build_datasets() -> list[dict]:
+    datasets = []
+    for dataset in DATASET_CATALOG:
+        stats = get_table_stats(dataset["table"])
+        status = dataset.get("status")
+        if stats["exists"] and stats["row_count"] > 0:
+            status = "ready"
+        elif stats["exists"]:
+            status = "empty"
+        elif not status:
+            status = "missing"
+        datasets.append(
+            {
+                **dataset,
+                **stats,
+                "status": status,
+            }
+        )
+    return datasets

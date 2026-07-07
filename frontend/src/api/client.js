@@ -1,0 +1,98 @@
+const API_BASE = import.meta.env.VITE_ABRAXAS_API_BASE || "http://127.0.0.1:8000";
+
+async function request(path, options = {}) {
+  const response = await fetch(`${API_BASE}${path}`, {
+    headers: {
+      "Content-Type": "application/json",
+      ...(options.headers || {}),
+    },
+    ...options,
+  });
+
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(detail || `HTTP ${response.status}`);
+  }
+
+  return response.json();
+}
+
+export function getHealth() {
+  return request("/api/health");
+}
+
+export function getRadar() {
+  return request("/api/radar");
+}
+
+export function updateRadar() {
+  return request("/api/radar/update", { method: "POST" });
+}
+
+export function getCandles(symbol = "BTCUSDT", interval = "15m", limit = 200) {
+  const params = new URLSearchParams({ symbol, interval, limit: String(limit) });
+  return request(`/api/candles?${params}`);
+}
+
+export function getStatistics({
+  symbol = "BTCUSDT",
+  interval = "15m",
+  limit = 300,
+  horizonSteps = 48,
+  paths = 700,
+} = {}) {
+  const params = new URLSearchParams({
+    symbol,
+    interval,
+    limit: String(limit),
+    horizon_steps: String(horizonSteps),
+    paths: String(paths),
+  });
+  return request(`/api/statistics?${params}`);
+}
+
+export function getRegime({ symbol = "BTCUSDT", timeframe = "15m", limit = 120, refresh = false } = {}) {
+  const params = new URLSearchParams({
+    symbol,
+    timeframe,
+    limit: String(limit),
+    refresh: String(refresh),
+  });
+  return request(`/api/regime?${params}`);
+}
+
+export function getLiveMapEvents({ refresh = false, limit = 250, types = "" } = {}) {
+  const params = new URLSearchParams({ refresh: String(refresh), limit: String(limit) });
+  if (types) params.set("types", types);
+  return request(`/api/live-map/events?${params}`);
+}
+
+export function getLiveMapNews({ refresh = false, limit = 160 } = {}) {
+  const params = new URLSearchParams({ refresh: String(refresh), limit: String(limit) });
+  return request(`/api/live-map/news?${params}`);
+}
+
+export function getLiveMapAlerts({ refresh = false, limit = 160 } = {}) {
+  const params = new URLSearchParams({ refresh: String(refresh), limit: String(limit) });
+  return request(`/api/live-map/alerts?${params}`);
+}
+
+export function getLiveMapHealth() {
+  return request("/api/live-map/health");
+}
+
+export function getDataCatalog() {
+  return request("/api/data/catalog");
+}
+
+export function getDataSources() {
+  return request("/api/data/sources");
+}
+
+export function getDataHealth() {
+  return request("/api/data/health");
+}
+
+export function getDataDatasets() {
+  return request("/api/data/datasets");
+}

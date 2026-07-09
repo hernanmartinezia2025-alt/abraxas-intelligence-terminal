@@ -46,6 +46,8 @@ http://127.0.0.1:8000/api/data/catalog
 http://127.0.0.1:8000/api/data/sources
 http://127.0.0.1:8000/api/data/health
 http://127.0.0.1:8000/api/data/datasets
+http://127.0.0.1:8000/api/data/datasets/market_candles/preview
+http://127.0.0.1:8000/api/data/export/market_candles.csv
 ```
 
 Feature Store:
@@ -105,6 +107,8 @@ The Data page now reads real backend metadata:
 - last timestamps
 - PowerBI readiness
 - future bot feature-store readiness
+- dataset previews
+- CSV exports for PowerBI and external analysis
 
 Candles requested through `/api/candles` are persisted into SQLite table `market_candles`. If the live Binance request fails and local candles exist, the API can serve the cached candles instead of returning an empty chart.
 

@@ -19,6 +19,10 @@ frontend/node_modules/
 frontend/dist/
 frontend/.vite/
 npm-debug.log*
+runtime_*.log
+runtime_*.err.log
+frontend/runtime_*.log
+frontend/runtime_*.err.log
 
 # OS / editors
 .DS_Store

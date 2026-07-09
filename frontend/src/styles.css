@@ -1234,7 +1234,7 @@ h2 {
 
 .dataset-row {
   display: grid;
-  grid-template-columns: minmax(260px, 1.4fr) 110px 80px minmax(130px, 0.8fr) 96px 74px;
+  grid-template-columns: minmax(240px, 1.35fr) 96px 72px minmax(120px, 0.78fr) 82px 64px 130px;
   gap: 10px;
   align-items: center;
   border: 1px solid rgba(255, 255, 255, 0.07);
@@ -1288,6 +1288,97 @@ h2 {
 .dataset-row i.planned {
   color: rgba(246, 248, 251, 0.74);
   background: rgba(255, 255, 255, 0.1);
+}
+
+.dataset-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.dataset-actions button,
+.dataset-actions a,
+.dataset-actions em,
+.dataset-toolbar button,
+.dataset-toolbar select,
+.export-strip a {
+  border: 1px solid rgba(223, 192, 122, 0.28);
+  background: rgba(223, 192, 122, 0.1);
+  color: #ffffff;
+  border-radius: 8px;
+  padding: 7px 9px;
+  font-size: 11px;
+  font-weight: 760;
+  text-decoration: none;
+  font-style: normal;
+}
+
+.dataset-actions button:disabled,
+.dataset-actions em {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+
+.dataset-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.dataset-toolbar select {
+  min-width: min(280px, 100%);
+  background: rgba(10, 12, 16, 0.82);
+}
+
+.preview-wrap {
+  padding: 11px;
+  display: grid;
+  gap: 10px;
+}
+
+.export-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.preview-table {
+  display: grid;
+  gap: 5px;
+  overflow-x: auto;
+}
+
+.preview-row {
+  min-width: 860px;
+  display: grid;
+  grid-template-columns: repeat(8, minmax(110px, 1fr));
+  gap: 6px;
+  align-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 8px;
+  padding: 8px;
+}
+
+.preview-row.header {
+  background: transparent;
+  border-color: transparent;
+}
+
+.preview-row span {
+  color: rgba(246, 248, 251, 0.68);
+  font-family: var(--font-num);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.preview-row.header span {
+  color: rgba(223, 192, 122, 0.82);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
 }
 
 .trade-page {

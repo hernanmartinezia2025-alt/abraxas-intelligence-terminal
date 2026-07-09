@@ -96,3 +96,13 @@ export function getDataHealth() {
 export function getDataDatasets() {
   return request("/api/data/datasets");
 }
+
+export function getDatasetPreview(datasetId, limit = 20) {
+  const params = new URLSearchParams({ limit: String(limit) });
+  return request(`/api/data/datasets/${datasetId}/preview?${params}`);
+}
+
+export function datasetExportUrl(datasetId, limit = 5000) {
+  const params = new URLSearchParams({ limit: String(limit) });
+  return `${API_BASE}/api/data/export/${datasetId}.csv?${params}`;
+}

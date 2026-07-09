@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import csv
+import io
 from datetime import datetime, timezone
 
 from backend.app.core.config import DB_PATH
@@ -240,6 +242,62 @@ def get_data_health() -> dict:
 
 def get_data_datasets() -> dict:
     return {"generated_at": utc_now_iso(), "datasets": build_datasets()}
+
+
+def get_dataset_definition(dataset_id: str) -> dict:
+    for dataset in DATASET_CATALOG:
+        if dataset["dataset_id"] == dataset_id:
+            return dataset
+    raise ValueError(f"Dataset no catalogado: {dataset_id}")
+
+
+def get_dataset_preview(dataset_id: str, limit: int = 25) -> dict:
+    dataset = get_dataset_definition(dataset_id)
+    table = dataset["table"]
+    stats = get_table_stats(table)
+    if not stats["exists"]:
+        return {
+            "generated_at": utc_now_iso(),
+            "dataset": {**dataset, **stats, "status": "missing"},
+            "rows": [],
+        }
+
+    order_column = first_existing_column(
+        stats["columns"],
+        ["timestamp", "published_at", "checked_at", "fetched_at", "open_time", "close_time", "created_at", "id"],
+    )
+    order_sql = f"ORDER BY {order_column} DESC" if order_column else ""
+    with connect() as connection:
+        rows = connection.execute(
+            f"SELECT * FROM {table} {order_sql} LIMIT ?",
+            (limit,),
+        ).fetchall()
+
+    return {
+        "generated_at": utc_now_iso(),
+        "dataset": {
+            **dataset,
+            **stats,
+            "status": "ready" if stats["row_count"] else "empty",
+        },
+        "rows": [dict(row) for row in rows],
+    }
+
+
+def export_dataset_csv(dataset_id: str, limit: int = 5000) -> str:
+    preview = get_dataset_preview(dataset_id=dataset_id, limit=limit)
+    rows = preview["rows"]
+    output = io.StringIO()
+    if not rows:
+        writer = csv.writer(output)
+        writer.writerow(["empty"])
+        return output.getvalue()
+
+    fieldnames = list(rows[0].keys())
+    writer = csv.DictWriter(output, fieldnames=fieldnames, extrasaction="ignore")
+    writer.writeheader()
+    writer.writerows(rows)
+    return output.getvalue()
 
 
 def build_datasets() -> list[dict]:

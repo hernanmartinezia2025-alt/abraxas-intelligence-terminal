@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { getDataCatalog, getDataHealth } from "../../api/client.js";
+import { datasetExportUrl, getDataCatalog, getDataHealth, getDatasetPreview } from "../../api/client.js";
 
 function formatTime(value) {
   if (!value) return "sin registro";
@@ -30,7 +30,10 @@ function statusTone(status) {
 export default function DataApiCenter() {
   const [catalog, setCatalog] = useState(null);
   const [health, setHealth] = useState(null);
+  const [selectedDataset, setSelectedDataset] = useState("market_candles");
+  const [preview, setPreview] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [previewLoading, setPreviewLoading] = useState(false);
   const [error, setError] = useState("");
 
   async function loadData({ silent = false } = {}) {
@@ -47,6 +50,18 @@ export default function DataApiCenter() {
     }
   }
 
+  async function loadPreview(datasetId = selectedDataset) {
+    setPreviewLoading(true);
+    try {
+      const payload = await getDatasetPreview(datasetId, 20);
+      setPreview(payload);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setPreviewLoading(false);
+    }
+  }
+
   useEffect(() => {
     loadData();
     const timer = window.setInterval(() => {
@@ -55,6 +70,10 @@ export default function DataApiCenter() {
     return () => window.clearInterval(timer);
   }, []);
 
+  useEffect(() => {
+    loadPreview(selectedDataset);
+  }, [selectedDataset]);
+
   const datasets = useMemo(() => health?.datasets || catalog?.datasets || [], [catalog, health]);
   const sources = catalog?.sources || [];
   const summary = health?.summary || {};
@@ -62,6 +81,9 @@ export default function DataApiCenter() {
   const assetFeaturesReady = datasets.some(
     (dataset) => dataset.dataset_id === "asset_features" && dataset.exists && dataset.row_count > 0
   );
+  const exportableDatasets = datasets.filter((dataset) => dataset.exists && dataset.powerbi_ready);
+  const previewRows = preview?.rows || [];
+  const previewColumns = previewRows[0] ? Object.keys(previewRows[0]).slice(0, 8) : [];
 
   return (
     <section className="data-center-page">
@@ -183,8 +205,71 @@ export default function DataApiCenter() {
               <span>{formatTime(dataset.last_timestamp)}</span>
               <span>{dataset.powerbi_ready && dataset.exists ? "ready" : dataset.powerbi_ready ? "pending data" : "planned"}</span>
               <span>{dataset.bot_ready && dataset.exists && dataset.row_count > 0 ? "ready" : dataset.dataset_id === "asset_features" ? "next" : "no"}</span>
+              <span className="dataset-actions">
+                <button type="button" disabled={!dataset.exists} onClick={() => setSelectedDataset(dataset.dataset_id)}>
+                  Preview
+                </button>
+                {dataset.exists && dataset.powerbi_ready ? (
+                  <a href={datasetExportUrl(dataset.dataset_id)} target="_blank" rel="noreferrer">
+                    CSV
+                  </a>
+                ) : (
+                  <em>CSV</em>
+                )}
+              </span>
             </div>
           ))}
+        </div>
+      </section>
+
+      <section className="exchange-panel data-panel">
+        <div className="exchange-panel-head compact">
+          <div>
+            <p className="eyebrow">Dataset Preview</p>
+            <h2>{selectedDataset}</h2>
+          </div>
+          <div className="dataset-toolbar">
+            <select value={selectedDataset} onChange={(event) => setSelectedDataset(event.target.value)}>
+              {datasets.map((dataset) => (
+                <option key={dataset.dataset_id} value={dataset.dataset_id}>
+                  {dataset.label}
+                </option>
+              ))}
+            </select>
+            <button type="button" onClick={() => loadPreview()} disabled={previewLoading}>
+              {previewLoading ? "Leyendo..." : "Refrescar preview"}
+            </button>
+          </div>
+        </div>
+        <div className="preview-wrap">
+          <div className="export-strip">
+            {exportableDatasets.map((dataset) => (
+              <a key={dataset.dataset_id} href={datasetExportUrl(dataset.dataset_id)} target="_blank" rel="noreferrer">
+                {dataset.dataset_id}.csv
+              </a>
+            ))}
+          </div>
+          {previewRows.length ? (
+            <div className="preview-table">
+              <div className="preview-row header">
+                {previewColumns.map((column) => (
+                  <span key={column}>{column}</span>
+                ))}
+              </div>
+              {previewRows.map((row, index) => (
+                <div className="preview-row" key={`${selectedDataset}-${index}`}>
+                  {previewColumns.map((column) => (
+                    <span key={column}>{String(row[column] ?? "").slice(0, 80)}</span>
+                  ))}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="map-empty">
+              <strong>Sin filas para mostrar</strong>
+              <span>Este dataset existe pero todavia no tiene registros, o esta planificado para una fase posterior.</span>
+            </div>
+          )}
         </div>
       </section>
     </section>

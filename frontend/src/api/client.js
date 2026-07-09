@@ -146,6 +146,23 @@ export function createBotVersion(botId, payload) {
   });
 }
 
+export function getBotBacktests(botId, limit = 20) {
+  const params = new URLSearchParams({ limit: String(limit) });
+  return request(`/api/bots/${botId}/backtests?${params}`);
+}
+
+export function getBacktests(limit = 20) {
+  const params = new URLSearchParams({ limit: String(limit) });
+  return request(`/api/bots/backtests?${params}`);
+}
+
+export function runBotBacktest(botId, payload = {}) {
+  return request(`/api/bots/${botId}/backtests`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
 export function getLiveMapEvents({ refresh = false, limit = 250, types = "" } = {}) {
   const params = new URLSearchParams({ refresh: String(refresh), limit: String(limit) });
   if (types) params.set("types", types);

@@ -1692,7 +1692,8 @@ h2 {
 }
 
 .bot-form-body button,
-.bot-list-panel .exchange-panel-head button {
+.bot-list-panel .exchange-panel-head button,
+.bot-detail-panel .exchange-panel-head button {
   border: 1px solid rgba(223, 192, 122, 0.36);
   background: rgba(223, 192, 122, 0.14);
   color: #ffffff;
@@ -1791,6 +1792,62 @@ h2 {
   padding: 12px;
   font-size: 12px;
   line-height: 1.5;
+}
+
+.backtest-list {
+  padding: 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.backtest-list article {
+  min-height: 58px;
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) repeat(3, minmax(78px, 0.45fr)) minmax(96px, 0.5fr);
+  gap: 8px;
+  align-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 8px;
+  padding: 10px;
+}
+
+.backtest-list article div {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.backtest-list strong {
+  color: #ffffff;
+}
+
+.backtest-list span,
+.backtest-list small {
+  color: rgba(246, 248, 251, 0.52);
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.backtest-list b {
+  color: rgba(246, 248, 251, 0.75);
+  font-family: var(--font-num);
+  font-size: 12px;
+  text-align: right;
+}
+
+.backtest-list b.positive {
+  color: #47d9aa;
+}
+
+.backtest-list b.negative {
+  color: #ff8b98;
+}
+
+.backtest-list small {
+  text-align: right;
 }
 
 .backend-surface {
@@ -2611,6 +2668,13 @@ h2 {
   }
   .research-row {
     grid-template-columns: 1fr;
+  }
+  .backtest-list article {
+    grid-template-columns: 1fr;
+  }
+  .backtest-list b,
+  .backtest-list small {
+    text-align: left;
   }
   .research-row b,
   .research-row small {

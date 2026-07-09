@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { createBot, getBot, getBots } from "../api/client.js";
+import { createBot, getBot, getBotBacktests, getBots, runBotBacktest } from "../api/client.js";
 
 const BOT_STAGES = [
   ["Saved Bots", "online", "Bots persistidos en SQLite con versiones auditables."],
@@ -43,12 +43,23 @@ function formatTime(value) {
   return date.toLocaleString([], { month: "short", day: "2-digit", hour: "2-digit", minute: "2-digit" });
 }
 
+function formatNumber(value, digits = 2) {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) return "--";
+  return Number(value).toLocaleString(undefined, {
+    maximumFractionDigits: digits,
+    minimumFractionDigits: digits,
+  });
+}
+
 export default function BotsPage({ selectedSymbol = "BTCUSDT" }) {
   const [bots, setBots] = useState([]);
   const [selectedBotId, setSelectedBotId] = useState(null);
   const [detail, setDetail] = useState(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [backtesting, setBacktesting] = useState(false);
+  const [backtests, setBacktests] = useState([]);
+  const [latestBacktest, setLatestBacktest] = useState(null);
   const [error, setError] = useState("");
   const [form, setForm] = useState({
     name: "",
@@ -93,6 +104,22 @@ export default function BotsPage({ selectedSymbol = "BTCUSDT" }) {
     }
   }
 
+  async function loadBacktests(botId) {
+    if (!botId) {
+      setBacktests([]);
+      setLatestBacktest(null);
+      return;
+    }
+    try {
+      const payload = await getBotBacktests(botId, 20);
+      const runs = payload.runs || [];
+      setBacktests(runs);
+      setLatestBacktest(runs[0] || null);
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
   async function handleCreateBot(event) {
     event.preventDefault();
     setSaving(true);
@@ -111,10 +138,32 @@ export default function BotsPage({ selectedSymbol = "BTCUSDT" }) {
       setDetail(payload);
       setForm((current) => ({ ...current, name: "", description: "" }));
       await loadBots({ silent: true });
+      await loadBacktests(payload.bot.id);
     } catch (err) {
       setError(err.message);
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleRunBacktest() {
+    if (!detail?.bot) return;
+    setBacktesting(true);
+    setError("");
+    try {
+      const payload = await runBotBacktest(detail.bot.id, {
+        version_id: latestVersion?.id,
+        initial_equity: 10000,
+        fee_pct: 0.1,
+        slippage_pct: 0.05,
+        limit: 500,
+      });
+      setLatestBacktest(payload);
+      await loadBacktests(detail.bot.id);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBacktesting(false);
     }
   }
 
@@ -128,6 +177,7 @@ export default function BotsPage({ selectedSymbol = "BTCUSDT" }) {
 
   useEffect(() => {
     loadDetail(selectedBotId);
+    loadBacktests(selectedBotId);
   }, [selectedBotId]);
 
   return (
@@ -251,7 +301,9 @@ export default function BotsPage({ selectedSymbol = "BTCUSDT" }) {
             <p className="eyebrow">Bot Detail</p>
             <h2>{detail?.bot?.name || "Sin bot seleccionado"}</h2>
           </div>
-          <span>{latestVersion ? `v${latestVersion.version}` : "no version"}</span>
+          <button type="button" onClick={handleRunBacktest} disabled={!detail?.bot || backtesting}>
+            {backtesting ? "Backtesting..." : "Run backtest"}
+          </button>
         </div>
         {detail?.bot ? (
           <div className="bot-detail-grid">
@@ -273,7 +325,27 @@ export default function BotsPage({ selectedSymbol = "BTCUSDT" }) {
             <article>
               <span>Versiones</span>
               <strong>{detail.versions.length}</strong>
-              <small>auditables</small>
+              <small>{latestVersion ? `v${latestVersion.version}` : "sin version"}</small>
+            </article>
+            <article>
+              <span>ROI ultimo</span>
+              <strong>{formatNumber(latestBacktest?.roi_pct, 2)}%</strong>
+              <small>{latestBacktest ? formatTime(latestBacktest.created_at) : "sin backtest"}</small>
+            </article>
+            <article>
+              <span>Drawdown</span>
+              <strong>{formatNumber(latestBacktest?.max_drawdown_pct, 2)}%</strong>
+              <small>max DD</small>
+            </article>
+            <article>
+              <span>Trades</span>
+              <strong>{latestBacktest?.total_trades ?? "--"}</strong>
+              <small>win {formatNumber(latestBacktest?.win_rate_pct, 1)}%</small>
+            </article>
+            <article>
+              <span>Profit factor</span>
+              <strong>{formatNumber(latestBacktest?.profit_factor, 2)}</strong>
+              <small>simulado</small>
             </article>
             <pre>{strategyPreview}</pre>
           </div>
@@ -283,6 +355,36 @@ export default function BotsPage({ selectedSymbol = "BTCUSDT" }) {
             <span>Crea un bot draft o selecciona uno existente para ver su estrategia.</span>
           </div>
         )}
+      </section>
+
+      <section className="exchange-panel bot-detail-panel">
+        <div className="exchange-panel-head compact">
+          <div>
+            <p className="eyebrow">Backtest Runs</p>
+            <h2>{backtests.length} simulaciones guardadas</h2>
+          </div>
+          <span>SQLite</span>
+        </div>
+        <div className="backtest-list">
+          {backtests.map((run) => (
+            <article key={run.id}>
+              <div>
+                <strong>Run #{run.id}</strong>
+                <span>{run.symbol} / {run.timeframe}</span>
+              </div>
+              <b className={Number(run.roi_pct || 0) >= 0 ? "positive" : "negative"}>{formatNumber(run.roi_pct, 2)}%</b>
+              <b>{formatNumber(run.max_drawdown_pct, 2)}% DD</b>
+              <b>{run.total_trades} trades</b>
+              <small>{formatTime(run.created_at)}</small>
+            </article>
+          ))}
+          {!backtests.length && (
+            <div className="map-empty">
+              <strong>Sin backtests todavia</strong>
+              <span>Ejecuta Run backtest para guardar el primer resultado de este bot.</span>
+            </div>
+          )}
+        </div>
       </section>
     </section>
   );

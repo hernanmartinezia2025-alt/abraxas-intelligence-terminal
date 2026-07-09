@@ -185,6 +185,35 @@ CREATE TABLE IF NOT EXISTS bot_versions (
 
 CREATE INDEX IF NOT EXISTS idx_bot_versions_bot
 ON bot_versions(bot_id, version);
+
+CREATE TABLE IF NOT EXISTS backtest_runs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    bot_id INTEGER NOT NULL,
+    bot_version_id INTEGER NOT NULL,
+    symbol TEXT NOT NULL,
+    timeframe TEXT NOT NULL,
+    input_start INTEGER,
+    input_end INTEGER,
+    initial_equity REAL NOT NULL,
+    final_equity REAL NOT NULL,
+    roi_pct REAL NOT NULL,
+    max_drawdown_pct REAL NOT NULL,
+    total_trades INTEGER NOT NULL,
+    win_rate_pct REAL NOT NULL,
+    profit_factor REAL NOT NULL,
+    metrics_json TEXT NOT NULL,
+    trades_json TEXT NOT NULL,
+    equity_curve_json TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY(bot_id) REFERENCES bots(id) ON DELETE CASCADE,
+    FOREIGN KEY(bot_version_id) REFERENCES bot_versions(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_backtest_runs_bot_time
+ON backtest_runs(bot_id, created_at);
+
+CREATE INDEX IF NOT EXISTS idx_backtest_runs_symbol_time
+ON backtest_runs(symbol, timeframe, created_at);
 """
 
 @contextmanager

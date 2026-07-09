@@ -54,7 +54,7 @@ SOURCE_CATALOG = [
         "name": "SQLite Local",
         "type": "storage",
         "status": "active",
-        "datasets": ["all_local_tables"],
+        "datasets": ["all_local_tables", "bots", "bot_versions", "backtest_runs"],
         "purpose": "Base local para cache, auditoria y datasets analiticos.",
     },
 ]
@@ -126,6 +126,33 @@ DATASET_CATALOG = [
         "bot_ready": True,
         "status": "planned",
         "description": "Clasificaciones auditables de regimen, riesgo, sesgo, tendencia y volatilidad.",
+    },
+    {
+        "dataset_id": "bots",
+        "table": "bots",
+        "label": "Saved Bots",
+        "category": "bot_forge",
+        "powerbi_ready": True,
+        "bot_ready": True,
+        "description": "Bots creados en Bot Forge con estado, activo, timeframe y perfil de riesgo.",
+    },
+    {
+        "dataset_id": "bot_versions",
+        "table": "bot_versions",
+        "label": "Bot Versions",
+        "category": "bot_forge",
+        "powerbi_ready": True,
+        "bot_ready": True,
+        "description": "Versiones auditables de estrategia JSON por bot.",
+    },
+    {
+        "dataset_id": "backtest_runs",
+        "table": "backtest_runs",
+        "label": "Backtest Runs",
+        "category": "bot_forge",
+        "powerbi_ready": True,
+        "bot_ready": True,
+        "description": "Resultados persistidos de simulaciones: ROI, drawdown, trades, win rate y profit factor.",
     },
 ]
 

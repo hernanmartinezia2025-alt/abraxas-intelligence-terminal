@@ -1,12 +1,14 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
   buildFeatures,
+  getBacktests,
   getFeatures,
   getBots,
   getLiveMapAlerts,
   getLiveMapHealth,
   getLiveMapNews,
   getOrderBook,
+  getBotBacktests,
   getRegimeSnapshots,
   getStatisticsRuns,
 } from "../../api/client.js";
@@ -111,6 +113,14 @@ export default function BackendSurface({ selectedSymbol = "BTCUSDT" }) {
         description: "Bots guardados en SQLite con versiones de estrategia auditables.",
         call: () => getBots(12),
         rows: ["bots"],
+      },
+      {
+        label: "Backtest Runs",
+        method: "GET",
+        path: "/api/bots/backtests",
+        description: "Resultados persistidos de simulaciones de bots contra market_candles.",
+        call: () => getBacktests(12),
+        rows: ["runs"],
       },
       {
         label: "Order Book",

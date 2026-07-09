@@ -13,7 +13,7 @@ function formatPercent(value) {
   return `${number >= 0 ? "+" : ""}${number.toFixed(2)}%`;
 }
 
-function orderRows(price, side) {
+function syntheticDepthRows(price, side) {
   const base = Number(price || 100);
   return Array.from({ length: 8 }).map((_, index) => {
     const step = (index + 1) * 0.0018;
@@ -27,8 +27,8 @@ export default function TradePage({ rows, selectedSymbol = "BTCUSDT", onSelectSy
   const [interval, setInterval] = useState("15m");
   const assets = latestRows(rows);
   const active = assets.find((asset) => asset.symbol === selectedSymbol) || assets[0];
-  const asks = orderRows(active?.price, "ask").reverse();
-  const bids = orderRows(active?.price, "bid");
+  const asks = syntheticDepthRows(active?.price, "ask").reverse();
+  const bids = syntheticDepthRows(active?.price, "bid");
 
   return (
     <section className="trade-page">
@@ -80,9 +80,10 @@ export default function TradePage({ rows, selectedSymbol = "BTCUSDT", onSelectSy
           <section className="exchange-panel order-book">
             <div className="exchange-panel-head compact">
               <div>
-                <p className="eyebrow">Order book</p>
-                <h2>Depth</h2>
+                <p className="eyebrow">Synthetic depth</p>
+                <h2>Observation book</h2>
               </div>
+              <span>not live orders</span>
             </div>
             <div className="book-table">
               {asks.map((row) => (

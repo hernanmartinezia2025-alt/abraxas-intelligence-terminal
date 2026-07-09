@@ -5,10 +5,10 @@ export default function ContextPlaceholder() {
     <section className="module-panel" id="context">
       <div className="section-head">
         <div>
-          <p className="eyebrow">Context</p>
-          <h2>Macro Board</h2>
+          <p className="eyebrow">Context Lab</p>
+          <h2>Manual Macro Board</h2>
         </div>
-        <span>manual</span>
+        <span>placeholder</span>
       </div>
       <div className="panel-body">
         <div className="vector-row">

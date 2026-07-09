@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import {
   buildFeatures,
   getFeatures,
+  getBots,
   getLiveMapAlerts,
   getLiveMapHealth,
   getLiveMapNews,
@@ -102,6 +103,14 @@ export default function BackendSurface({ selectedSymbol = "BTCUSDT" }) {
         description: "Eventos severos y market-relevant ordenados por impacto.",
         call: () => getLiveMapAlerts({ limit: 12 }),
         rows: ["events", "alerts"],
+      },
+      {
+        label: "Bot Forge",
+        method: "GET",
+        path: "/api/bots",
+        description: "Bots guardados en SQLite con versiones de estrategia auditables.",
+        call: () => getBots(12),
+        rows: ["bots"],
       },
       {
         label: "Order Book",

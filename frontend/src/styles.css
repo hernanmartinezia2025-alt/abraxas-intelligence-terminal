@@ -1635,6 +1635,164 @@ h2 {
   margin: 0;
 }
 
+.bot-forge-grid {
+  display: grid;
+  grid-template-columns: minmax(320px, 0.9fr) minmax(0, 1.1fr);
+  gap: 12px;
+}
+
+.bot-form,
+.bot-list-panel,
+.bot-detail-panel {
+  overflow: hidden;
+}
+
+.bot-form-body {
+  padding: 13px;
+  display: grid;
+  gap: 10px;
+}
+
+.bot-form-body label {
+  display: grid;
+  gap: 6px;
+  color: rgba(246, 248, 251, 0.52);
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.bot-form-body input,
+.bot-form-body textarea,
+.bot-form-body select {
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.055);
+  color: #ffffff;
+  border-radius: 8px;
+  padding: 10px;
+  font: inherit;
+  outline: none;
+}
+
+.bot-form-body textarea {
+  min-height: 92px;
+  resize: vertical;
+}
+
+.bot-form-body option {
+  color: #101215;
+}
+
+.bot-form-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.bot-form-body button,
+.bot-list-panel .exchange-panel-head button {
+  border: 1px solid rgba(223, 192, 122, 0.36);
+  background: rgba(223, 192, 122, 0.14);
+  color: #ffffff;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-weight: 850;
+}
+
+.bot-list {
+  padding: 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.bot-list button {
+  width: 100%;
+  min-height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(246, 248, 251, 0.72);
+  border-radius: 8px;
+  padding: 10px;
+  text-align: left;
+}
+
+.bot-list button.active,
+.bot-list button:hover {
+  border-color: rgba(223, 192, 122, 0.4);
+  background: rgba(223, 192, 122, 0.11);
+}
+
+.bot-list button div {
+  display: grid;
+  gap: 5px;
+}
+
+.bot-list strong {
+  color: #ffffff;
+}
+
+.bot-list span,
+.bot-list b {
+  color: rgba(246, 248, 251, 0.52);
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.bot-detail-grid {
+  padding: 13px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.bot-detail-grid article {
+  min-height: 88px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 8px;
+  padding: 11px;
+  display: grid;
+  align-content: space-between;
+}
+
+.bot-detail-grid span,
+.bot-detail-grid small {
+  color: rgba(246, 248, 251, 0.52);
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.bot-detail-grid strong {
+  color: #ffffff;
+  font-family: var(--font-num);
+  font-size: 21px;
+  overflow-wrap: anywhere;
+}
+
+.bot-detail-grid pre {
+  grid-column: 1 / -1;
+  max-height: 360px;
+  margin: 0;
+  overflow: auto;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  background: rgba(0, 0, 0, 0.3);
+  color: rgba(246, 248, 251, 0.78);
+  border-radius: 8px;
+  padding: 12px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .backend-surface {
   overflow: hidden;
 }
@@ -2375,6 +2533,10 @@ h2 {
   .surface-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+  .bot-forge-grid,
+  .bot-detail-grid {
+    grid-template-columns: 1fr;
+  }
   .trade-grid {
     grid-template-areas:
       "chart"
@@ -2436,6 +2598,9 @@ h2 {
   }
   .surface-result {
     flex-direction: column;
+  }
+  .bot-form-row {
+    grid-template-columns: 1fr;
   }
   .map-actions {
     justify-items: start;

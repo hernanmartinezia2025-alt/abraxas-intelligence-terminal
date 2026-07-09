@@ -155,6 +155,36 @@ CREATE TABLE IF NOT EXISTS live_source_health (
     max_stale_minutes INTEGER NOT NULL,
     checked_at TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS bots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE,
+    description TEXT NOT NULL,
+    status TEXT NOT NULL,
+    mode TEXT NOT NULL,
+    base_symbol TEXT NOT NULL,
+    timeframe TEXT NOT NULL,
+    risk_profile TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_bots_status
+ON bots(status, updated_at);
+
+CREATE TABLE IF NOT EXISTS bot_versions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    bot_id INTEGER NOT NULL,
+    version INTEGER NOT NULL,
+    strategy_json TEXT NOT NULL,
+    notes TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY(bot_id) REFERENCES bots(id) ON DELETE CASCADE,
+    UNIQUE(bot_id, version)
+);
+
+CREATE INDEX IF NOT EXISTS idx_bot_versions_bot
+ON bot_versions(bot_id, version);
 """
 
 @contextmanager

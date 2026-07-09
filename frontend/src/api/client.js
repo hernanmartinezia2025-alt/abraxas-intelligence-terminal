@@ -123,6 +123,29 @@ export function buildFeatures({ symbol = "BTCUSDT", timeframe = "15m", limit = 3
   return request(`/api/features/build?${params}`, { method: "POST" });
 }
 
+export function getBots(limit = 100) {
+  const params = new URLSearchParams({ limit: String(limit) });
+  return request(`/api/bots?${params}`);
+}
+
+export function createBot(payload) {
+  return request("/api/bots", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function getBot(botId) {
+  return request(`/api/bots/${botId}`);
+}
+
+export function createBotVersion(botId, payload) {
+  return request(`/api/bots/${botId}/versions`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
 export function getLiveMapEvents({ refresh = false, limit = 250, types = "" } = {}) {
   const params = new URLSearchParams({ refresh: String(refresh), limit: String(limit) });
   if (types) params.set("types", types);

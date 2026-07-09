@@ -115,7 +115,7 @@ export default function App() {
       {activePage === "map" && <LiveMapPage />}
       {activePage === "research" && <ResearchPage selectedSymbol={selectedSymbol} />}
       {activePage === "data" && <DataPage selectedSymbol={selectedSymbol} />}
-      {activePage === "bots" && <BotsPage />}
+      {activePage === "bots" && <BotsPage selectedSymbol={selectedSymbol} />}
       {activePage === "risk" && <RiskPage />}
     </Shell>
   );

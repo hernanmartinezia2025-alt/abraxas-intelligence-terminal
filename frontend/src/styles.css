@@ -96,14 +96,13 @@ div {
 .brand-mark {
   width: 38px;
   aspect-ratio: 1;
-  display: grid;
-  place-items: center;
+  display: block;
   border: 1px solid rgba(223, 192, 122, 0.52);
   border-radius: 8px;
-  color: var(--brand-2);
-  background: linear-gradient(180deg, #24201a, #121212);
-  font-size: 12px;
-  font-weight: 900;
+  background: #080808;
+  object-fit: cover;
+  object-position: center;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.34);
 }
 .brand-block strong {
   display: block;
@@ -151,6 +150,33 @@ div {
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
+}
+
+.rail-crest {
+  position: relative;
+  min-height: 196px;
+  border: 1px solid rgba(223, 192, 122, 0.12);
+  border-radius: 8px;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 35%, rgba(223, 192, 122, 0.1), transparent 64%),
+    rgba(255, 255, 255, 0.025);
+}
+
+.rail-crest::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.34));
+}
+
+.rail-crest img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center top;
+  opacity: 0.62;
+  filter: grayscale(1) contrast(1.08);
 }
 
 .rail-module-card,
@@ -2556,6 +2582,7 @@ h2 {
     min-width: max-content;
   }
   .rail-module-card,
+  .rail-crest,
   .rail-status-card,
   .rail-footer {
     display: none;

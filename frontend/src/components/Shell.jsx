@@ -37,7 +37,7 @@ export default function Shell({
     <div className="terminal-frame">
       <aside className="side-rail">
         <div className="brand-block">
-          <span className="brand-mark">AX</span>
+          <img className="brand-mark" src="/abraxas-emblem.png" alt="ABRAXAS emblem" />
           <div>
             <strong>ABRAXAS</strong>
             <small>local intelligence</small>
@@ -51,6 +51,9 @@ export default function Shell({
             </a>
           ))}
         </nav>
+        <div className="rail-crest" aria-hidden="true">
+          <img src="/abraxas-emblem.png" alt="" />
+        </div>
         <div className="rail-module-card">
           <span>Recovery path</span>
           <div>

@@ -1062,6 +1062,123 @@ h2 {
   font-size: 12px;
 }
 
+.research-archive {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, #14171b, #0d0f12);
+  border-radius: 8px;
+  box-shadow: 0 22px 56px rgba(10, 10, 10, 0.2);
+  overflow: hidden;
+}
+
+.research-result-grid {
+  padding: 13px 13px 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.research-result-grid article {
+  min-height: 92px;
+  border: 1px solid rgba(223, 192, 122, 0.2);
+  background:
+    linear-gradient(120deg, rgba(223, 192, 122, 0.08), transparent 50%),
+    rgba(255, 255, 255, 0.04);
+  border-radius: 8px;
+  padding: 12px;
+  display: grid;
+  align-content: space-between;
+  gap: 8px;
+}
+
+.research-result-grid span,
+.research-row span,
+.research-row small {
+  color: rgba(246, 248, 251, 0.5);
+  font-size: 10px;
+  font-weight: 850;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.research-result-grid strong {
+  color: #ffffff;
+  font-family: var(--font-num);
+  font-size: 25px;
+}
+
+.research-result-grid small {
+  color: rgba(246, 248, 251, 0.68);
+}
+
+.research-archive-grid {
+  padding: 13px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.research-list {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.035);
+  border-radius: 8px;
+  padding: 12px;
+  display: grid;
+  gap: 12px;
+}
+
+.research-list h2 {
+  color: #ffffff;
+  font-size: 17px;
+}
+
+.research-list > div:last-child {
+  display: grid;
+  gap: 7px;
+}
+
+.research-row {
+  min-height: 54px;
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(76px, 0.45fr) minmax(72px, 0.45fr) minmax(88px, 0.5fr);
+  gap: 8px;
+  align-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 8px;
+  padding: 9px;
+}
+
+.research-row div {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.research-row strong {
+  color: #ffffff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.research-row b {
+  color: rgba(246, 248, 251, 0.76);
+  font-family: var(--font-num);
+  font-size: 11px;
+  text-align: right;
+}
+
+.research-row small {
+  text-align: right;
+}
+
+.research-empty {
+  border: 1px dashed rgba(255, 255, 255, 0.13);
+  color: rgba(246, 248, 251, 0.56);
+  border-radius: 8px;
+  padding: 12px;
+}
+
 .data-center-page {
   display: grid;
   gap: 12px;
@@ -2248,6 +2365,8 @@ h2 {
   .module-grid,
   .stat-analysis-grid,
   .data-grid,
+  .research-archive-grid,
+  .research-result-grid,
   .regime-body,
   .trade-grid,
   .live-map-grid {
@@ -2324,6 +2443,13 @@ h2 {
   .dataset-row,
   .dataset-row.header {
     grid-template-columns: 1fr;
+  }
+  .research-row {
+    grid-template-columns: 1fr;
+  }
+  .research-row b,
+  .research-row small {
+    text-align: left;
   }
   .dataset-row.header {
     display: none;

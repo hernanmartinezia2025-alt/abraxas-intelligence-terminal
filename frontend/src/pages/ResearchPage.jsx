@@ -1,6 +1,7 @@
 import React from "react";
 import ContextPlaceholder from "../features/context/ContextPlaceholder.jsx";
 import RegimeEngine from "../features/regime/RegimeEngine.jsx";
+import ResearchArchive from "../features/research/ResearchArchive.jsx";
 import StatisticalIntelligence from "../features/statistics/StatisticalIntelligence.jsx";
 import StrategyPlaceholder from "../features/strategy/StrategyPlaceholder.jsx";
 
@@ -9,6 +10,7 @@ export default function ResearchPage({ selectedSymbol }) {
     <section className="page-stack">
       <StatisticalIntelligence selectedSymbol={selectedSymbol} />
       <RegimeEngine selectedSymbol={selectedSymbol} />
+      <ResearchArchive selectedSymbol={selectedSymbol} />
       <StrategyPlaceholder />
       <ContextPlaceholder />
     </section>

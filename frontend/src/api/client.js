@@ -56,6 +56,40 @@ export function getStatistics({
   return request(`/api/statistics?${params}`);
 }
 
+export function getStatisticsSummary({ symbol = "BTCUSDT", interval = "15m", limit = 300 } = {}) {
+  const params = new URLSearchParams({
+    symbol,
+    interval,
+    limit: String(limit),
+  });
+  return request(`/api/statistics/summary?${params}`);
+}
+
+export function getMonteCarlo({
+  symbol = "BTCUSDT",
+  interval = "15m",
+  limit = 300,
+  horizonSteps = 48,
+  paths = 700,
+} = {}) {
+  const params = new URLSearchParams({
+    symbol,
+    interval,
+    limit: String(limit),
+    horizon_steps: String(horizonSteps),
+    paths: String(paths),
+  });
+  return request(`/api/statistics/monte-carlo?${params}`);
+}
+
+export function getStatisticsRuns({ symbol = "", timeframe = "", runType = "", limit = 20 } = {}) {
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (symbol) params.set("symbol", symbol);
+  if (timeframe) params.set("timeframe", timeframe);
+  if (runType) params.set("run_type", runType);
+  return request(`/api/statistics/runs?${params}`);
+}
+
 export function getRegime({ symbol = "BTCUSDT", timeframe = "15m", limit = 120, refresh = false } = {}) {
   const params = new URLSearchParams({
     symbol,
@@ -64,6 +98,29 @@ export function getRegime({ symbol = "BTCUSDT", timeframe = "15m", limit = 120, 
     refresh: String(refresh),
   });
   return request(`/api/regime?${params}`);
+}
+
+export function getRegimeSnapshots({ symbol = "", timeframe = "", limit = 20 } = {}) {
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (symbol) params.set("symbol", symbol);
+  if (timeframe) params.set("timeframe", timeframe);
+  return request(`/api/regime/snapshots?${params}`);
+}
+
+export function getFeatures({ symbol = "", timeframe = "", limit = 20 } = {}) {
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (symbol) params.set("symbol", symbol);
+  if (timeframe) params.set("timeframe", timeframe);
+  return request(`/api/features?${params}`);
+}
+
+export function buildFeatures({ symbol = "BTCUSDT", timeframe = "15m", limit = 300 } = {}) {
+  const params = new URLSearchParams({
+    symbol,
+    timeframe,
+    limit: String(limit),
+  });
+  return request(`/api/features/build?${params}`, { method: "POST" });
 }
 
 export function getLiveMapEvents({ refresh = false, limit = 250, types = "" } = {}) {

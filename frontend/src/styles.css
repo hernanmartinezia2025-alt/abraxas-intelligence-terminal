@@ -1518,6 +1518,114 @@ h2 {
   margin: 0;
 }
 
+.backend-surface {
+  overflow: hidden;
+}
+
+.surface-grid {
+  padding: 12px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.surface-card {
+  min-height: 164px;
+  display: grid;
+  align-content: space-between;
+  gap: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    linear-gradient(160deg, rgba(255, 255, 255, 0.065), rgba(255, 255, 255, 0.018)),
+    rgba(12, 14, 18, 0.72);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.surface-card.online {
+  border-color: rgba(71, 217, 170, 0.22);
+}
+
+.surface-card.down {
+  border-color: rgba(255, 99, 118, 0.26);
+}
+
+.surface-card div,
+.surface-card footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.surface-card span,
+.surface-card b,
+.surface-card small {
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.surface-card span {
+  color: var(--gold);
+}
+
+.surface-card strong {
+  color: #ffffff;
+  font-size: 15px;
+}
+
+.surface-card code {
+  color: rgba(246, 248, 251, 0.62);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.surface-card p {
+  margin: 0;
+  color: rgba(246, 248, 251, 0.68);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.surface-card b {
+  color: #47d9aa;
+}
+
+.surface-card.down b {
+  color: #ff8b98;
+}
+
+.surface-card small {
+  max-width: 62%;
+  color: rgba(246, 248, 251, 0.48);
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.surface-result {
+  margin: 0 12px 12px;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid rgba(71, 217, 170, 0.24);
+  background: rgba(7, 150, 105, 0.1);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.surface-result strong {
+  color: #ffffff;
+}
+
+.surface-result span {
+  color: rgba(246, 248, 251, 0.68);
+}
+
 .trade-page {
   display: grid;
   gap: 12px;
@@ -2145,6 +2253,9 @@ h2 {
   .live-map-grid {
     grid-template-columns: 1fr;
   }
+  .surface-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
   .trade-grid {
     grid-template-areas:
       "chart"
@@ -2200,6 +2311,12 @@ h2 {
   .ops-command {
     flex-direction: column;
     align-items: stretch;
+  }
+  .surface-grid {
+    grid-template-columns: 1fr;
+  }
+  .surface-result {
+    flex-direction: column;
   }
   .map-actions {
     justify-items: start;

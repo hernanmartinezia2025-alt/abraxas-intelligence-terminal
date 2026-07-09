@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { datasetExportUrl, getDataCatalog, getDataHealth, getDatasetPreview } from "../../api/client.js";
+import BackendSurface from "./BackendSurface.jsx";
 
 function formatTime(value) {
   if (!value) return "sin registro";
@@ -27,7 +28,7 @@ function statusTone(status) {
   return "neutral";
 }
 
-export default function DataApiCenter() {
+export default function DataApiCenter({ selectedSymbol = "BTCUSDT" }) {
   const [catalog, setCatalog] = useState(null);
   const [health, setHealth] = useState(null);
   const [selectedDataset, setSelectedDataset] = useState("market_candles");
@@ -99,6 +100,8 @@ export default function DataApiCenter() {
       </section>
 
       {error && <div className="error-box">{error}</div>}
+
+      <BackendSurface selectedSymbol={selectedSymbol} />
 
       <section className="data-kpi-grid">
         <article>

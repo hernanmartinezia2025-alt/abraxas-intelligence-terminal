@@ -34,6 +34,11 @@ export function getCandles(symbol = "BTCUSDT", interval = "15m", limit = 200) {
   return request(`/api/candles?${params}`);
 }
 
+export function getOrderBook(symbol = "BTCUSDT", limit = 20) {
+  const params = new URLSearchParams({ symbol, limit: String(limit) });
+  return request(`/api/order-book?${params}`);
+}
+
 export function getStatistics({
   symbol = "BTCUSDT",
   interval = "15m",

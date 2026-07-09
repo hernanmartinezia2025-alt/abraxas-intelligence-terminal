@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import { getOrderBook } from "../api/client.js";
 import MarketChart from "../features/charts/MarketChart.jsx";
 import { latestRows } from "../utils/assets.js";
 
@@ -13,22 +14,48 @@ function formatPercent(value) {
   return `${number >= 0 ? "+" : ""}${number.toFixed(2)}%`;
 }
 
-function syntheticDepthRows(price, side) {
-  const base = Number(price || 100);
-  return Array.from({ length: 8 }).map((_, index) => {
-    const step = (index + 1) * 0.0018;
-    const level = side === "ask" ? base * (1 + step) : base * (1 - step);
-    const size = 0.42 + index * 0.17;
-    return { level, size };
-  });
+function formatQuantity(value) {
+  return Number(value || 0).toLocaleString("en-US", { minimumFractionDigits: 3, maximumFractionDigits: 6 });
+}
+
+function formatClock(value) {
+  if (!value) return "--";
+  return new Date(value).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 }
 
 export default function TradePage({ rows, selectedSymbol = "BTCUSDT", onSelectSymbol }) {
   const [interval, setInterval] = useState("15m");
+  const [orderBook, setOrderBook] = useState(null);
+  const [bookLoading, setBookLoading] = useState(false);
+  const [bookError, setBookError] = useState("");
   const assets = latestRows(rows);
   const active = assets.find((asset) => asset.symbol === selectedSymbol) || assets[0];
-  const asks = syntheticDepthRows(active?.price, "ask").reverse();
-  const bids = syntheticDepthRows(active?.price, "bid");
+  const activeSymbol = active?.symbol || selectedSymbol || "BTCUSDT";
+  const asks = (orderBook?.asks || []).slice(0, 8).reverse();
+  const bids = (orderBook?.bids || []).slice(0, 8);
+  const midPrice = orderBook?.mid_price || active?.price;
+
+  async function loadOrderBook({ silent = false } = {}) {
+    if (!silent) setBookLoading(true);
+    setBookError("");
+    try {
+      const payload = await getOrderBook(activeSymbol, 20);
+      setOrderBook(payload);
+    } catch (err) {
+      setBookError(err.message);
+    } finally {
+      if (!silent) setBookLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    setOrderBook(null);
+    loadOrderBook();
+    const timer = window.setInterval(() => {
+      loadOrderBook({ silent: true });
+    }, 5000);
+    return () => window.clearInterval(timer);
+  }, [activeSymbol]);
 
   return (
     <section className="trade-page">
@@ -56,7 +83,7 @@ export default function TradePage({ rows, selectedSymbol = "BTCUSDT", onSelectSy
           <div className="exchange-panel-head">
             <div>
               <p className="eyebrow">Spot chart</p>
-              <h2>{active?.symbol || "BTCUSDT"}</h2>
+              <h2>{activeSymbol}</h2>
             </div>
             <div className="timeframe-row">
               {TIMEFRAMES.map((timeframe) => (
@@ -72,7 +99,7 @@ export default function TradePage({ rows, selectedSymbol = "BTCUSDT", onSelectSy
             </div>
           </div>
           <div className="panel-body">
-            <MarketChart interval={interval} symbol={active?.symbol || selectedSymbol} />
+            <MarketChart interval={interval} symbol={activeSymbol} />
           </div>
         </section>
 
@@ -80,23 +107,30 @@ export default function TradePage({ rows, selectedSymbol = "BTCUSDT", onSelectSy
           <section className="exchange-panel order-book">
             <div className="exchange-panel-head compact">
               <div>
-                <p className="eyebrow">Synthetic depth</p>
-                <h2>Observation book</h2>
+                <p className="eyebrow">Live order book</p>
+                <h2>Binance Depth</h2>
               </div>
-              <span>not live orders</span>
+              <span>{bookLoading ? "loading" : `REST ${formatClock(orderBook?.fetched_at)}`}</span>
             </div>
             <div className="book-table">
+              {bookError && <div className="book-state error">{bookError}</div>}
+              {!bookError && !asks.length && !bids.length && <div className="book-state">Cargando profundidad real...</div>}
               {asks.map((row) => (
-                <div className="book-row ask" key={`ask-${row.level}`}>
-                  <span>{formatPrice(row.level)}</span>
-                  <b>{row.size.toFixed(3)}</b>
+                <div className="book-row ask" key={`ask-${row.price}`}>
+                  <span>{formatPrice(row.price)}</span>
+                  <b>{formatQuantity(row.quantity)}</b>
                 </div>
               ))}
-              <div className="mid-price">${formatPrice(active?.price)}</div>
+              <div className="mid-price">
+                <span>${formatPrice(midPrice)}</span>
+                {orderBook?.spread_percent !== null && orderBook?.spread_percent !== undefined && (
+                  <small>spread {orderBook.spread_percent.toFixed(4)}%</small>
+                )}
+              </div>
               {bids.map((row) => (
-                <div className="book-row bid" key={`bid-${row.level}`}>
-                  <span>{formatPrice(row.level)}</span>
-                  <b>{row.size.toFixed(3)}</b>
+                <div className="book-row bid" key={`bid-${row.price}`}>
+                  <span>{formatPrice(row.price)}</span>
+                  <b>{formatQuantity(row.quantity)}</b>
                 </div>
               ))}
             </div>

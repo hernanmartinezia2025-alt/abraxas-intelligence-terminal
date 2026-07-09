@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.app.api.routes import candles, data_center, features, health, live_map, radar, regime, statistics
+from backend.app.api.routes import candles, data_center, features, health, live_map, order_book, radar, regime, statistics
 from backend.app.storage.sqlite import initialize_database
 
 app = FastAPI(title="ABRAXAS Intelligence Terminal API", version="1.0.0")
@@ -19,6 +19,7 @@ app.add_middleware(
 app.include_router(health.router)
 app.include_router(radar.router)
 app.include_router(candles.router)
+app.include_router(order_book.router)
 app.include_router(live_map.router)
 app.include_router(statistics.router)
 app.include_router(data_center.router)

@@ -1704,6 +1704,19 @@ h2 {
   display: grid;
   gap: 3px;
 }
+.book-state {
+  min-height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(246, 248, 251, 0.62);
+  font-size: 12px;
+}
+.book-state.error {
+  color: #ff93a1;
+  background: rgba(209, 77, 93, 0.08);
+}
 .book-row,
 .mid-price {
   min-height: 25px;
@@ -1730,12 +1743,19 @@ h2 {
 }
 .mid-price {
   margin: 5px 0;
+  flex-direction: column;
   justify-content: center;
   color: #ffffff;
   background: rgba(223, 192, 122, 0.12);
   border: 1px solid rgba(223, 192, 122, 0.22);
   font-size: 15px;
   font-weight: 800;
+}
+.mid-price small {
+  color: rgba(246, 248, 251, 0.58);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
 }
 
 .ticket-body {

@@ -34,13 +34,13 @@ Usa snapshots reales desde backend y SQLite. Requiere mejorar profundidad de mer
 
 ### Trade
 
-Estado: mixto.
+Estado: mixto, con order book real inicial.
 
-El chart usa candles reales via backend. La lectura ABRAXAS viene del radar. El depth visual era sintetico y podia confundirse con order book real. Se marco como `Synthetic depth` y `not live orders`.
+El chart usa candles reales via backend. La lectura ABRAXAS viene del radar. El order book ahora usa snapshot real de Binance Spot via `/api/order-book` y se refresca desde el frontend.
 
 Pendiente:
 
-- order book real desde API publica;
+- migrar order book a WebSocket cuando se necesite menor latencia;
 - trades recientes reales;
 - separar observacion de simulacion;
 - no mostrar nada como ejecucion hasta tener paper mode y risk engine.

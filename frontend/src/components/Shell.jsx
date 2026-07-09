@@ -7,6 +7,8 @@ const NAV_ITEMS = [
   ["map", "Map", "live world"],
   ["research", "Research", "strategy"],
   ["data", "Data", "sources"],
+  ["bots", "Bots", "forge"],
+  ["risk", "Risk", "limits"],
 ];
 
 const ROADMAP_ITEMS = [
@@ -14,8 +16,8 @@ const ROADMAP_ITEMS = [
   ["Stats", "next"],
   ["Regime", "next"],
   ["Backtest", "next"],
-  ["Bots", "later"],
-  ["Tools", "later"],
+  ["Bots", "visible"],
+  ["Risk", "visible"],
 ];
 
 export default function Shell({

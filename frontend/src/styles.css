@@ -1381,6 +1381,143 @@ h2 {
   letter-spacing: 0.06em;
 }
 
+.ops-page {
+  display: grid;
+  gap: 12px;
+}
+
+.ops-command {
+  padding: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.ops-command h2 {
+  color: #ffffff;
+  font-size: clamp(28px, 4vw, 46px);
+}
+
+.ops-command .eyebrow {
+  color: var(--brand-2);
+}
+
+.ops-command span {
+  color: rgba(246, 248, 251, 0.66);
+  line-height: 1.46;
+}
+
+.ops-command strong {
+  border: 1px solid rgba(209, 77, 93, 0.34);
+  background: rgba(209, 77, 93, 0.12);
+  color: #ffb2bd;
+  border-radius: 8px;
+  padding: 13px 15px;
+  font-family: var(--font-num);
+  font-size: 17px;
+}
+
+.ops-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr));
+  gap: 10px;
+}
+
+.ops-card {
+  min-height: 166px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    linear-gradient(120deg, rgba(223, 192, 122, 0.07), transparent 46%),
+    linear-gradient(180deg, #14171b, #0d0f12);
+  border-radius: 8px;
+  padding: 13px;
+  display: grid;
+  align-content: space-between;
+  gap: 14px;
+  box-shadow: 0 18px 46px rgba(10, 10, 10, 0.16);
+}
+
+.ops-card div {
+  display: grid;
+  gap: 7px;
+}
+
+.ops-card span {
+  width: fit-content;
+  border-radius: 999px;
+  padding: 4px 8px;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(246, 248, 251, 0.58);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.ops-card h2 {
+  color: #ffffff;
+  font-size: 20px;
+}
+
+.ops-card p {
+  color: rgba(246, 248, 251, 0.68);
+  line-height: 1.42;
+  margin: 0;
+}
+
+.ops-card.next,
+.ops-card.required,
+.ops-card.mandatory {
+  border-top: 3px solid var(--brand-2);
+}
+
+.ops-card.planned,
+.ops-card.visible {
+  border-top: 3px solid var(--green);
+}
+
+.ops-card.locked,
+.ops-card.blocked {
+  border-top: 3px solid var(--red);
+}
+
+.ops-panel {
+  min-height: 0;
+}
+
+.ops-checklist {
+  padding: 12px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr));
+  gap: 8px;
+}
+
+.ops-checklist span {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.045);
+  color: rgba(246, 248, 251, 0.72);
+  border-radius: 8px;
+  padding: 10px;
+  font-size: 12px;
+}
+
+.ops-warning {
+  padding: 14px;
+  display: grid;
+  gap: 8px;
+}
+
+.ops-warning strong {
+  color: #ffb2bd;
+  font-size: 18px;
+}
+
+.ops-warning p {
+  color: rgba(246, 248, 251, 0.7);
+  line-height: 1.46;
+  margin: 0;
+}
+
 .trade-page {
   display: grid;
   gap: 12px;
@@ -2037,6 +2174,10 @@ h2 {
     align-items: stretch;
   }
   .data-command {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .ops-command {
     flex-direction: column;
     align-items: stretch;
   }

@@ -1,10 +1,12 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { getRadar, updateRadar } from "./api/client.js";
 import Shell from "./components/Shell.jsx";
+import BotsPage from "./pages/BotsPage.jsx";
 import DataPage from "./pages/DataPage.jsx";
 import LiveMapPage from "./pages/LiveMapPage.jsx";
 import MarketsPage from "./pages/MarketsPage.jsx";
 import ResearchPage from "./pages/ResearchPage.jsx";
+import RiskPage from "./pages/RiskPage.jsx";
 import TradePage from "./pages/TradePage.jsx";
 import { latestRows } from "./utils/assets.js";
 
@@ -14,6 +16,8 @@ const PAGE_META = {
   map: ["World vectors", "Live Map"],
   research: ["Research desk", "Research"],
   data: ["Data layer", "Data"],
+  bots: ["Bot Forge", "Bots"],
+  risk: ["Risk engine", "Risk"],
 };
 
 const VALID_PAGES = Object.keys(PAGE_META);
@@ -111,6 +115,8 @@ export default function App() {
       {activePage === "map" && <LiveMapPage />}
       {activePage === "research" && <ResearchPage selectedSymbol={selectedSymbol} />}
       {activePage === "data" && <DataPage />}
+      {activePage === "bots" && <BotsPage />}
+      {activePage === "risk" && <RiskPage />}
     </Shell>
   );
 }

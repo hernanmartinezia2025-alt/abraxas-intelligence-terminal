@@ -16,11 +16,11 @@ export default function MarketsPage({ rows, sentiment, selectedSymbol = "BTCUSDT
       />
       {activeTab === "overview" ? (
         <>
+          <MarketUniversePanel />
           <MarketIntelligenceBrief selectedSymbol={selectedSymbol} />
           <RadarPanel rows={rows} sentiment={sentiment} />
-          <MarketUniversePanel />
         </>
-      ) : activeTab === "assets" ? <MarketReadingsPanel rows={rows} sentiment={sentiment} /> : <MarketUniversePanel />}
+      ) : <MarketReadingsPanel rows={rows} sentiment={sentiment} />}
     </>
   );
 }

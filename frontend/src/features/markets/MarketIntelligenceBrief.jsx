@@ -6,6 +6,16 @@ function value(value, digits = 2, suffix = "") {
   return `${Number(value).toLocaleString(undefined, { maximumFractionDigits: digits, minimumFractionDigits: digits })}${suffix}`;
 }
 
+function operationalPosture(regime, summary) {
+  const risk = Number(regime.risk_score);
+  const bias = String(regime.market_bias || "").toLowerCase();
+  if (risk >= 65) return { label: "NO OPERAR", tone: "danger", detail: "Riesgo estadístico elevado: esperar reducción de volatilidad y nueva lectura." };
+  if (regime.regime_label === "compression") return { label: "RANGO / ESPERAR", tone: "neutral", detail: "El mercado está comprimido: no perseguir ruptura sin confirmación y volumen." };
+  if (bias.includes("bull") || bias.includes("up")) return { label: "SESGO ALCISTA", tone: "positive", detail: "Buscar confirmación de continuidad; el brief no envía órdenes." };
+  if (bias.includes("bear") || bias.includes("down")) return { label: "SESGO BAJISTA", tone: "negative", detail: "Priorizar protección y confirmación; el brief no envía órdenes." };
+  return { label: Number(summary.latest_return_pct || 0) >= 0 ? "OBSERVAR / FUERZA" : "OBSERVAR / DEBILIDAD", tone: "neutral", detail: "Lectura informativa: esperar confluencia antes de cambiar el plan." };
+}
+
 export default function MarketIntelligenceBrief({ selectedSymbol = "BTCUSDT" }) {
   const [payload, setPayload] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -37,6 +47,7 @@ export default function MarketIntelligenceBrief({ selectedSymbol = "BTCUSDT" }) 
   const summary = payload?.summary || {};
   const regime = payload?.regime || {};
   const monteCarlo = payload?.monteCarlo || {};
+  const posture = operationalPosture(regime, summary);
 
   return (
     <section className="market-intelligence-brief exchange-panel">
@@ -60,6 +71,11 @@ export default function MarketIntelligenceBrief({ selectedSymbol = "BTCUSDT" }) 
         <span>Lectura</span>
         <p>{regime.reading || summary.reading || "Esperando datos suficientes para construir la lectura."}</p>
         {monteCarlo.reading && <small>{monteCarlo.reading}</small>}
+      </div>
+      <div className={`market-execution-readout ${posture.tone}`}>
+        <div><span>Postura operativa</span><strong>{posture.label}</strong></div>
+        <p>{posture.detail}</p>
+        <small>Guardrail: esta lectura informa al operador y al futuro bot; no ejecuta órdenes.</small>
       </div>
     </section>
   );

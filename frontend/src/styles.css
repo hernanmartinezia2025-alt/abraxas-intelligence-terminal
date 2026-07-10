@@ -122,7 +122,7 @@ html[data-rail-density="compact"] .rail-crest {
   padding: 0 4px 18px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
-.rail-collapse-button { margin-left: auto; width: 28px; height: 28px; border: 1px solid rgba(223,192,122,.22); border-radius: 6px; background: rgba(255,255,255,.04); color: var(--brand-2); font-size: 18px; }
+.rail-collapse-button { position: absolute; top: 14px; right: 12px; width: 28px; height: 28px; border: 1px solid rgba(223,192,122,.22); border-radius: 6px; background: rgba(255,255,255,.04); color: var(--brand-2); font-size: 18px; }
 .rail-collapse-button:hover { border-color: rgba(223,192,122,.62); background: rgba(223,192,122,.13); }
 
 .brand-mark {
@@ -403,8 +403,8 @@ html[data-rail-density="compact"] .rail-crest {
 }
 .market-intelligence-metrics article {
   min-height: 82px;
-  border: 1px solid var(--line);
-  background: linear-gradient(180deg, #ffffff, var(--surface));
+  border: 1px solid rgba(223, 192, 122, 0.18);
+  background: linear-gradient(180deg, #17212b, #10171f);
   border-radius: 7px;
   padding: 10px;
   display: grid;
@@ -412,8 +412,8 @@ html[data-rail-density="compact"] .rail-crest {
   gap: 5px;
 }
 .market-intelligence-metrics span,
-.market-intelligence-metrics small { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .06em; }
-.market-intelligence-metrics strong { color: var(--ink); font: 700 17px var(--font-num); overflow-wrap: anywhere; }
+.market-intelligence-metrics small { color: rgba(246,248,251,.56); font-size: 10px; text-transform: uppercase; letter-spacing: .06em; }
+.market-intelligence-metrics strong { color: #ffffff; font: 700 17px var(--font-num); overflow-wrap: anywhere; }
 .market-intelligence-metrics small { text-transform: none; letter-spacing: 0; }
 .market-intelligence-reading {
   display: grid;
@@ -427,6 +427,14 @@ html[data-rail-density="compact"] .rail-crest {
 .market-intelligence-reading span { color: var(--brand); font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
 .market-intelligence-reading p { color: var(--ink-soft); font-size: 12px; line-height: 1.42; }
 .market-intelligence-reading small { grid-column: 2; color: var(--muted); font-size: 11px; line-height: 1.35; }
+.market-execution-readout { display: grid; grid-template-columns: minmax(160px, .45fr) minmax(0, 1fr); gap: 6px 14px; margin: 0 10px 10px; padding: 12px; border: 1px solid rgba(223,192,122,.22); border-radius: 7px; background: linear-gradient(110deg, rgba(223,192,122,.10), rgba(11,16,22,.96)); }
+.market-execution-readout > div { display: grid; gap: 4px; }
+.market-execution-readout span { color: var(--brand-2); font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.market-execution-readout strong { color: #ffffff; font: 700 18px var(--font-num); }
+.market-execution-readout p { align-self: center; color: rgba(246,248,251,.78); font-size: 12px; line-height: 1.4; }
+.market-execution-readout small { grid-column: 2; color: rgba(246,248,251,.46); font-size: 10px; }
+.market-execution-readout.danger { border-color: rgba(209,77,93,.5); }
+.market-execution-readout.positive { border-color: rgba(7,150,105,.5); }
 
 .topbar {
   display: flex;
@@ -636,7 +644,8 @@ h2 {
 
 .sentiment-analysis {
   display: grid;
-  grid-template-columns: minmax(220px, 1.05fr) minmax(180px, 0.7fr) minmax(220px, 0.9fr) minmax(240px, 1fr);
+  grid-template-columns: minmax(240px, 1fr) minmax(260px, 1fr);
+  grid-template-areas: "summary horizon" "breadth checklist";
   gap: 14px;
   padding: 16px 18px;
   border: 1px solid rgba(223, 192, 122, 0.28);
@@ -645,19 +654,20 @@ h2 {
   color: #f4f7fb;
 }
 .sentiment-analysis .eyebrow { color: var(--brand-2); }
+.sentiment-summary { grid-area: summary; }
 .sentiment-summary { display: grid; align-content: start; gap: 7px; }
 .sentiment-summary h3 { font-size: 22px; }
 .sentiment-summary p { color: rgba(244, 247, 251, 0.78); line-height: 1.45; }
 .sentiment-summary small,
 .sentiment-checklist small { color: rgba(244, 247, 251, 0.5); font-size: 11px; }
-.sentiment-breadth { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.sentiment-breadth { grid-area: breadth; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .sentiment-breadth div { border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.045); border-radius: 7px; padding: 12px 9px; }
 .sentiment-breadth dt { color: rgba(244,247,251,.54); font-size: 10px; text-transform: uppercase; letter-spacing: .06em; }
 .sentiment-breadth dd { margin: 7px 0 0; font: 700 20px var(--font-num); }
-.sentiment-checklist { display: grid; align-content: start; gap: 7px; }
+.sentiment-checklist { grid-area: checklist; display: grid; align-content: start; gap: 7px; }
 .sentiment-checklist > span { color: var(--brand-2); font-size: 10px; text-transform: uppercase; letter-spacing: .08em; }
 .sentiment-checklist p { color: rgba(244,247,251,.76); line-height: 1.36; font-size: 12px; }
-.sentiment-horizon-block { display: grid; align-content: start; gap: 9px; }
+.sentiment-horizon-block { grid-area: horizon; display: grid; align-content: start; gap: 9px; }
 .sentiment-horizon-block > span { color: var(--brand-2); font-size: 10px; text-transform: uppercase; letter-spacing: .08em; }
 .sentiment-gauge { position: relative; padding-top: 8px; }
 .sentiment-gauge::before { content: ""; display: block; height: 7px; border-radius: 999px; background: linear-gradient(90deg, #4d83bd 0%, #5d8fb0 25%, #8f8c73 50%, #b97b56 75%, #bd5363 100%); }
@@ -3437,6 +3447,7 @@ h2 {
   .backtest-analysis-grid {
     grid-template-columns: 1fr;
   }
+  .sentiment-analysis { grid-template-columns: 1fr; grid-template-areas: "summary" "horizon" "breadth" "checklist"; }
   .market-overview-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .surface-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -3483,6 +3494,8 @@ h2 {
   .market-intelligence-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .market-intelligence-reading { grid-template-columns: 1fr; }
   .market-intelligence-reading small { grid-column: auto; }
+  .market-execution-readout { grid-template-columns: 1fr; }
+  .market-execution-readout small { grid-column: auto; }
   .market-lens-toolbar { align-items: stretch; flex-direction: column; }
   .trade-side-stack {
     grid-template-columns: 1fr;

@@ -110,7 +110,7 @@ export default function App() {
       onAssetChange={setSelectedSymbol}
     >
       {error && <div className="error-box">{error}</div>}
-      {activePage === "markets" && <MarketsPage rows={rows} sentiment={radar.sentiment} />}
+      {activePage === "markets" && <MarketsPage rows={rows} sentiment={radar.sentiment} selectedSymbol={selectedSymbol} />}
       {activePage === "trade" && <TradePage rows={rows} selectedSymbol={selectedSymbol} onSelectSymbol={setSelectedSymbol} />}
       {activePage === "map" && <LiveMapPage />}
       {activePage === "research" && <ResearchPage selectedSymbol={selectedSymbol} />}

@@ -377,6 +377,40 @@ html[data-rail-density="compact"] .rail-crest {
 .page-subtabs button span { font-size: 12px; font-weight: 800; }
 .page-subtabs button small { color: inherit; font-size: 10px; opacity: 0.66; }
 
+.market-intelligence-brief { margin-bottom: 12px; }
+.market-intelligence-metrics {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 8px;
+  padding: 10px;
+}
+.market-intelligence-metrics article {
+  min-height: 82px;
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, #ffffff, var(--surface));
+  border-radius: 7px;
+  padding: 10px;
+  display: grid;
+  align-content: start;
+  gap: 5px;
+}
+.market-intelligence-metrics span,
+.market-intelligence-metrics small { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .06em; }
+.market-intelligence-metrics strong { color: var(--ink); font: 700 17px var(--font-num); overflow-wrap: anywhere; }
+.market-intelligence-metrics small { text-transform: none; letter-spacing: 0; }
+.market-intelligence-reading {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px 12px;
+  margin: 0 10px 10px;
+  padding: 10px 12px;
+  border-left: 2px solid var(--brand);
+  background: var(--surface-subtle);
+}
+.market-intelligence-reading span { color: var(--brand); font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.market-intelligence-reading p { color: var(--ink-soft); font-size: 12px; line-height: 1.42; }
+.market-intelligence-reading small { grid-column: 2; color: var(--muted); font-size: 11px; line-height: 1.35; }
+
 .topbar {
   display: flex;
   align-items: center;
@@ -3368,6 +3402,7 @@ h2 {
   .surface-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+  .market-intelligence-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .bot-forge-grid,
   .bot-detail-grid {
     grid-template-columns: 1fr;
@@ -3406,6 +3441,9 @@ h2 {
   .radar-command { padding: 14px; }
   .sentiment-breadth { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .market-overview-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .market-intelligence-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .market-intelligence-reading { grid-template-columns: 1fr; }
+  .market-intelligence-reading small { grid-column: auto; }
   .market-lens-toolbar { align-items: stretch; flex-direction: column; }
   .trade-side-stack {
     grid-template-columns: 1fr;

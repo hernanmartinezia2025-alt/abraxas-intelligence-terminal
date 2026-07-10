@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { getOrderBook } from "../api/client.js";
 import MarketChart from "../features/charts/MarketChart.jsx";
+import PageSubtabs from "../components/PageSubtabs.jsx";
 import { latestRows } from "../utils/assets.js";
 
 const TIMEFRAMES = ["1m", "5m", "15m", "1h", "4h"];
@@ -24,6 +25,7 @@ function formatClock(value) {
 }
 
 export default function TradePage({ rows, selectedSymbol = "BTCUSDT", onSelectSymbol }) {
+  const [activeTab, setActiveTab] = useState("chart");
   const [interval, setInterval] = useState("15m");
   const [orderBook, setOrderBook] = useState(null);
   const [bookLoading, setBookLoading] = useState(false);
@@ -50,13 +52,14 @@ export default function TradePage({ rows, selectedSymbol = "BTCUSDT", onSelectSy
   }
 
   useEffect(() => {
+    if (activeTab !== "depth") return undefined;
     setOrderBook(null);
     loadOrderBook();
     const timer = window.setInterval(() => {
       loadOrderBook({ silent: true });
     }, 5000);
     return () => window.clearInterval(timer);
-  }, [activeSymbol]);
+  }, [activeSymbol, activeTab]);
 
   return (
     <section className="trade-page">
@@ -79,7 +82,18 @@ export default function TradePage({ rows, selectedSymbol = "BTCUSDT", onSelectSy
         })}
       </div>
 
-      <div className={`trade-grid ${chartExpanded ? "chart-expanded" : ""}`}>
+      <PageSubtabs
+        tabs={[
+          ["chart", "Chart", "candles + volume"],
+          ["depth", "Market Depth", "Binance order book"],
+          ["intelligence", "Intelligence", "riesgo + lectura"],
+        ]}
+        activeTab={activeTab}
+        onChange={setActiveTab}
+      />
+
+      <div className={`trade-grid trade-tab-layout ${chartExpanded ? "chart-expanded" : ""}`}>
+        {activeTab === "chart" && (
         <section className="exchange-panel trade-chart">
           <div className="exchange-panel-head">
             <div>
@@ -114,8 +128,9 @@ export default function TradePage({ rows, selectedSymbol = "BTCUSDT", onSelectSy
             <MarketChart interval={interval} symbol={activeSymbol} expanded={chartExpanded} />
           </div>
         </section>
+        )}
 
-        <aside className="trade-side-stack">
+        {activeTab === "depth" && (
           <section className="exchange-panel order-book">
             <div className="exchange-panel-head compact">
               <div>
@@ -147,7 +162,9 @@ export default function TradePage({ rows, selectedSymbol = "BTCUSDT", onSelectSy
               ))}
             </div>
           </section>
+        )}
 
+        {activeTab === "intelligence" && (
           <section className="exchange-panel ticket-panel">
             <div className="exchange-panel-head compact">
               <div>
@@ -173,7 +190,7 @@ export default function TradePage({ rows, selectedSymbol = "BTCUSDT", onSelectSy
               <small>Lectura desde snapshot local; paper/live siguen bloqueados por diseño.</small>
             </div>
           </section>
-        </aside>
+        )}
       </div>
     </section>
   );

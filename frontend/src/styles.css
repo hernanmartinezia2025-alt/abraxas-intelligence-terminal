@@ -2677,6 +2677,11 @@ h2 {
   gap: 12px;
   align-items: start;
 }
+.trade-grid.trade-tab-layout { grid-template-columns: minmax(0, 1fr); grid-template-areas: none; }
+.trade-tab-layout .trade-chart,
+.trade-tab-layout .order-book,
+.trade-tab-layout .ticket-panel { grid-area: auto; width: 100%; }
+.trade-tab-layout .book-table { max-width: 760px; margin: 0 auto; }
 
 .trade-chart {
   min-height: 0;

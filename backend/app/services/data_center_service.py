@@ -10,6 +10,14 @@ from backend.app.storage.sqlite import connect, initialize_database
 
 SOURCE_CATALOG = [
     {
+        "source_id": "fred",
+        "name": "FRED",
+        "type": "macro_market",
+        "status": "active",
+        "datasets": ["macro_observations"],
+        "purpose": "Indices, petroleo, dolar amplio y tasas diarias sin claves privadas.",
+    },
+    {
         "source_id": "binance",
         "name": "Binance",
         "type": "market",
@@ -67,6 +75,15 @@ SOURCE_CATALOG = [
 ]
 
 DATASET_CATALOG = [
+    {
+        "dataset_id": "macro_observations",
+        "table": "macro_observations",
+        "label": "Macro Observations",
+        "category": "macro_market",
+        "powerbi_ready": True,
+        "bot_ready": False,
+        "description": "Series diarias macro normalizadas desde FRED para indices, commodities, FX y tasas.",
+    },
     {
         "dataset_id": "market_snapshots",
         "table": "market_snapshots",

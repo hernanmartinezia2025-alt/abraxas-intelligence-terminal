@@ -27,6 +27,23 @@ CREATE TABLE IF NOT EXISTS market_snapshots (
 CREATE INDEX IF NOT EXISTS idx_market_snapshots_symbol_time
 ON market_snapshots(symbol, timestamp);
 
+CREATE TABLE IF NOT EXISTS macro_observations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    series_id TEXT NOT NULL,
+    symbol TEXT NOT NULL,
+    name TEXT NOT NULL,
+    category TEXT NOT NULL,
+    observation_date TEXT NOT NULL,
+    value REAL NOT NULL,
+    unit TEXT NOT NULL,
+    source TEXT NOT NULL,
+    fetched_at TEXT NOT NULL,
+    UNIQUE(series_id, observation_date)
+);
+
+CREATE INDEX IF NOT EXISTS idx_macro_observations_category_date
+ON macro_observations(category, observation_date);
+
 CREATE TABLE IF NOT EXISTS market_candles (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     symbol TEXT NOT NULL,

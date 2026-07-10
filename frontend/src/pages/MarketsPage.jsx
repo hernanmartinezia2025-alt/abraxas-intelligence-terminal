@@ -7,6 +7,7 @@ import MarketReadingsPanel from "../features/radar/MarketReadingsPanel.jsx";
 
 export default function MarketsPage({ rows, sentiment, selectedSymbol = "BTCUSDT" }) {
   const [activeTab, setActiveTab] = useState("overview");
+  const [universe, setUniverse] = useState("crypto");
   return (
     <>
       <PageSubtabs
@@ -16,9 +17,8 @@ export default function MarketsPage({ rows, sentiment, selectedSymbol = "BTCUSDT
       />
       {activeTab === "overview" ? (
         <>
-          <MarketUniversePanel />
-          <MarketIntelligenceBrief selectedSymbol={selectedSymbol} />
-          <RadarPanel rows={rows} sentiment={sentiment} />
+          <MarketUniversePanel selected={universe} onChange={setUniverse} />
+          {universe === "crypto" && <><MarketIntelligenceBrief selectedSymbol={selectedSymbol} /><RadarPanel rows={rows} sentiment={sentiment} /></>}
         </>
       ) : <MarketReadingsPanel rows={rows} sentiment={sentiment} />}
     </>

@@ -25,6 +25,11 @@ export function getRadar() {
   return request("/api/radar");
 }
 
+export function getMarketUniverse(category, refresh = false) {
+  const params = new URLSearchParams({ category, refresh: String(refresh) });
+  return request(`/api/markets/universe?${params}`);
+}
+
 export function updateRadar() {
   return request("/api/radar/update", { method: "POST" });
 }

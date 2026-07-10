@@ -4,7 +4,6 @@ import ContextPlaceholder from "../features/context/ContextPlaceholder.jsx";
 import RegimeEngine from "../features/regime/RegimeEngine.jsx";
 import ResearchArchive from "../features/research/ResearchArchive.jsx";
 import StatisticalIntelligence from "../features/statistics/StatisticalIntelligence.jsx";
-import StrategyPlaceholder from "../features/strategy/StrategyPlaceholder.jsx";
 
 export default function ResearchPage({ selectedSymbol }) {
   const [activeTab, setActiveTab] = useState("intelligence");
@@ -14,7 +13,7 @@ export default function ResearchPage({ selectedSymbol }) {
         tabs={[
           ["intelligence", "Intelligence", "statistics + regime"],
           ["archive", "Archive", "runs persistidos"],
-          ["labs", "Labs", "strategy + context"],
+          ["context", "Context", "macro context lab"],
         ]}
         activeTab={activeTab}
         onChange={setActiveTab}
@@ -26,7 +25,7 @@ export default function ResearchPage({ selectedSymbol }) {
         </>
       )}
       {activeTab === "archive" && <ResearchArchive selectedSymbol={selectedSymbol} />}
-      {activeTab === "labs" && <><StrategyPlaceholder /><ContextPlaceholder /></>}
+      {activeTab === "context" && <ContextPlaceholder />}
     </section>
   );
 }

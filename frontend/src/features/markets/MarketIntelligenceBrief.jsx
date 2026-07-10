@@ -47,6 +47,7 @@ export default function MarketIntelligenceBrief({ selectedSymbol = "BTCUSDT" }) 
   const summary = payload?.summary || {};
   const regime = payload?.regime || {};
   const monteCarlo = payload?.monteCarlo || {};
+  const percentiles = monteCarlo.percentiles || {};
   const posture = operationalPosture(regime, summary);
 
   return (
@@ -68,9 +69,17 @@ export default function MarketIntelligenceBrief({ selectedSymbol = "BTCUSDT" }) 
         <article><span>Prob. arriba</span><strong>{value(monteCarlo.probability_up_pct, 1, "%")}</strong><small>Monte Carlo · 48 pasos</small></article>
       </div>
       <div className="market-intelligence-reading">
-        <span>Lectura</span>
-        <p>{regime.reading || summary.reading || "Esperando datos suficientes para construir la lectura."}</p>
-        {monteCarlo.reading && <small>{monteCarlo.reading}</small>}
+        <div className="intelligence-reading-copy">
+          <span>Interpretación cuantitativa</span>
+          <p>{regime.reading || summary.reading || "Esperando datos suficientes para construir la lectura."}</p>
+          <small>{monteCarlo.disclaimer || "Escenarios probabilísticos; no son una predicción ni una orden."}</small>
+        </div>
+        <div className="scenario-summary-grid">
+          <article><span>Cola baja P05</span><strong>${value(percentiles.p05, 2)}</strong></article>
+          <article><span>Mediana P50</span><strong>${value(percentiles.p50, 2)}</strong></article>
+          <article><span>Cola alta P95</span><strong>${value(percentiles.p95, 2)}</strong></article>
+          <article><span>Probabilidad</span><strong>{value(monteCarlo.probability_up_pct, 1, "%")} ↑ / {value(monteCarlo.probability_down_pct, 1, "%")} ↓</strong></article>
+        </div>
       </div>
       <div className={`market-execution-readout ${posture.tone}`}>
         <div><span>Postura operativa</span><strong>{posture.label}</strong></div>

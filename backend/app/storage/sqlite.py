@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import json
+import logging
 import sqlite3
 from contextlib import contextmanager
 from typing import Iterator
 
 from backend.app.core.config import DB_PATH
+
+LOGGER = logging.getLogger(__name__)
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS market_snapshots (
@@ -200,7 +204,7 @@ CREATE TABLE IF NOT EXISTS backtest_runs (
     max_drawdown_pct REAL NOT NULL,
     total_trades INTEGER NOT NULL,
     win_rate_pct REAL NOT NULL,
-    profit_factor REAL NOT NULL,
+    profit_factor REAL,
     metrics_json TEXT NOT NULL,
     trades_json TEXT NOT NULL,
     equity_curve_json TEXT NOT NULL,
@@ -214,12 +218,154 @@ ON backtest_runs(bot_id, created_at);
 
 CREATE INDEX IF NOT EXISTS idx_backtest_runs_symbol_time
 ON backtest_runs(symbol, timeframe, created_at);
+
+CREATE TABLE IF NOT EXISTS backtest_trades (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    backtest_id INTEGER NOT NULL,
+    bot_id INTEGER NOT NULL,
+    bot_version_id INTEGER NOT NULL,
+    trade_index INTEGER NOT NULL,
+    side TEXT NOT NULL DEFAULT 'long',
+    entry_signal_timestamp INTEGER,
+    exit_signal_timestamp INTEGER,
+    entry_timestamp INTEGER NOT NULL,
+    exit_timestamp INTEGER NOT NULL,
+    entry_price REAL NOT NULL,
+    exit_price REAL NOT NULL,
+    quantity REAL NOT NULL,
+    allocated_equity REAL,
+    gross_pnl REAL,
+    entry_fee REAL,
+    exit_fee REAL,
+    fees_paid REAL,
+    slippage_cost REAL,
+    pnl REAL NOT NULL,
+    return_pct REAL NOT NULL,
+    bars_held INTEGER,
+    exit_reason TEXT,
+    forced_exit INTEGER NOT NULL DEFAULT 0 CHECK(forced_exit IN (0, 1)),
+    created_at TEXT NOT NULL,
+    FOREIGN KEY(backtest_id) REFERENCES backtest_runs(id) ON DELETE CASCADE,
+    FOREIGN KEY(bot_id) REFERENCES bots(id) ON DELETE CASCADE,
+    FOREIGN KEY(bot_version_id) REFERENCES bot_versions(id) ON DELETE CASCADE,
+    UNIQUE(backtest_id, trade_index)
+);
+
+CREATE INDEX IF NOT EXISTS idx_backtest_trades_run_exit
+ON backtest_trades(backtest_id, exit_timestamp);
+
+CREATE INDEX IF NOT EXISTS idx_backtest_trades_bot_version
+ON backtest_trades(bot_id, bot_version_id, exit_timestamp);
+
+CREATE TABLE IF NOT EXISTS backtest_equity (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    backtest_id INTEGER NOT NULL,
+    bot_id INTEGER NOT NULL,
+    bot_version_id INTEGER NOT NULL,
+    point_index INTEGER NOT NULL,
+    timestamp INTEGER NOT NULL,
+    equity REAL NOT NULL,
+    benchmark_equity REAL,
+    close REAL NOT NULL,
+    drawdown_pct REAL,
+    in_position INTEGER NOT NULL CHECK(in_position IN (0, 1)),
+    created_at TEXT NOT NULL,
+    FOREIGN KEY(backtest_id) REFERENCES backtest_runs(id) ON DELETE CASCADE,
+    FOREIGN KEY(bot_id) REFERENCES bots(id) ON DELETE CASCADE,
+    FOREIGN KEY(bot_version_id) REFERENCES bot_versions(id) ON DELETE CASCADE,
+    UNIQUE(backtest_id, point_index)
+);
+
+CREATE INDEX IF NOT EXISTS idx_backtest_equity_run_time
+ON backtest_equity(backtest_id, timestamp, point_index);
+
+CREATE INDEX IF NOT EXISTS idx_backtest_equity_bot_version
+ON backtest_equity(bot_id, bot_version_id, timestamp);
 """
+
+BACKTEST_INTEGRITY_TRIGGERS = """
+CREATE TRIGGER IF NOT EXISTS trg_backtest_runs_version_bot_insert
+BEFORE INSERT ON backtest_runs
+FOR EACH ROW
+WHEN NOT EXISTS (
+    SELECT 1 FROM bot_versions
+    WHERE id = NEW.bot_version_id AND bot_id = NEW.bot_id
+)
+BEGIN
+    SELECT RAISE(ABORT, 'backtest version does not belong to bot');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_backtest_runs_version_bot_update
+BEFORE UPDATE OF bot_id, bot_version_id ON backtest_runs
+FOR EACH ROW
+WHEN NOT EXISTS (
+    SELECT 1 FROM bot_versions
+    WHERE id = NEW.bot_version_id AND bot_id = NEW.bot_id
+)
+BEGIN
+    SELECT RAISE(ABORT, 'backtest version does not belong to bot');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_backtest_trades_parent_insert
+BEFORE INSERT ON backtest_trades
+FOR EACH ROW
+WHEN NOT EXISTS (
+    SELECT 1 FROM backtest_runs
+    WHERE id = NEW.backtest_id
+      AND bot_id = NEW.bot_id
+      AND bot_version_id = NEW.bot_version_id
+)
+BEGIN
+    SELECT RAISE(ABORT, 'backtest trade does not match parent run');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_backtest_trades_parent_update
+BEFORE UPDATE OF backtest_id, bot_id, bot_version_id ON backtest_trades
+FOR EACH ROW
+WHEN NOT EXISTS (
+    SELECT 1 FROM backtest_runs
+    WHERE id = NEW.backtest_id
+      AND bot_id = NEW.bot_id
+      AND bot_version_id = NEW.bot_version_id
+)
+BEGIN
+    SELECT RAISE(ABORT, 'backtest trade does not match parent run');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_backtest_equity_parent_insert
+BEFORE INSERT ON backtest_equity
+FOR EACH ROW
+WHEN NOT EXISTS (
+    SELECT 1 FROM backtest_runs
+    WHERE id = NEW.backtest_id
+      AND bot_id = NEW.bot_id
+      AND bot_version_id = NEW.bot_version_id
+)
+BEGIN
+    SELECT RAISE(ABORT, 'backtest equity does not match parent run');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_backtest_equity_parent_update
+BEFORE UPDATE OF backtest_id, bot_id, bot_version_id ON backtest_equity
+FOR EACH ROW
+WHEN NOT EXISTS (
+    SELECT 1 FROM backtest_runs
+    WHERE id = NEW.backtest_id
+      AND bot_id = NEW.bot_id
+      AND bot_version_id = NEW.bot_version_id
+)
+BEGIN
+    SELECT RAISE(ABORT, 'backtest equity does not match parent run');
+END;
+"""
+
+BACKTEST_SCHEMA_VERSION = 2
 
 @contextmanager
 def connect() -> Iterator[sqlite3.Connection]:
     connection = sqlite3.connect(DB_PATH)
     connection.row_factory = sqlite3.Row
+    connection.execute("PRAGMA foreign_keys = ON")
     try:
         yield connection
         connection.commit()
@@ -227,6 +373,197 @@ def connect() -> Iterator[sqlite3.Connection]:
         connection.close()
 
 
+def _parse_legacy_list(value: object, run_id: int, field: str) -> list[dict]:
+    try:
+        parsed = json.loads(str(value)) if value else []
+    except (json.JSONDecodeError, TypeError, ValueError):
+        LOGGER.warning("Skipping corrupt %s for legacy backtest run %s", field, run_id)
+        return []
+    if not isinstance(parsed, list):
+        LOGGER.warning("Skipping non-list %s for legacy backtest run %s", field, run_id)
+        return []
+    return [item for item in parsed if isinstance(item, dict)]
+
+
+def _migrate_nullable_profit_factor(connection: sqlite3.Connection) -> None:
+    columns = {
+        row["name"]: row
+        for row in connection.execute("PRAGMA table_info(backtest_runs)").fetchall()
+    }
+    profit_factor_column = columns.get("profit_factor")
+    if not profit_factor_column or not int(profit_factor_column["notnull"]):
+        return
+
+    connection.commit()
+    connection.execute("PRAGMA foreign_keys = OFF")
+    connection.execute("PRAGMA legacy_alter_table = ON")
+    try:
+        connection.execute("BEGIN IMMEDIATE")
+        connection.execute("ALTER TABLE backtest_runs RENAME TO backtest_runs_v1")
+        connection.execute(
+            """
+            CREATE TABLE backtest_runs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                bot_id INTEGER NOT NULL,
+                bot_version_id INTEGER NOT NULL,
+                symbol TEXT NOT NULL,
+                timeframe TEXT NOT NULL,
+                input_start INTEGER,
+                input_end INTEGER,
+                initial_equity REAL NOT NULL,
+                final_equity REAL NOT NULL,
+                roi_pct REAL NOT NULL,
+                max_drawdown_pct REAL NOT NULL,
+                total_trades INTEGER NOT NULL,
+                win_rate_pct REAL NOT NULL,
+                profit_factor REAL,
+                metrics_json TEXT NOT NULL,
+                trades_json TEXT NOT NULL,
+                equity_curve_json TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY(bot_id) REFERENCES bots(id) ON DELETE CASCADE,
+                FOREIGN KEY(bot_version_id) REFERENCES bot_versions(id) ON DELETE CASCADE
+            )
+            """
+        )
+        connection.execute(
+            """
+            INSERT INTO backtest_runs (
+                id, bot_id, bot_version_id, symbol, timeframe, input_start, input_end,
+                initial_equity, final_equity, roi_pct, max_drawdown_pct, total_trades,
+                win_rate_pct, profit_factor, metrics_json, trades_json,
+                equity_curve_json, created_at
+            )
+            SELECT
+                id, bot_id, bot_version_id, symbol, timeframe, input_start, input_end,
+                initial_equity, final_equity, roi_pct, max_drawdown_pct, total_trades,
+                win_rate_pct, profit_factor, metrics_json, trades_json,
+                equity_curve_json, created_at
+            FROM backtest_runs_v1
+            """
+        )
+        connection.execute("DROP TABLE backtest_runs_v1")
+        connection.execute(
+            "CREATE INDEX idx_backtest_runs_bot_time ON backtest_runs(bot_id, created_at)"
+        )
+        connection.execute(
+            "CREATE INDEX idx_backtest_runs_symbol_time ON backtest_runs(symbol, timeframe, created_at)"
+        )
+        connection.commit()
+    except Exception:
+        if connection.in_transaction:
+            connection.rollback()
+        raise
+    finally:
+        connection.execute("PRAGMA legacy_alter_table = OFF")
+        connection.execute("PRAGMA foreign_keys = ON")
+
+
+def _backfill_backtest_payloads(connection: sqlite3.Connection) -> None:
+    runs = connection.execute(
+        """
+        SELECT id, bot_id, bot_version_id, trades_json, equity_curve_json, created_at
+        FROM backtest_runs
+        ORDER BY id
+        """
+    ).fetchall()
+    for run in runs:
+        trades = _parse_legacy_list(run["trades_json"], int(run["id"]), "trades_json")
+        equity_curve = _parse_legacy_list(run["equity_curve_json"], int(run["id"]), "equity_curve_json")
+        trade_rows = []
+        for trade_index, trade in enumerate(trades, start=1):
+            try:
+                forced_exit = bool(trade.get("forced_exit"))
+                trade_rows.append(
+                    {
+                        "backtest_id": int(run["id"]),
+                        "bot_id": int(run["bot_id"]),
+                        "bot_version_id": int(run["bot_version_id"]),
+                        "trade_index": trade_index,
+                        "side": str(trade.get("side") or "long"),
+                        "entry_timestamp": int(trade["entry_timestamp"]),
+                        "exit_timestamp": int(trade["exit_timestamp"]),
+                        "entry_price": float(trade["entry_price"]),
+                        "exit_price": float(trade["exit_price"]),
+                        "quantity": float(trade["quantity"]),
+                        "pnl": float(trade.get("pnl") or 0),
+                        "return_pct": float(trade.get("return_pct") or 0),
+                        "exit_reason": str(
+                            trade.get("exit_reason") or ("end_of_data" if forced_exit else "legacy")
+                        ),
+                        "forced_exit": int(forced_exit),
+                        "created_at": run["created_at"],
+                    }
+                )
+            except (KeyError, TypeError, ValueError):
+                LOGGER.warning(
+                    "Skipping invalid trade %s for legacy backtest run %s",
+                    trade_index,
+                    run["id"],
+                )
+        if trade_rows:
+            connection.executemany(
+                """
+                INSERT OR IGNORE INTO backtest_trades (
+                    backtest_id, bot_id, bot_version_id, trade_index, side,
+                    entry_timestamp, exit_timestamp, entry_price, exit_price,
+                    quantity, pnl, return_pct, exit_reason, forced_exit, created_at
+                ) VALUES (
+                    :backtest_id, :bot_id, :bot_version_id, :trade_index, :side,
+                    :entry_timestamp, :exit_timestamp, :entry_price, :exit_price,
+                    :quantity, :pnl, :return_pct, :exit_reason, :forced_exit, :created_at
+                )
+                """,
+                trade_rows,
+            )
+
+        equity_rows = []
+        for point_index, point in enumerate(equity_curve, start=1):
+            try:
+                equity_rows.append(
+                    {
+                        "backtest_id": int(run["id"]),
+                        "bot_id": int(run["bot_id"]),
+                        "bot_version_id": int(run["bot_version_id"]),
+                        "point_index": point_index,
+                        "timestamp": int(point["timestamp"]),
+                        "equity": float(point["equity"]),
+                        "benchmark_equity": point.get("benchmark_equity"),
+                        "close": float(point["close"]),
+                        "drawdown_pct": point.get("drawdown_pct"),
+                        "in_position": int(bool(point.get("in_position"))),
+                        "created_at": run["created_at"],
+                    }
+                )
+            except (KeyError, TypeError, ValueError):
+                LOGGER.warning(
+                    "Skipping invalid equity point %s for legacy backtest run %s",
+                    point_index,
+                    run["id"],
+                )
+        if equity_rows:
+            connection.executemany(
+                """
+                INSERT OR IGNORE INTO backtest_equity (
+                    backtest_id, bot_id, bot_version_id, point_index, timestamp,
+                    equity, benchmark_equity, close, drawdown_pct, in_position, created_at
+                ) VALUES (
+                    :backtest_id, :bot_id, :bot_version_id, :point_index, :timestamp,
+                    :equity, :benchmark_equity, :close, :drawdown_pct, :in_position, :created_at
+                )
+                """,
+                equity_rows,
+            )
+
+
 def initialize_database() -> None:
     with connect() as connection:
         connection.executescript(SCHEMA)
+        user_version = int(connection.execute("PRAGMA user_version").fetchone()[0])
+        if user_version < 1:
+            _backfill_backtest_payloads(connection)
+        if user_version < 2:
+            _migrate_nullable_profit_factor(connection)
+        connection.executescript(BACKTEST_INTEGRITY_TRIGGERS)
+        if user_version < BACKTEST_SCHEMA_VERSION:
+            connection.execute(f"PRAGMA user_version = {BACKTEST_SCHEMA_VERSION}")

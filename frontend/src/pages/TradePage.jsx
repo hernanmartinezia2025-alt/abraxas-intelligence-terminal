@@ -28,11 +28,12 @@ export default function TradePage({ rows, selectedSymbol = "BTCUSDT", onSelectSy
   const [orderBook, setOrderBook] = useState(null);
   const [bookLoading, setBookLoading] = useState(false);
   const [bookError, setBookError] = useState("");
+  const [chartExpanded, setChartExpanded] = useState(false);
   const assets = latestRows(rows);
   const active = assets.find((asset) => asset.symbol === selectedSymbol) || assets[0];
   const activeSymbol = active?.symbol || selectedSymbol || "BTCUSDT";
-  const asks = (orderBook?.asks || []).slice(0, 8).reverse();
-  const bids = (orderBook?.bids || []).slice(0, 8);
+  const asks = (orderBook?.asks || []).slice(0, 5).reverse();
+  const bids = (orderBook?.bids || []).slice(0, 5);
   const midPrice = orderBook?.mid_price || active?.price;
 
   async function loadOrderBook({ silent = false } = {}) {
@@ -78,28 +79,39 @@ export default function TradePage({ rows, selectedSymbol = "BTCUSDT", onSelectSy
         })}
       </div>
 
-      <div className="trade-grid">
+      <div className={`trade-grid ${chartExpanded ? "chart-expanded" : ""}`}>
         <section className="exchange-panel trade-chart">
           <div className="exchange-panel-head">
             <div>
               <p className="eyebrow">Spot chart</p>
               <h2>{activeSymbol}</h2>
             </div>
-            <div className="timeframe-row">
-              {TIMEFRAMES.map((timeframe) => (
-                <button
-                  className={interval === timeframe ? "active" : ""}
-                  key={timeframe}
-                  onClick={() => setInterval(timeframe)}
-                  type="button"
-                >
-                  {timeframe}
-                </button>
-              ))}
+            <div className="trade-chart-actions">
+              <span>Candles + volume</span>
+              <div className="timeframe-row">
+                {TIMEFRAMES.map((timeframe) => (
+                  <button
+                    className={interval === timeframe ? "active" : ""}
+                    key={timeframe}
+                    onClick={() => setInterval(timeframe)}
+                    type="button"
+                  >
+                    {timeframe}
+                  </button>
+                ))}
+              </div>
+              <button
+                className="chart-expand-button"
+                type="button"
+                onClick={() => setChartExpanded((current) => !current)}
+                aria-pressed={chartExpanded}
+              >
+                {chartExpanded ? "Reducir" : "Expandir"}
+              </button>
             </div>
           </div>
           <div className="panel-body">
-            <MarketChart interval={interval} symbol={activeSymbol} />
+            <MarketChart interval={interval} symbol={activeSymbol} expanded={chartExpanded} />
           </div>
         </section>
 
@@ -110,7 +122,7 @@ export default function TradePage({ rows, selectedSymbol = "BTCUSDT", onSelectSy
                 <p className="eyebrow">Live order book</p>
                 <h2>Binance Depth</h2>
               </div>
-              <span>{bookLoading ? "loading" : `REST ${formatClock(orderBook?.fetched_at)}`}</span>
+              <span>{bookLoading ? "loading" : `5 levels · ${formatClock(orderBook?.fetched_at)}`}</span>
             </div>
             <div className="book-table">
               {bookError && <div className="book-state error">{bookError}</div>}
@@ -139,9 +151,10 @@ export default function TradePage({ rows, selectedSymbol = "BTCUSDT", onSelectSy
           <section className="exchange-panel ticket-panel">
             <div className="exchange-panel-head compact">
               <div>
-                <p className="eyebrow">Observation</p>
-                <h2>No execution</h2>
+                <p className="eyebrow">Trade readout</p>
+                <h2>Sin ejecucion</h2>
               </div>
+              <span>NO LIVE</span>
             </div>
             <div className="ticket-body">
               <label>
@@ -149,30 +162,18 @@ export default function TradePage({ rows, selectedSymbol = "BTCUSDT", onSelectSy
                 <strong>{active?.symbol || "--"}</strong>
               </label>
               <label>
-                Risk
+                Cambio 24h
+                <strong className={Number(active?.change_24h || 0) >= 0 ? "positive" : "negative"}>{formatPercent(active?.change_24h)}</strong>
+              </label>
+              <label>
+                Riesgo
                 <strong>{active?.risk_level || "NORMAL"}</strong>
               </label>
-              <p>{active?.abraxas_reading || "Actualiza mercado para cargar la lectura operativa."}</p>
+              <p>{active?.abraxas_reading || "Actualiza Markets para cargar una lectura operativa persistida."}</p>
+              <small>Lectura desde snapshot local; paper/live siguen bloqueados por diseño.</small>
             </div>
           </section>
         </aside>
-
-        <section className="exchange-panel tape-panel">
-          <div className="exchange-panel-head compact">
-            <div>
-              <p className="eyebrow">Market tape</p>
-              <h2>Readings</h2>
-            </div>
-          </div>
-          <div className="tape-list">
-            {assets.map((asset) => (
-              <article key={asset.symbol}>
-                <b>{asset.symbol}</b>
-                <span>{asset.abraxas_reading}</span>
-              </article>
-            ))}
-          </div>
-        </section>
       </div>
     </section>
   );

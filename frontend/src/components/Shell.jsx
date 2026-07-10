@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import GlobalAssetSelector from "./GlobalAssetSelector.jsx";
 
 const NAV_ITEMS = [
@@ -33,6 +33,14 @@ export default function Shell({
   selectedSymbol = "BTCUSDT",
   onAssetChange,
 }) {
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [railDensity, setRailDensity] = useState(() => window.localStorage.getItem("abraxas-rail-density") || "comfortable");
+
+  useEffect(() => {
+    document.documentElement.dataset.railDensity = railDensity;
+    window.localStorage.setItem("abraxas-rail-density", railDensity);
+  }, [railDensity]);
+
   return (
     <div className="terminal-frame">
       <aside className="side-rail">
@@ -65,14 +73,39 @@ export default function Shell({
             ))}
           </div>
         </div>
-        <div className="rail-status-card">
-          <span>Selected</span>
-          <strong>{selectedSymbol}</strong>
-          <small>{snapshotCount} snapshots stored</small>
-        </div>
-        <div className="rail-footer">
-          <span>Local mode</span>
-          <strong>SQLite</strong>
+        <div className="rail-bottom">
+          <div className="rail-status-card">
+            <span>Selected</span>
+            <strong>{selectedSymbol}</strong>
+            <small>{snapshotCount} snapshots stored</small>
+          </div>
+          {settingsOpen && (
+            <div className="rail-settings">
+              <span>Terminal settings</span>
+              <label>
+                Densidad del rail
+                <select value={railDensity} onChange={(event) => setRailDensity(event.target.value)}>
+                  <option value="comfortable">Confortable</option>
+                  <option value="compact">Compacta</option>
+                </select>
+              </label>
+              <small>Preferencia local persistida en este navegador.</small>
+            </div>
+          )}
+          <div className="rail-footer">
+            <span>Local mode</span>
+            <strong>SQLite</strong>
+          </div>
+          <button
+            className="rail-settings-button"
+            type="button"
+            onClick={() => setSettingsOpen((current) => !current)}
+            aria-expanded={settingsOpen}
+            aria-label="Abrir configuracion del terminal"
+            title="Configuracion del terminal"
+          >
+            ⚙
+          </button>
         </div>
       </aside>
 

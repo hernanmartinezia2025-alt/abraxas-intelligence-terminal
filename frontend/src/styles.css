@@ -75,6 +75,7 @@ div {
   position: sticky;
   top: 0;
   height: 100vh;
+  min-height: 100vh;
   padding: 18px 14px;
   border-right: 1px solid rgba(255, 255, 255, 0.08);
   background: linear-gradient(180deg, var(--rail), #050505);
@@ -82,6 +83,22 @@ div {
   display: flex;
   flex-direction: column;
   gap: 24px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(223, 192, 122, 0.34) transparent;
+}
+
+html[data-rail-density="compact"] .side-rail {
+  gap: 14px;
+  padding-block: 14px;
+}
+
+html[data-rail-density="compact"] .rail-nav a {
+  padding-block: 7px;
+}
+
+html[data-rail-density="compact"] .rail-crest {
+  min-height: 140px;
 }
 
 .brand-block {
@@ -230,8 +247,13 @@ div {
   font-size: 11px;
 }
 
-.rail-footer {
+.rail-bottom {
   margin-top: auto;
+  display: grid;
+  gap: 10px;
+}
+
+.rail-footer {
   border: 1px solid rgba(255, 255, 255, 0.09);
   background: rgba(255, 255, 255, 0.045);
   border-radius: 8px;
@@ -242,6 +264,68 @@ div {
   font-size: 12px;
 }
 .rail-footer strong { color: var(--brand-2); }
+
+.rail-settings {
+  display: grid;
+  gap: 8px;
+  border: 1px solid rgba(223, 192, 122, 0.24);
+  background: rgba(18, 20, 24, 0.96);
+  border-radius: 8px;
+  padding: 10px;
+}
+
+.rail-settings > span,
+.rail-settings label,
+.rail-settings small {
+  color: rgba(247, 247, 247, 0.58);
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+}
+
+.rail-settings label {
+  display: grid;
+  gap: 6px;
+}
+
+.rail-settings select {
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  color: #ffffff;
+  border-radius: 6px;
+  padding: 8px;
+  font-size: 11px;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.rail-settings option { background: #111419; }
+
+.rail-settings small {
+  color: rgba(247, 247, 247, 0.42);
+  line-height: 1.35;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.rail-settings-button {
+  width: 100%;
+  min-height: 38px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.045);
+  color: rgba(247, 247, 247, 0.8);
+  border-radius: 8px;
+  font-size: 18px;
+}
+
+.rail-settings-button:hover,
+.rail-settings-button[aria-expanded="true"] {
+  color: #ffffff;
+  border-color: rgba(223, 192, 122, 0.48);
+  background: rgba(223, 192, 122, 0.13);
+}
 
 .shell {
   width: 100%;
@@ -2426,10 +2510,8 @@ h2 {
 
 .trade-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(300px, 350px);
-  grid-template-areas:
-    "chart side"
-    "tape tape";
+  grid-template-columns: minmax(0, 1fr) minmax(250px, 290px);
+  grid-template-areas: "chart side";
   gap: 12px;
   align-items: start;
 }
@@ -2453,7 +2535,17 @@ h2 {
   gap: 12px;
   align-self: start;
 }
-.tape-panel { grid-area: tape; }
+
+.trade-grid.chart-expanded {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    "chart"
+    "side";
+}
+
+.trade-grid.chart-expanded .trade-side-stack {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
 
 .exchange-panel-head {
   min-height: 70px;
@@ -2500,13 +2592,46 @@ h2 {
   background: rgba(223, 192, 122, 0.14);
 }
 
+.trade-chart-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 7px;
+}
+
+.trade-chart-actions > span {
+  color: rgba(246, 248, 251, 0.48);
+  font-size: 10px;
+  font-weight: 850;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+}
+
+.chart-expand-button {
+  border: 1px solid rgba(223, 192, 122, 0.28);
+  background: rgba(223, 192, 122, 0.1);
+  color: #ffffff;
+  border-radius: 7px;
+  padding: 8px 10px;
+  font-family: var(--font-num);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.chart-expand-button:hover,
+.chart-expand-button[aria-pressed="true"] {
+  border-color: rgba(223, 192, 122, 0.56);
+  background: rgba(223, 192, 122, 0.18);
+}
+
 .exchange-chart {
   height: clamp(360px, 52vh, 520px);
 }
 
 .real-chart-wrap {
   position: relative;
-  min-height: clamp(430px, 56vh, 620px);
+  min-height: clamp(480px, 64vh, 760px);
   border: 1px solid #1d1d1d;
   background: linear-gradient(180deg, #101318, #090909);
   border-radius: 8px;
@@ -2514,7 +2639,13 @@ h2 {
 }
 .real-chart {
   width: 100%;
-  height: clamp(430px, 56vh, 620px);
+  height: clamp(480px, 64vh, 760px);
+}
+
+.real-chart-wrap.expanded,
+.real-chart.expanded {
+  min-height: clamp(560px, 76vh, 900px);
+  height: clamp(560px, 76vh, 900px);
 }
 .chart-toolbar {
   position: absolute;
@@ -2652,6 +2783,15 @@ h2 {
   margin: 0;
 }
 
+.ticket-body small {
+  color: rgba(246, 248, 251, 0.46);
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.ticket-body strong.positive { color: #47d9aa; }
+.ticket-body strong.negative { color: #ff8b98; }
+
 .tape-list {
   padding: 10px;
   display: grid;
@@ -2676,6 +2816,39 @@ h2 {
   color: rgba(246, 248, 251, 0.68);
   line-height: 1.35;
   font-size: 12px;
+}
+
+.market-readings-panel {
+  margin-top: 12px;
+}
+
+.market-readings-grid {
+  padding: 10px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  gap: 8px;
+}
+
+.market-readings-grid article {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.025));
+  border-radius: 8px;
+  padding: 10px;
+  display: grid;
+  gap: 6px;
+}
+
+.market-readings-grid b {
+  color: #ffffff;
+  font-family: var(--font-num);
+  font-size: 12px;
+}
+
+.market-readings-grid span {
+  color: rgba(246, 248, 251, 0.68);
+  font-size: 11px;
+  line-height: 1.35;
 }
 
 .live-map-page {
@@ -2981,6 +3154,22 @@ h2 {
   .rail-footer {
     display: none;
   }
+  .rail-bottom {
+    margin: 0 0 0 auto;
+    display: flex;
+    align-items: center;
+  }
+  .rail-settings {
+    position: fixed;
+    z-index: 40;
+    top: 74px;
+    right: 12px;
+    width: min(280px, calc(100vw - 24px));
+    box-shadow: 0 20px 42px rgba(0, 0, 0, 0.4);
+  }
+  .rail-settings-button {
+    width: 42px;
+  }
   .shell {
     width: 100%;
     padding-top: 18px;
@@ -3022,8 +3211,7 @@ h2 {
   .trade-grid {
     grid-template-areas:
       "chart"
-      "side"
-      "tape";
+      "side";
   }
   .trade-side-stack {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);

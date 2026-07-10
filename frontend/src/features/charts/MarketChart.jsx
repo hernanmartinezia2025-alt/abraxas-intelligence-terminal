@@ -13,7 +13,7 @@ function normalizeCandles(candles) {
   }));
 }
 
-export default function MarketChart({ symbol = "BTCUSDT", interval = "15m" }) {
+export default function MarketChart({ symbol = "BTCUSDT", interval = "15m", expanded = false }) {
   const containerRef = useRef(null);
   const chartRef = useRef(null);
   const candleSeriesRef = useRef(null);
@@ -128,13 +128,13 @@ export default function MarketChart({ symbol = "BTCUSDT", interval = "15m" }) {
   }, [candles]);
 
   return (
-    <div className="real-chart-wrap">
+    <div className={`real-chart-wrap ${expanded ? "expanded" : ""}`}>
       <div className="chart-toolbar">
         <span>{symbol}</span>
         <strong>{interval}</strong>
         {lastCandle && <b className={move >= 0 ? "positive" : "negative"}>{move >= 0 ? "+" : ""}{move.toFixed(2)}%</b>}
       </div>
-      <div className="real-chart" ref={containerRef} />
+      <div className={`real-chart ${expanded ? "expanded" : ""}`} ref={containerRef} />
       {loading && <div className="chart-state">Loading candles</div>}
       {error && <div className="chart-state error">Chart error: {error}</div>}
       {!loading && !error && candles.length === 0 && <div className="chart-state">No candles</div>}

@@ -3,8 +3,8 @@
 :root {
   --font-ui: Manrope, "Segoe UI Variable", "Segoe UI", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   --font-num: "JetBrains Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
-  --page: #dfe4ea;
-  --page-2: #d2dae2;
+  --page: #0b1016;
+  --page-2: #111b24;
   --surface: #f7f7f3;
   --surface-subtle: #edf0f2;
   --surface-strong: #151515;
@@ -36,6 +36,8 @@ html {
   scroll-behavior: smooth;
   width: 100%;
   overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(223, 192, 122, 0.72) #070b10;
 }
 body {
   margin: 0;
@@ -43,9 +45,21 @@ body {
   width: 100%;
   overflow-x: hidden;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.45), rgba(223, 228, 234, 0) 260px),
-    linear-gradient(120deg, rgba(9, 9, 9, 0.055), transparent 34%),
+    linear-gradient(180deg, rgba(223, 192, 122, 0.055), transparent 340px),
+    radial-gradient(circle at 72% 16%, rgba(31, 75, 108, 0.2), transparent 38%),
+    linear-gradient(120deg, rgba(255, 255, 255, 0.018), transparent 34%),
     var(--page);
+}
+html::-webkit-scrollbar { width: 12px; }
+html::-webkit-scrollbar-track { background: #070b10; }
+html::-webkit-scrollbar-thumb {
+  min-height: 64px;
+  border: 3px solid #070b10;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(223, 192, 122, 0.9), rgba(137, 106, 54, 0.9));
+}
+html::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #f0d18c, #ad8541);
 }
 #root {
   min-height: 100vh;
@@ -72,10 +86,10 @@ div {
 }
 
 .side-rail {
-  position: sticky;
-  top: 0;
-  height: 100vh;
+  position: relative;
+  height: auto;
   min-height: 100vh;
+  align-self: stretch;
   padding: 18px 14px;
   border-right: 1px solid rgba(255, 255, 255, 0.08);
   background: linear-gradient(180deg, var(--rail), #050505);
@@ -83,9 +97,7 @@ div {
   display: flex;
   flex-direction: column;
   gap: 24px;
-  overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(223, 192, 122, 0.34) transparent;
+  overflow: visible;
 }
 
 html[data-rail-density="compact"] .side-rail {
@@ -342,7 +354,7 @@ html[data-rail-density="compact"] .rail-crest {
   flex-wrap: wrap;
   margin-bottom: 18px;
   padding-bottom: 18px;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid rgba(223, 192, 122, 0.2);
 }
 
 .title-stack {
@@ -368,6 +380,7 @@ h1 {
   font-weight: 820;
   letter-spacing: 0;
 }
+.topbar h1 { color: #f4f7fb; }
 h2 {
   color: var(--ink);
   font-size: 19px;

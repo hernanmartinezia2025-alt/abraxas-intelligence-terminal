@@ -592,20 +592,9 @@ h2 {
   display: grid;
   gap: 5px;
 }
-.sentiment-trigger {
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-.sentiment-trigger:hover,
-.sentiment-trigger:focus-visible {
-  border-color: rgba(223, 192, 122, 0.72);
-  outline: none;
-}
-.sentiment-trigger.fud_extreme { border-color: rgba(107, 157, 220, 0.75); }
-.sentiment-trigger.fomo_extreme { border-color: rgba(209, 77, 93, 0.72); }
-.sentiment-trigger i {
+.fear-greed-tile.fud_extreme { border-color: rgba(107, 157, 220, 0.75); }
+.fear-greed-tile.fomo_extreme { border-color: rgba(209, 77, 93, 0.72); }
+.fear-greed-tile i {
   color: var(--brand-2);
   font-size: 10px;
   font-style: normal;
@@ -655,19 +644,19 @@ h2 {
 
 .asset-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  gap: 9px;
 }
 .asset-card,
 .empty-state {
-  min-height: 206px;
-  border: 1px solid var(--line);
-  background: linear-gradient(180deg, #ffffff, var(--surface));
+  min-height: 164px;
+  border: 1px solid rgba(223, 192, 122, 0.16);
+  background: linear-gradient(180deg, #17212b, #10171f);
   border-radius: 8px;
-  padding: 16px;
+  padding: 12px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
   overflow: hidden;
   box-shadow: 0 10px 30px rgba(10, 10, 10, 0.075);
 }
@@ -677,6 +666,17 @@ h2 {
 .asset-card.negative {
   border-top: 3px solid var(--red);
 }
+.asset-card .asset-head span,
+.asset-card .volume-line span,
+.asset-card .volume-line b,
+.asset-card p { color: rgba(244, 247, 251, 0.72); }
+.asset-card strong { color: #ffffff; font-size: clamp(21px, 2vw, 28px); }
+.asset-card .asset-meta small { color: rgba(244, 247, 251, 0.56); border-color: rgba(255,255,255,.16); background: rgba(255,255,255,.06); }
+.asset-sparkline { width: 100%; height: 30px; display: block; opacity: .92; }
+.asset-sparkline polyline { fill: none; stroke-width: 1.8; }
+.asset-sparkline.positive polyline { stroke: #47d9aa; }
+.asset-sparkline.negative polyline { stroke: #ff8b98; }
+.asset-sparkline.empty { color: rgba(244,247,251,.35); font-size: 10px; }
 .asset-head {
   display: flex;
   justify-content: space-between;

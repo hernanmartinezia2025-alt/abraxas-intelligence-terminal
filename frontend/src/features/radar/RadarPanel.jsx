@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import { latestRows } from "../../utils/assets.js";
 
 function formatPrice(value) {
@@ -37,8 +37,26 @@ function compactRisk(level) {
   return "NORMAL";
 }
 
+function Sparkline({ rows, symbol, tone }) {
+  const points = rows
+    .filter((row) => row.symbol === symbol)
+    .slice(0, 24)
+    .reverse()
+    .map((row) => Number(row.price || 0))
+    .filter((price) => Number.isFinite(price));
+  if (points.length < 2) return <div className="asset-sparkline empty">sin historial</div>;
+  const min = Math.min(...points);
+  const max = Math.max(...points);
+  const range = max - min || 1;
+  const polyline = points.map((price, index) => `${(index / (points.length - 1)) * 100},${25 - ((price - min) / range) * 22}`).join(" ");
+  return (
+    <svg className={`asset-sparkline ${tone}`} viewBox="0 0 100 28" preserveAspectRatio="none" role="img" aria-label={`${symbol} historial de snapshots`}>
+      <polyline points={polyline} vectorEffect="non-scaling-stroke" />
+    </svg>
+  );
+}
+
 export default function RadarPanel({ rows, sentiment }) {
-  const [sentimentOpen, setSentimentOpen] = useState(false);
   const assets = latestRows(rows);
   const state = marketState(assets);
   const fear = assets[0];
@@ -54,17 +72,12 @@ export default function RadarPanel({ rows, sentiment }) {
           <p>{state.reading}</p>
         </div>
         <div className="radar-side-metrics">
-          <button
-            type="button"
-            className={`fear-greed-tile sentiment-trigger ${sentiment?.regime?.toLowerCase() || ""}`}
-            onClick={() => setSentimentOpen((open) => !open)}
-            aria-expanded={sentimentOpen}
-          >
+          <div className={`fear-greed-tile ${sentiment?.regime?.toLowerCase() || ""}`}>
             <span>Fear & Greed</span>
             <strong>{sentiment?.value ?? fear?.fear_greed_value ?? "--"}</strong>
             <small>{sentiment?.title || fear?.fear_greed_label || "sin dato"}</small>
-            <i>{sentimentOpen ? "Ocultar lectura" : "Ver lectura"}</i>
-          </button>
+            <i>lectura visible</i>
+          </div>
           <div className="leader-tile">
             <span>Mayor movimiento</span>
             <strong>{leader?.symbol || "--"}</strong>
@@ -73,7 +86,7 @@ export default function RadarPanel({ rows, sentiment }) {
         </div>
       </div>
 
-      {sentimentOpen && sentiment && (
+      {sentiment && (
         <section className="sentiment-analysis" aria-label="Analitica FOMO y FUD">
           <div className="sentiment-summary">
             <p className="eyebrow">Sentiment regime / real data</p>
@@ -116,6 +129,7 @@ export default function RadarPanel({ rows, sentiment }) {
                 <b className={tone}>{formatPercent(change)}</b>
                 <small>{compactRisk(row.risk_level)}</small>
               </div>
+              <Sparkline rows={rows} symbol={row.symbol} tone={tone} />
               <div className="volume-line">
                 <span>Volumen 24h</span>
                 <b>${formatCompact(row.volume_24h)}</b>

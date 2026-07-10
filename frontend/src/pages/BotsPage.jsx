@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createBot, getBacktest, getBot, getBotBacktests, getBots, runBotBacktest } from "../api/client.js";
 import BacktestComparisonPanel from "../features/backtests/BacktestComparisonPanel.jsx";
 import BacktestEquityChart from "../features/charts/BacktestEquityChart.jsx";
+import PageSubtabs from "../components/PageSubtabs.jsx";
 
 const BOT_STAGES = [
   ["Saved Bots", "online", "Bots persistidos en SQLite con versiones auditables."],
@@ -59,6 +60,7 @@ function formatPercentage(value, digits = 2) {
 }
 
 export default function BotsPage({ selectedSymbol = "BTCUSDT" }) {
+  const [activeTab, setActiveTab] = useState("forge");
   const [bots, setBots] = useState([]);
   const [selectedBotId, setSelectedBotId] = useState(null);
   const [detail, setDetail] = useState(null);
@@ -339,6 +341,17 @@ export default function BotsPage({ selectedSymbol = "BTCUSDT" }) {
 
       {error && <div className="error-box">{error}</div>}
 
+      <PageSubtabs
+        tabs={[
+          ["forge", "Forge", "crear + configurar"],
+          ["runs", "Backtest Runs", "ROI + trades + auditoría"],
+          ["compare", "Compare", "versiones A/B"],
+        ]}
+        activeTab={activeTab}
+        onChange={setActiveTab}
+      />
+
+      {activeTab === "forge" && <>
       <section className="ops-grid">
         {BOT_STAGES.map(([title, state, description]) => (
           <article className={`ops-card ${state}`} key={title}>
@@ -587,7 +600,9 @@ export default function BotsPage({ selectedSymbol = "BTCUSDT" }) {
           </div>
         )}
       </section>
+      </>}
 
+      {activeTab === "runs" && <>
       <section className="exchange-panel bot-detail-panel">
         <div className="exchange-panel-head compact">
           <div>
@@ -623,12 +638,6 @@ export default function BotsPage({ selectedSymbol = "BTCUSDT" }) {
           )}
         </div>
       </section>
-
-      <BacktestComparisonPanel
-        botId={selectedBotId}
-        runs={backtests}
-        versions={detailMatchesSelection ? detail.versions || [] : []}
-      />
 
       <section className="exchange-panel backtest-analysis-panel">
         <div className="exchange-panel-head compact">
@@ -723,6 +732,15 @@ export default function BotsPage({ selectedSymbol = "BTCUSDT" }) {
           </div>
         )}
       </section>
+      </>}
+
+      {activeTab === "compare" && (
+        <BacktestComparisonPanel
+          botId={selectedBotId}
+          runs={backtests}
+          versions={detailMatchesSelection ? detail.versions || [] : []}
+        />
+      )}
     </section>
   );
 }

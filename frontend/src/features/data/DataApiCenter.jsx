@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { datasetExportUrl, getDataCatalog, getDataHealth, getDatasetPreview } from "../../api/client.js";
 import BackendSurface from "./BackendSurface.jsx";
+import PageSubtabs from "../../components/PageSubtabs.jsx";
 
 function formatTime(value) {
   if (!value) return "sin registro";
@@ -29,6 +30,7 @@ function statusTone(status) {
 }
 
 export default function DataApiCenter({ selectedSymbol = "BTCUSDT" }) {
+  const [activeTab, setActiveTab] = useState("overview");
   const [catalog, setCatalog] = useState(null);
   const [health, setHealth] = useState(null);
   const [selectedDataset, setSelectedDataset] = useState("market_candles");
@@ -72,8 +74,8 @@ export default function DataApiCenter({ selectedSymbol = "BTCUSDT" }) {
   }, []);
 
   useEffect(() => {
-    loadPreview(selectedDataset);
-  }, [selectedDataset]);
+    if (activeTab === "datasets") loadPreview(selectedDataset);
+  }, [selectedDataset, activeTab]);
 
   const datasets = useMemo(() => health?.datasets || catalog?.datasets || [], [catalog, health]);
   const sources = catalog?.sources || [];
@@ -105,8 +107,20 @@ export default function DataApiCenter({ selectedSymbol = "BTCUSDT" }) {
 
       {error && <div className="error-box">{error}</div>}
 
-      <BackendSurface selectedSymbol={selectedSymbol} />
+      <PageSubtabs
+        tabs={[
+          ["overview", "Overview", "estado local"],
+          ["sources", "Sources", "registro + health"],
+          ["datasets", "Datasets", "preview + CSV"],
+          ["backend", "Backend Surface", "endpoints reales"],
+        ]}
+        activeTab={activeTab}
+        onChange={setActiveTab}
+      />
 
+      {activeTab === "backend" && <BackendSurface selectedSymbol={selectedSymbol} />}
+
+      {activeTab === "overview" && (
       <section className="data-kpi-grid">
         <article>
           <span>SQLite</span>
@@ -129,7 +143,9 @@ export default function DataApiCenter({ selectedSymbol = "BTCUSDT" }) {
           <small>features numericas para bots</small>
         </article>
       </section>
+      )}
 
+      {activeTab === "sources" && (
       <section className="data-grid">
         <article className="exchange-panel data-panel">
           <div className="exchange-panel-head compact">
@@ -181,7 +197,9 @@ export default function DataApiCenter({ selectedSymbol = "BTCUSDT" }) {
           </div>
         </article>
       </section>
+      )}
 
+      {activeTab === "datasets" && <>
       <section className="exchange-panel data-panel">
         <div className="exchange-panel-head compact">
           <div>
@@ -279,6 +297,7 @@ export default function DataApiCenter({ selectedSymbol = "BTCUSDT" }) {
           )}
         </div>
       </section>
+      </>}
     </section>
   );
 }

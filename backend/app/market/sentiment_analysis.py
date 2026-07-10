@@ -114,4 +114,9 @@ def build_sentiment_analysis(rows: list[dict[str, Any]]) -> dict[str, Any] | Non
         "history_note": (
             "El indice se publica diariamente; los snapshots intradia pueden repetir el mismo valor."
         ),
+        "horizons": [
+            {"key": "1h", "label": "1 hora", "status": "unavailable", "reason": "Alternative.me no publica esta granularidad."},
+            {"key": "4h", "label": "4 horas", "status": "unavailable", "reason": "Alternative.me no publica esta granularidad."},
+            {"key": "1d", "label": "Diario", "status": "available", "reason": "Fuente actual: Alternative.me."},
+        ],
     }

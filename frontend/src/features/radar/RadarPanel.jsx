@@ -56,6 +56,11 @@ function Sparkline({ rows, symbol, tone }) {
   );
 }
 
+function SentimentGauge({ value = 0 }) {
+  const position = `${Math.max(0, Math.min(100, Number(value)))}%`;
+  return <div className="sentiment-gauge" role="img" aria-label={`Fear and Greed ${value} sobre 100`}><i style={{ left: position }} /><div><span>FUD</span><span>NEUTRAL</span><span>FOMO</span></div></div>;
+}
+
 export default function RadarPanel({ rows, sentiment }) {
   const assets = latestRows(rows);
   const state = marketState(assets);
@@ -99,6 +104,13 @@ export default function RadarPanel({ rows, sentiment }) {
             <div><dt>Bajan</dt><dd className="negative">{sentiment.market_breadth.negative}</dd></div>
             <div><dt>Promedio 24h</dt><dd>{formatPercent(sentiment.market_breadth.average_change_24h)}</dd></div>
           </dl>
+          <div className="sentiment-horizon-block">
+            <span>FOMO / FUD por horizonte</span>
+            <SentimentGauge value={sentiment.value} />
+            <div className="sentiment-horizons">
+              {(sentiment.horizons || []).map((horizon) => <b className={horizon.status} key={horizon.key}>{horizon.label}<small>{horizon.status === "available" ? "disponible" : "sin fuente"}</small></b>)}
+            </div>
+          </div>
           <div className="sentiment-checklist">
             <span>Checklist operativo</span>
             {sentiment.checklist.map((item) => <p key={item}>{item}</p>)}

@@ -705,6 +705,12 @@ h2 {
   overflow: hidden;
   box-shadow: 0 10px 30px rgba(10, 10, 10, 0.075);
 }
+.asset-card { text-align: left; font: inherit; cursor: pointer; }
+.asset-card:hover,
+.asset-card:focus-visible { transform: translateY(-2px); border-color: rgba(223,192,122,.52); box-shadow: 0 14px 34px rgba(0,0,0,.24); outline: none; }
+.asset-card-action { margin-top: auto; color: var(--brand-2); font-size: 9px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; opacity: 0; transition: opacity .16s ease; }
+.asset-card:hover .asset-card-action,
+.asset-card:focus-visible .asset-card-action { opacity: 1; }
 .asset-card.positive {
   border-top: 3px solid var(--green);
 }

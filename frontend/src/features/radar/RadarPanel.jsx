@@ -61,7 +61,7 @@ function SentimentGauge({ value = 0 }) {
   return <div className="sentiment-gauge" role="img" aria-label={`Fear and Greed ${value} sobre 100`}><i style={{ left: position }} /><div><span>FUD</span><span>NEUTRAL</span><span>FOMO</span></div></div>;
 }
 
-export default function RadarPanel({ rows, sentiment }) {
+export default function RadarPanel({ rows, sentiment, onOpenTrade }) {
   const assets = latestRows(rows);
   const state = marketState(assets);
   const fear = assets[0];
@@ -131,7 +131,7 @@ export default function RadarPanel({ rows, sentiment }) {
           const change = Number(row.change_24h || 0);
           const tone = change >= 0 ? "positive" : "negative";
           return (
-            <article className={`asset-card ${tone}`} key={row.symbol}>
+            <button className={`asset-card ${tone}`} key={row.symbol} type="button" onClick={() => onOpenTrade?.(row.symbol)} aria-label={`Abrir ${row.symbol} en Trade`}>
               <div className="asset-head">
                 <span>{row.symbol}</span>
                 <em>{change >= 0 ? "UP" : "DOWN"}</em>
@@ -147,7 +147,8 @@ export default function RadarPanel({ rows, sentiment }) {
                 <b>${formatCompact(row.volume_24h)}</b>
               </div>
               <p>{row.abraxas_reading}</p>
-            </article>
+              <span className="asset-card-action">Abrir en Trade →</span>
+            </button>
           );
         })}
       </div>

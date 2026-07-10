@@ -1918,6 +1918,198 @@ h2 {
   text-align: right;
 }
 
+.backtest-comparison-panel {
+  overflow: hidden;
+}
+
+.backtest-compare-controls {
+  padding: 12px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: end;
+}
+
+.backtest-compare-controls label {
+  display: grid;
+  gap: 6px;
+  color: rgba(246, 248, 251, 0.52);
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.backtest-compare-controls select {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.045);
+  color: #ffffff;
+  border-radius: 8px;
+  padding: 10px;
+  font-family: var(--font-num);
+}
+
+.backtest-compare-controls option {
+  background: #111419;
+}
+
+.backtest-compare-controls button {
+  min-height: 38px;
+  border: 1px solid rgba(223, 192, 122, 0.3);
+  background: rgba(223, 192, 122, 0.12);
+  color: #ffffff;
+}
+
+.backtest-compare-controls button:hover:not(:disabled) {
+  border-color: rgba(223, 192, 122, 0.58);
+  background: rgba(223, 192, 122, 0.2);
+}
+
+.backtest-compare-controls select:focus-visible,
+.backtest-compare-controls button:focus-visible {
+  outline: 2px solid rgba(223, 192, 122, 0.72);
+  outline-offset: 2px;
+}
+
+.comparison-errors {
+  margin: 0 12px 12px;
+  display: grid;
+  gap: 5px;
+  border: 1px solid rgba(255, 99, 118, 0.35);
+  background: rgba(255, 99, 118, 0.08);
+  color: #ffb2bb;
+  border-radius: 8px;
+  padding: 10px;
+  font-size: 11px;
+}
+
+.comparison-run-meta {
+  padding: 0 12px 12px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.comparison-run-meta article {
+  display: grid;
+  gap: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-left: 3px solid #dfc07a;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 8px;
+  padding: 11px;
+}
+
+.comparison-run-meta article.b {
+  border-left-color: #78a6ff;
+}
+
+.comparison-run-meta span,
+.comparison-run-meta small {
+  color: rgba(246, 248, 251, 0.52);
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+}
+
+.comparison-run-meta strong {
+  color: #ffffff;
+  font-family: var(--font-num);
+  font-size: 16px;
+}
+
+.comparison-compatibility {
+  margin: 0 12px 12px;
+  display: grid;
+  gap: 5px;
+  border: 1px solid rgba(223, 192, 122, 0.26);
+  border-left: 3px solid #dfc07a;
+  background: rgba(223, 192, 122, 0.07);
+  border-radius: 8px;
+  padding: 11px;
+  color: rgba(246, 248, 251, 0.72);
+  font-size: 11px;
+}
+
+.comparison-compatibility.ready {
+  border-color: rgba(71, 217, 170, 0.28);
+  border-left-color: #47d9aa;
+  background: rgba(71, 217, 170, 0.07);
+}
+
+.comparison-compatibility strong {
+  color: #ffffff;
+}
+
+.comparison-compatibility small {
+  color: rgba(246, 248, 251, 0.48);
+}
+
+.comparison-chart-wrap {
+  margin: 0 12px 12px;
+}
+
+.comparison-chart-wrap .backtest-chart-legend b {
+  align-self: center;
+  color: rgba(246, 248, 251, 0.5);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.backtest-comparison-table-wrap {
+  overflow-x: auto;
+  padding: 0 12px 12px;
+}
+
+.backtest-comparison-table-wrap table {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: collapse;
+  color: rgba(246, 248, 251, 0.72);
+  font-family: var(--font-num);
+  font-size: 11px;
+}
+
+.backtest-comparison-table-wrap caption {
+  padding: 0 0 9px;
+  color: rgba(246, 248, 251, 0.48);
+  text-align: left;
+  font-family: var(--font-ui);
+  font-size: 10px;
+}
+
+.backtest-comparison-table-wrap th,
+.backtest-comparison-table-wrap td {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 10px 9px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.backtest-comparison-table-wrap th:first-child {
+  text-align: left;
+}
+
+.backtest-comparison-table-wrap thead th {
+  color: rgba(246, 248, 251, 0.5);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+}
+
+.backtest-comparison-table-wrap tbody th {
+  color: rgba(246, 248, 251, 0.7);
+}
+
+.backtest-comparison-table-wrap .comparison-winner {
+  color: #47d9aa;
+  background: rgba(71, 217, 170, 0.055);
+}
+
 .backtest-analysis-grid {
   padding: 12px;
   display: grid;
@@ -2894,6 +3086,13 @@ h2 {
   }
   .backtest-controls {
     grid-template-columns: 1fr;
+  }
+  .backtest-compare-controls,
+  .comparison-run-meta {
+    grid-template-columns: 1fr;
+  }
+  .backtest-compare-controls button {
+    width: 100%;
   }
   .map-actions {
     justify-items: start;

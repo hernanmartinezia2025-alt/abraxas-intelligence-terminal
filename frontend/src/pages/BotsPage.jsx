@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createBot, getBacktest, getBot, getBotBacktests, getBots, runBotBacktest } from "../api/client.js";
+import BacktestComparisonPanel from "../features/backtests/BacktestComparisonPanel.jsx";
 import BacktestEquityChart from "../features/charts/BacktestEquityChart.jsx";
 
 const BOT_STAGES = [
@@ -7,7 +8,7 @@ const BOT_STAGES = [
   ["Strategy JSON", "online", "Cada version guarda reglas, parametros y perfil de riesgo."],
   ["Backtests", "online", "Runs auditables por version con costos, trades y equity persistidos."],
   ["Paper Mode", "locked", "Simulacion en tiempo real sin tocar dinero ni claves."],
-  ["ROI Profile", "online", "ROI, benchmark, drawdown, win rate, profit factor y curva de equity."],
+  ["ROI Profile", "online", "ROI, benchmark, drawdown, profit factor, equity y comparacion A/B."],
   ["Live Execution", "blocked", "Bloqueado hasta tener risk engine, permisos y kill switch."],
 ];
 
@@ -460,7 +461,7 @@ export default function BotsPage({ selectedSymbol = "BTCUSDT" }) {
             <div className="backtest-controls">
               <label>
                 Version
-                <select value={selectedVersionId} onChange={(event) => selectVersion(event.target.value)}>
+                <select value={selectedVersionId} onChange={(event) => selectVersion(event.target.value)} disabled={backtesting}>
                   {(detail.versions || []).map((version) => (
                     <option key={version.id} value={version.id}>v{version.version} · #{version.id}</option>
                   ))}
@@ -473,6 +474,7 @@ export default function BotsPage({ selectedSymbol = "BTCUSDT" }) {
                   min="1"
                   max="1000000000"
                   step="100"
+                  disabled={backtesting}
                   value={backtestParams.initial_equity}
                   onChange={(event) => setBacktestParams((current) => ({ ...current, initial_equity: event.target.value }))}
                 />
@@ -484,6 +486,7 @@ export default function BotsPage({ selectedSymbol = "BTCUSDT" }) {
                   min="0"
                   max="5"
                   step="0.01"
+                  disabled={backtesting}
                   value={backtestParams.fee_pct}
                   onChange={(event) => setBacktestParams((current) => ({ ...current, fee_pct: event.target.value }))}
                 />
@@ -495,6 +498,7 @@ export default function BotsPage({ selectedSymbol = "BTCUSDT" }) {
                   min="0"
                   max="5"
                   step="0.01"
+                  disabled={backtesting}
                   value={backtestParams.slippage_pct}
                   onChange={(event) => setBacktestParams((current) => ({ ...current, slippage_pct: event.target.value }))}
                 />
@@ -506,6 +510,7 @@ export default function BotsPage({ selectedSymbol = "BTCUSDT" }) {
                   min="60"
                   max="1000"
                   step="20"
+                  disabled={backtesting}
                   value={backtestParams.limit}
                   onChange={(event) => setBacktestParams((current) => ({ ...current, limit: event.target.value }))}
                 />
@@ -604,8 +609,8 @@ export default function BotsPage({ selectedSymbol = "BTCUSDT" }) {
                 <strong>Run #{run.id}</strong>
                 <span>{run.symbol} / {run.timeframe} · version #{run.bot_version_id}</span>
               </div>
-              <b className={Number(run.roi_pct || 0) >= 0 ? "positive" : "negative"}>{formatNumber(run.roi_pct, 2)}%</b>
-              <b>{formatNumber(run.max_drawdown_pct, 2)}% DD</b>
+              <b className={Number(run.roi_pct || 0) >= 0 ? "positive" : "negative"}>{formatPercentage(run.roi_pct, 2)}</b>
+              <b>{formatPercentage(run.max_drawdown_pct, 2)} DD</b>
               <b>{run.total_trades} trades</b>
               <small>{formatTime(run.created_at)}</small>
             </button>
@@ -618,6 +623,12 @@ export default function BotsPage({ selectedSymbol = "BTCUSDT" }) {
           )}
         </div>
       </section>
+
+      <BacktestComparisonPanel
+        botId={selectedBotId}
+        runs={backtests}
+        versions={detailMatchesSelection ? detail.versions || [] : []}
+      />
 
       <section className="exchange-panel backtest-analysis-panel">
         <div className="exchange-panel-head compact">

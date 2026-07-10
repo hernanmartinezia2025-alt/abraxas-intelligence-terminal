@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { latestRows } from "../../utils/assets.js";
 
 function formatPrice(value) {
@@ -37,7 +37,8 @@ function compactRisk(level) {
   return "NORMAL";
 }
 
-export default function RadarPanel({ rows }) {
+export default function RadarPanel({ rows, sentiment }) {
+  const [sentimentOpen, setSentimentOpen] = useState(false);
   const assets = latestRows(rows);
   const state = marketState(assets);
   const fear = assets[0];
@@ -53,11 +54,17 @@ export default function RadarPanel({ rows }) {
           <p>{state.reading}</p>
         </div>
         <div className="radar-side-metrics">
-          <div className="fear-greed-tile">
+          <button
+            type="button"
+            className={`fear-greed-tile sentiment-trigger ${sentiment?.regime?.toLowerCase() || ""}`}
+            onClick={() => setSentimentOpen((open) => !open)}
+            aria-expanded={sentimentOpen}
+          >
             <span>Fear & Greed</span>
-            <strong>{fear?.fear_greed_value ?? "--"}</strong>
-            <small>{fear?.fear_greed_label || "sin dato"}</small>
-          </div>
+            <strong>{sentiment?.value ?? fear?.fear_greed_value ?? "--"}</strong>
+            <small>{sentiment?.title || fear?.fear_greed_label || "sin dato"}</small>
+            <i>{sentimentOpen ? "Ocultar lectura" : "Ver lectura"}</i>
+          </button>
           <div className="leader-tile">
             <span>Mayor movimiento</span>
             <strong>{leader?.symbol || "--"}</strong>
@@ -65,6 +72,27 @@ export default function RadarPanel({ rows }) {
           </div>
         </div>
       </div>
+
+      {sentimentOpen && sentiment && (
+        <section className="sentiment-analysis" aria-label="Analitica FOMO y FUD">
+          <div className="sentiment-summary">
+            <p className="eyebrow">Sentiment regime / real data</p>
+            <h3>{sentiment.title}</h3>
+            <p>{sentiment.guidance}</p>
+            <small>{sentiment.source}</small>
+          </div>
+          <dl className="sentiment-breadth">
+            <div><dt>Suben</dt><dd className="positive">{sentiment.market_breadth.positive}</dd></div>
+            <div><dt>Bajan</dt><dd className="negative">{sentiment.market_breadth.negative}</dd></div>
+            <div><dt>Promedio 24h</dt><dd>{formatPercent(sentiment.market_breadth.average_change_24h)}</dd></div>
+          </dl>
+          <div className="sentiment-checklist">
+            <span>Checklist operativo</span>
+            {sentiment.checklist.map((item) => <p key={item}>{item}</p>)}
+            <small>{sentiment.history_note}</small>
+          </div>
+        </section>
+      )}
 
       <div className="asset-grid">
         {assets.length === 0 && (

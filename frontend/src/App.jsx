@@ -60,7 +60,7 @@ export default function App() {
     setError("");
     try {
       const result = await updateRadar();
-      setRadar({ latest_snapshots: result.rows || [] });
+      setRadar({ ...result, latest_snapshots: result.latest_snapshots || result.rows || [] });
       setLastUpdated(new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
     } catch (err) {
       setError(err.message);
@@ -72,7 +72,7 @@ export default function App() {
   async function silentRefreshRadar() {
     try {
       const result = await updateRadar();
-      setRadar({ latest_snapshots: result.rows || [] });
+      setRadar({ ...result, latest_snapshots: result.latest_snapshots || result.rows || [] });
       setLastUpdated(new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
     } catch (err) {
       setError(err.message);
@@ -110,7 +110,7 @@ export default function App() {
       onAssetChange={setSelectedSymbol}
     >
       {error && <div className="error-box">{error}</div>}
-      {activePage === "markets" && <MarketsPage rows={rows} />}
+      {activePage === "markets" && <MarketsPage rows={rows} sentiment={radar.sentiment} />}
       {activePage === "trade" && <TradePage rows={rows} selectedSymbol={selectedSymbol} onSelectSymbol={setSelectedSymbol} />}
       {activePage === "map" && <LiveMapPage />}
       {activePage === "research" && <ResearchPage selectedSymbol={selectedSymbol} />}

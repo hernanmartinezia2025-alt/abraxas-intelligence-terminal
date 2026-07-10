@@ -514,6 +514,26 @@ h2 {
   display: grid;
   gap: 5px;
 }
+.sentiment-trigger {
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.sentiment-trigger:hover,
+.sentiment-trigger:focus-visible {
+  border-color: rgba(223, 192, 122, 0.72);
+  outline: none;
+}
+.sentiment-trigger.fud_extreme { border-color: rgba(107, 157, 220, 0.75); }
+.sentiment-trigger.fomo_extreme { border-color: rgba(209, 77, 93, 0.72); }
+.sentiment-trigger i {
+  color: var(--brand-2);
+  font-size: 10px;
+  font-style: normal;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+}
 .fear-greed-tile span,
 .leader-tile span {
   color: rgba(244, 247, 251, 0.52);
@@ -529,6 +549,31 @@ h2 {
 }
 .fear-greed-tile small,
 .leader-tile small { color: rgba(244, 247, 251, 0.58); }
+
+.sentiment-analysis {
+  display: grid;
+  grid-template-columns: minmax(260px, 1.15fr) minmax(210px, 0.75fr) minmax(280px, 1fr);
+  gap: 14px;
+  padding: 16px 18px;
+  border: 1px solid rgba(223, 192, 122, 0.28);
+  border-radius: 8px;
+  background: linear-gradient(120deg, rgba(223, 192, 122, 0.10), rgba(11, 16, 22, 0.98));
+  color: #f4f7fb;
+}
+.sentiment-analysis .eyebrow { color: var(--brand-2); }
+.sentiment-summary { display: grid; align-content: start; gap: 7px; }
+.sentiment-summary h3 { font-size: 22px; }
+.sentiment-summary p { color: rgba(244, 247, 251, 0.78); line-height: 1.45; }
+.sentiment-summary small,
+.sentiment-checklist small { color: rgba(244, 247, 251, 0.5); font-size: 11px; }
+.sentiment-breadth { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.sentiment-breadth div { border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.045); border-radius: 7px; padding: 12px 9px; }
+.sentiment-breadth dt { color: rgba(244,247,251,.54); font-size: 10px; text-transform: uppercase; letter-spacing: .06em; }
+.sentiment-breadth dd { margin: 7px 0 0; font: 700 20px var(--font-num); }
+.sentiment-checklist { display: grid; align-content: start; gap: 7px; }
+.sentiment-checklist > span { color: var(--brand-2); font-size: 10px; text-transform: uppercase; letter-spacing: .08em; }
+.sentiment-checklist p { color: rgba(244,247,251,.76); line-height: 1.36; font-size: 12px; }
+.sentiment-checklist p::before { content: "— "; color: var(--brand-2); }
 
 .asset-grid {
   display: grid;
@@ -3187,6 +3232,7 @@ h2 {
     flex: 1;
   }
   .radar-command,
+  .sentiment-analysis,
   .module-grid,
   .stat-analysis-grid,
   .data-grid,
@@ -3237,6 +3283,7 @@ h2 {
   .system-chip { min-width: 0; }
   .asset-card strong { font-size: 29px; }
   .radar-command { padding: 14px; }
+  .sentiment-breadth { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .trade-side-stack {
     grid-template-columns: 1fr;
   }

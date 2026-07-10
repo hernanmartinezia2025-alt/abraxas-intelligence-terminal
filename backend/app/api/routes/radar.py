@@ -18,4 +18,4 @@ def radar_update() -> dict:
         rows = update_market()
     except Exception as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
-    return {"saved": len(rows), "rows": rows}
+    return {"saved": len(rows), "rows": rows, **get_radar()}

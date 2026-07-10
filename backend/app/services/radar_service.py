@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from backend.app.core.config import DEFAULT_SYMBOLS
 from backend.app.market.binance import fetch_24h_tickers
 from backend.app.market.sentiment import fetch_fear_greed
+from backend.app.market.sentiment_analysis import build_sentiment_analysis
 from backend.app.market.signals import build_reading, classify_risk
 from backend.app.storage.sqlite import connect, initialize_database
 
@@ -67,4 +68,5 @@ def get_radar() -> dict:
         "latest_snapshots": rows,
         "symbols": sorted({row["symbol"] for row in rows}),
         "count": len(rows),
+        "sentiment": build_sentiment_analysis(rows),
     }

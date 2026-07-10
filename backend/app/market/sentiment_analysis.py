@@ -77,6 +77,8 @@ def build_sentiment_analysis(rows: list[dict[str, Any]]) -> dict[str, Any] | Non
     negative = sum(change < 0 for change in changes)
     unchanged = len(changes) - positive - negative
     average_change = sum(changes) / len(changes) if changes else 0.0
+    total_volume = sum(float(row.get("volume_24h") or 0) for row in assets)
+    high_risk = sum(1 for row in assets if str(row.get("risk_level") or "").startswith("HIGH"))
 
     by_timestamp: dict[str, list[int]] = defaultdict(list)
     for row in rows:
@@ -103,6 +105,9 @@ def build_sentiment_analysis(rows: list[dict[str, Any]]) -> dict[str, Any] | Non
             "negative": negative,
             "unchanged": unchanged,
             "average_change_24h": round(average_change, 4),
+            "positive_share": round((positive / len(assets)) * 100, 2) if assets else 0.0,
+            "total_volume_24h": round(total_volume, 2),
+            "high_risk": high_risk,
         },
         "history": history,
         "previous_value": previous_value,

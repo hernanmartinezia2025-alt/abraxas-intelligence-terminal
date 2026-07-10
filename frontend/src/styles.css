@@ -2880,6 +2880,69 @@ h2 {
   margin-top: 12px;
 }
 
+.market-overview-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  padding: 10px 10px 4px;
+}
+.market-overview-strip article {
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  background: rgba(255, 255, 255, 0.045);
+  border-radius: 8px;
+  padding: 11px;
+  display: grid;
+  gap: 4px;
+}
+.market-overview-strip span,
+.market-overview-strip small {
+  color: rgba(246, 248, 251, 0.52);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.market-overview-strip strong {
+  color: #ffffff;
+  font: 700 19px var(--font-num);
+}
+.market-overview-strip small { text-transform: none; letter-spacing: 0; }
+.market-lens-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+.market-lens-toolbar > div { display: flex; flex-wrap: wrap; gap: 6px; }
+.market-lens-toolbar button,
+.market-lens-toolbar select {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.045);
+  color: rgba(246, 248, 251, 0.68);
+  border-radius: 6px;
+  padding: 7px 10px;
+  font-size: 11px;
+}
+.market-lens-toolbar button.active,
+.market-lens-toolbar button:hover {
+  border-color: rgba(223, 192, 122, 0.5);
+  background: rgba(223, 192, 122, 0.13);
+  color: #ffffff;
+}
+.market-lens-toolbar label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: rgba(246, 248, 251, 0.48);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.market-lens-toolbar select { color: #ffffff; padding-block: 6px; }
+.market-lens-toolbar option { background: #111419; }
+
 .market-readings-grid {
   padding: 10px;
   display: grid;
@@ -2896,6 +2959,18 @@ h2 {
   display: grid;
   gap: 6px;
 }
+.market-readings-grid article.positive { border-left: 2px solid #079669; }
+.market-readings-grid article.negative { border-left: 2px solid #d14d5d; }
+.market-reading-head { display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+.market-reading-head em {
+  color: rgba(246, 248, 251, 0.48);
+  font-size: 9px;
+  font-style: normal;
+  letter-spacing: 0.06em;
+}
+.market-readings-grid article > strong { font: 700 18px var(--font-num); }
+.market-readings-grid article > strong.positive { color: #47d9aa; }
+.market-readings-grid article > strong.negative { color: #ff8b98; }
 
 .market-readings-grid b {
   color: #ffffff;
@@ -2908,6 +2983,7 @@ h2 {
   font-size: 11px;
   line-height: 1.35;
 }
+.market-readings-grid small { color: rgba(246, 248, 251, 0.42); font-size: 10px; }
 
 .live-map-page {
   display: grid;
@@ -3257,6 +3333,7 @@ h2 {
   .backtest-analysis-grid {
     grid-template-columns: 1fr;
   }
+  .market-overview-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .surface-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -3297,6 +3374,8 @@ h2 {
   .asset-card strong { font-size: 29px; }
   .radar-command { padding: 14px; }
   .sentiment-breadth { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .market-overview-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .market-lens-toolbar { align-items: stretch; flex-direction: column; }
   .trade-side-stack {
     grid-template-columns: 1fr;
   }

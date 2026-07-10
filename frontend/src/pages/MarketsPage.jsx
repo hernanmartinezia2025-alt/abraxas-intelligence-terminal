@@ -6,7 +6,7 @@ export default function MarketsPage({ rows, sentiment }) {
   return (
     <>
       <RadarPanel rows={rows} sentiment={sentiment} />
-      <MarketReadingsPanel rows={rows} />
+      <MarketReadingsPanel rows={rows} sentiment={sentiment} />
     </>
   );
 }

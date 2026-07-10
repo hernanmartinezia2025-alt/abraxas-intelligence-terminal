@@ -156,6 +156,10 @@ export function getBacktests(limit = 20) {
   return request(`/api/bots/backtests?${params}`);
 }
 
+export function getBacktest(backtestId) {
+  return request(`/api/bots/backtests/${backtestId}`);
+}
+
 export function runBotBacktest(botId, payload = {}) {
   return request(`/api/bots/${botId}/backtests`, {
     method: "POST",

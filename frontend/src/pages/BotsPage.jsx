@@ -1,12 +1,13 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { createBot, getBot, getBotBacktests, getBots, runBotBacktest } from "../api/client.js";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { createBot, getBacktest, getBot, getBotBacktests, getBots, runBotBacktest } from "../api/client.js";
+import BacktestEquityChart from "../features/charts/BacktestEquityChart.jsx";
 
 const BOT_STAGES = [
   ["Saved Bots", "online", "Bots persistidos en SQLite con versiones auditables."],
   ["Strategy JSON", "online", "Cada version guarda reglas, parametros y perfil de riesgo."],
-  ["Backtests", "next", "Probar cada version contra market_candles antes de simular en vivo."],
+  ["Backtests", "online", "Runs auditables por version con costos, trades y equity persistidos."],
   ["Paper Mode", "locked", "Simulacion en tiempo real sin tocar dinero ni claves."],
-  ["ROI Profile", "planned", "ROI, drawdown, win rate, profit factor y curva de equity."],
+  ["ROI Profile", "online", "ROI, benchmark, drawdown, win rate, profit factor y curva de equity."],
   ["Live Execution", "blocked", "Bloqueado hasta tener risk engine, permisos y kill switch."],
 ];
 
@@ -51,6 +52,11 @@ function formatNumber(value, digits = 2) {
   });
 }
 
+function formatPercentage(value, digits = 2) {
+  const formatted = formatNumber(value, digits);
+  return formatted === "--" ? formatted : `${formatted}%`;
+}
+
 export default function BotsPage({ selectedSymbol = "BTCUSDT" }) {
   const [bots, setBots] = useState([]);
   const [selectedBotId, setSelectedBotId] = useState(null);
@@ -58,8 +64,11 @@ export default function BotsPage({ selectedSymbol = "BTCUSDT" }) {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [backtesting, setBacktesting] = useState(false);
+  const [runDetailLoading, setRunDetailLoading] = useState(false);
   const [backtests, setBacktests] = useState([]);
-  const [latestBacktest, setLatestBacktest] = useState(null);
+  const [selectedRunId, setSelectedRunId] = useState(null);
+  const [selectedRun, setSelectedRun] = useState(null);
+  const [selectedVersionId, setSelectedVersionId] = useState("");
   const [error, setError] = useState("");
   const [form, setForm] = useState({
     name: "",
@@ -68,12 +77,53 @@ export default function BotsPage({ selectedSymbol = "BTCUSDT" }) {
     timeframe: "15m",
     risk_profile: "balanced",
   });
+  const [backtestParams, setBacktestParams] = useState({
+    initial_equity: 10000,
+    fee_pct: 0.1,
+    slippage_pct: 0.05,
+    limit: 500,
+  });
+  const selectedBotIdRef = useRef(null);
+  const detailRequestRef = useRef(0);
+  const backtestsRequestRef = useRef(0);
+  const runDetailRequestRef = useRef(0);
 
-  const latestVersion = detail?.versions?.[0];
+  const detailMatchesSelection = detail?.bot?.id === selectedBotId;
+  const latestVersion = detailMatchesSelection ? detail?.versions?.[0] : null;
+  const selectedVersion = detailMatchesSelection
+    ? detail?.versions?.find((version) => version.id === Number(selectedVersionId)) || latestVersion
+    : null;
+  const visibleBacktests = selectedVersion
+    ? backtests.filter((run) => run.bot_version_id === selectedVersion.id)
+    : [];
+  const runVersion = detail?.versions?.find((version) => version.id === selectedRun?.bot_version_id);
+  const runMetrics = selectedRun ? { ...selectedRun, ...(selectedRun.metrics || {}) } : {};
+  const effectiveEngineVersion = runMetrics.engine_version || selectedRun?.engine_version || "";
+  const isV2Run = String(effectiveEngineVersion).startsWith("2.");
+  const runWarnings = selectedRun?.warnings || runMetrics.warnings || [];
+  const runTrades = selectedRun?.trades || [];
+  const runEquity = selectedRun?.equity_curve || [];
   const strategyPreview = useMemo(() => {
-    if (!latestVersion?.strategy) return "{}";
-    return JSON.stringify(latestVersion.strategy, null, 2);
-  }, [latestVersion]);
+    if (!selectedVersion?.strategy) return "{}";
+    return JSON.stringify(selectedVersion.strategy, null, 2);
+  }, [selectedVersion]);
+  const numericBacktestParams = {
+    initial_equity: Number(backtestParams.initial_equity),
+    fee_pct: Number(backtestParams.fee_pct),
+    slippage_pct: Number(backtestParams.slippage_pct),
+    limit: Number(backtestParams.limit),
+  };
+  const backtestParamsValid = (
+    numericBacktestParams.initial_equity > 0
+    && numericBacktestParams.initial_equity <= 1_000_000_000
+    && numericBacktestParams.fee_pct >= 0
+    && numericBacktestParams.fee_pct <= 5
+    && numericBacktestParams.slippage_pct >= 0
+    && numericBacktestParams.slippage_pct <= 5
+    && Number.isInteger(numericBacktestParams.limit)
+    && numericBacktestParams.limit >= 60
+    && numericBacktestParams.limit <= 1000
+  );
 
   async function loadBots({ silent = false } = {}) {
     if (!silent) setLoading(true);
@@ -81,8 +131,9 @@ export default function BotsPage({ selectedSymbol = "BTCUSDT" }) {
     try {
       const payload = await getBots(100);
       setBots(payload.bots || []);
-      const nextId = selectedBotId || payload.bots?.[0]?.id || null;
-      if (nextId) setSelectedBotId(nextId);
+      const currentExists = payload.bots?.some((bot) => bot.id === selectedBotIdRef.current);
+      const nextId = currentExists ? selectedBotIdRef.current : payload.bots?.[0]?.id || null;
+      if (nextId !== selectedBotIdRef.current) selectBot(nextId);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -91,33 +142,104 @@ export default function BotsPage({ selectedSymbol = "BTCUSDT" }) {
   }
 
   async function loadDetail(botId) {
+    const requestId = ++detailRequestRef.current;
     if (!botId) {
       setDetail(null);
+      setSelectedVersionId("");
       return;
     }
     setError("");
     try {
       const payload = await getBot(botId);
+      if (requestId !== detailRequestRef.current || selectedBotIdRef.current !== botId) return;
       setDetail(payload);
+      setSelectedVersionId((current) => {
+        const exists = payload.versions?.some((version) => version.id === Number(current));
+        return exists ? current : String(payload.versions?.[0]?.id || "");
+      });
     } catch (err) {
+      if (requestId !== detailRequestRef.current) return;
       setError(err.message);
     }
   }
 
-  async function loadBacktests(botId) {
+  async function loadBacktests(botId, { preferredRunId = null } = {}) {
+    const requestId = ++backtestsRequestRef.current;
     if (!botId) {
       setBacktests([]);
-      setLatestBacktest(null);
+      setSelectedRunId(null);
+      setSelectedRun(null);
       return;
     }
     try {
       const payload = await getBotBacktests(botId, 20);
+      if (requestId !== backtestsRequestRef.current || selectedBotIdRef.current !== botId) return;
       const runs = payload.runs || [];
       setBacktests(runs);
-      setLatestBacktest(runs[0] || null);
+      setSelectedRunId((current) => {
+        const requested = preferredRunId || current;
+        return runs.some((run) => run.id === Number(requested)) ? Number(requested) : runs[0]?.id || null;
+      });
     } catch (err) {
+      if (requestId !== backtestsRequestRef.current) return;
       setError(err.message);
     }
+  }
+
+  async function loadRunDetail(runId) {
+    const requestId = ++runDetailRequestRef.current;
+    if (!runId) {
+      setSelectedRun(null);
+      setRunDetailLoading(false);
+      return;
+    }
+    const expectedBotId = selectedBotIdRef.current;
+    setRunDetailLoading(true);
+    setSelectedRun(null);
+    try {
+      const payload = await getBacktest(runId);
+      if (
+        requestId !== runDetailRequestRef.current
+        || selectedBotIdRef.current !== expectedBotId
+        || payload.bot_id !== expectedBotId
+      ) return;
+      setSelectedRun(payload);
+    } catch (err) {
+      if (requestId !== runDetailRequestRef.current) return;
+      setError(err.message);
+      setSelectedRun(null);
+    } finally {
+      if (requestId === runDetailRequestRef.current) setRunDetailLoading(false);
+    }
+  }
+
+  function selectBot(botId) {
+    detailRequestRef.current += 1;
+    backtestsRequestRef.current += 1;
+    runDetailRequestRef.current += 1;
+    selectedBotIdRef.current = botId;
+    setSelectedBotId(botId);
+    setDetail(null);
+    setSelectedVersionId("");
+    setBacktests([]);
+    setSelectedRunId(null);
+    setSelectedRun(null);
+    setRunDetailLoading(false);
+  }
+
+  function selectVersion(versionId) {
+    runDetailRequestRef.current += 1;
+    setSelectedVersionId(versionId);
+    const nextRun = backtests.find((run) => run.bot_version_id === Number(versionId));
+    setSelectedRunId(nextRun?.id || null);
+    setSelectedRun(null);
+  }
+
+  function selectRun(runId) {
+    runDetailRequestRef.current += 1;
+    setSelectedRunId(runId);
+    setSelectedRun(null);
+    setRunDetailLoading(Boolean(runId));
   }
 
   async function handleCreateBot(event) {
@@ -134,8 +256,9 @@ export default function BotsPage({ selectedSymbol = "BTCUSDT" }) {
         strategy,
         notes: "Version inicial generada desde Bot Forge.",
       });
-      setSelectedBotId(payload.bot.id);
+      selectBot(payload.bot.id);
       setDetail(payload);
+      setSelectedVersionId(String(payload.versions?.[0]?.id || ""));
       setForm((current) => ({ ...current, name: "", description: "" }));
       await loadBots({ silent: true });
       await loadBacktests(payload.bot.id);
@@ -147,19 +270,23 @@ export default function BotsPage({ selectedSymbol = "BTCUSDT" }) {
   }
 
   async function handleRunBacktest() {
-    if (!detail?.bot) return;
+    if (!detailMatchesSelection || !selectedVersion) return;
+    if (!backtestParamsValid) {
+      setError("Revisa los parametros: capital positivo, costos entre 0% y 5%, y 60-1000 barras enteras.");
+      return;
+    }
+    const botId = selectedBotId;
     setBacktesting(true);
     setError("");
     try {
-      const payload = await runBotBacktest(detail.bot.id, {
-        version_id: latestVersion?.id,
-        initial_equity: 10000,
-        fee_pct: 0.1,
-        slippage_pct: 0.05,
-        limit: 500,
+      const payload = await runBotBacktest(botId, {
+        version_id: selectedVersion.id,
+        ...numericBacktestParams,
       });
-      setLatestBacktest(payload);
-      await loadBacktests(detail.bot.id);
+      if (selectedBotIdRef.current !== botId) return;
+      setSelectedRun(payload);
+      setSelectedRunId(payload.id);
+      await loadBacktests(botId, { preferredRunId: payload.id });
     } catch (err) {
       setError(err.message);
     } finally {
@@ -179,6 +306,24 @@ export default function BotsPage({ selectedSymbol = "BTCUSDT" }) {
     loadDetail(selectedBotId);
     loadBacktests(selectedBotId);
   }, [selectedBotId]);
+
+  useEffect(() => {
+    if (!selectedVersionId) return;
+    const matchingRuns = backtests.filter((run) => run.bot_version_id === Number(selectedVersionId));
+    if (!matchingRuns.some((run) => run.id === selectedRunId)) {
+      runDetailRequestRef.current += 1;
+      setSelectedRun(null);
+      setSelectedRunId(matchingRuns[0]?.id || null);
+    }
+  }, [backtests, selectedRunId, selectedVersionId]);
+
+  useEffect(() => {
+    if (selectedRun?.id === selectedRunId) {
+      setRunDetailLoading(false);
+      return;
+    }
+    loadRunDetail(selectedRunId);
+  }, [selectedRunId]);
 
   return (
     <section className="ops-page">
@@ -280,8 +425,9 @@ export default function BotsPage({ selectedSymbol = "BTCUSDT" }) {
               <button
                 className={bot.id === selectedBotId ? "active" : ""}
                 key={bot.id}
-                onClick={() => setSelectedBotId(bot.id)}
+                onClick={() => selectBot(bot.id)}
                 type="button"
+                aria-pressed={bot.id === selectedBotId}
               >
                 <div>
                   <strong>{bot.name}</strong>
@@ -299,55 +445,135 @@ export default function BotsPage({ selectedSymbol = "BTCUSDT" }) {
         <div className="exchange-panel-head compact">
           <div>
             <p className="eyebrow">Bot Detail</p>
-            <h2>{detail?.bot?.name || "Sin bot seleccionado"}</h2>
+            <h2>{detailMatchesSelection ? detail.bot.name : "Sin bot seleccionado"}</h2>
           </div>
-          <button type="button" onClick={handleRunBacktest} disabled={!detail?.bot || backtesting}>
+          <button
+            type="button"
+            onClick={handleRunBacktest}
+            disabled={!detailMatchesSelection || !selectedVersion || !backtestParamsValid || backtesting}
+          >
             {backtesting ? "Backtesting..." : "Run backtest"}
           </button>
         </div>
-        {detail?.bot ? (
-          <div className="bot-detail-grid">
-            <article>
-              <span>Estado</span>
-              <strong>{detail.bot.status}</strong>
-              <small>{detail.bot.mode}</small>
-            </article>
-            <article>
-              <span>Activo</span>
-              <strong>{detail.bot.base_symbol}</strong>
-              <small>{detail.bot.timeframe}</small>
-            </article>
-            <article>
-              <span>Riesgo</span>
-              <strong>{detail.bot.risk_profile}</strong>
-              <small>{formatTime(detail.bot.updated_at)}</small>
-            </article>
-            <article>
-              <span>Versiones</span>
-              <strong>{detail.versions.length}</strong>
-              <small>{latestVersion ? `v${latestVersion.version}` : "sin version"}</small>
-            </article>
-            <article>
-              <span>ROI ultimo</span>
-              <strong>{formatNumber(latestBacktest?.roi_pct, 2)}%</strong>
-              <small>{latestBacktest ? formatTime(latestBacktest.created_at) : "sin backtest"}</small>
-            </article>
-            <article>
-              <span>Drawdown</span>
-              <strong>{formatNumber(latestBacktest?.max_drawdown_pct, 2)}%</strong>
-              <small>max DD</small>
-            </article>
-            <article>
-              <span>Trades</span>
-              <strong>{latestBacktest?.total_trades ?? "--"}</strong>
-              <small>win {formatNumber(latestBacktest?.win_rate_pct, 1)}%</small>
-            </article>
-            <article>
-              <span>Profit factor</span>
-              <strong>{formatNumber(latestBacktest?.profit_factor, 2)}</strong>
-              <small>simulado</small>
-            </article>
-            <pre>{strategyPreview}</pre>
+        {detailMatchesSelection ? (
+          <div>
+            <div className="backtest-controls">
+              <label>
+                Version
+                <select value={selectedVersionId} onChange={(event) => selectVersion(event.target.value)}>
+                  {(detail.versions || []).map((version) => (
+                    <option key={version.id} value={version.id}>v{version.version} · #{version.id}</option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Capital inicial
+                <input
+                  type="number"
+                  min="1"
+                  max="1000000000"
+                  step="100"
+                  value={backtestParams.initial_equity}
+                  onChange={(event) => setBacktestParams((current) => ({ ...current, initial_equity: event.target.value }))}
+                />
+              </label>
+              <label>
+                Fee %
+                <input
+                  type="number"
+                  min="0"
+                  max="5"
+                  step="0.01"
+                  value={backtestParams.fee_pct}
+                  onChange={(event) => setBacktestParams((current) => ({ ...current, fee_pct: event.target.value }))}
+                />
+              </label>
+              <label>
+                Slippage %
+                <input
+                  type="number"
+                  min="0"
+                  max="5"
+                  step="0.01"
+                  value={backtestParams.slippage_pct}
+                  onChange={(event) => setBacktestParams((current) => ({ ...current, slippage_pct: event.target.value }))}
+                />
+              </label>
+              <label>
+                Barras solicitadas
+                <input
+                  type="number"
+                  min="60"
+                  max="1000"
+                  step="20"
+                  value={backtestParams.limit}
+                  onChange={(event) => setBacktestParams((current) => ({ ...current, limit: event.target.value }))}
+                />
+              </label>
+            </div>
+            <div className="bot-detail-grid">
+              <article>
+                <span>Estado</span>
+                <strong>{detail.bot.status}</strong>
+                <small>{detail.bot.mode}</small>
+              </article>
+              <article>
+                <span>Activo</span>
+                <strong>{detail.bot.base_symbol}</strong>
+                <small>{detail.bot.timeframe}</small>
+              </article>
+              <article>
+                <span>Version del run</span>
+                <strong>{selectedRun ? (runVersion ? `v${runVersion.version}` : `#${selectedRun.bot_version_id}`) : "--"}</strong>
+                <small>{selectedRun ? `run #${selectedRun.id}` : "sin run"}</small>
+              </article>
+              <article>
+                <span>Engine</span>
+                <strong>{effectiveEngineVersion || "--"}</strong>
+                <small>{runMetrics.position_mode || selectedRun?.position_mode || "long-only"}</small>
+              </article>
+              <article>
+                <span>ROI estrategia</span>
+                <strong>{formatPercentage(runMetrics.roi_pct, 2)}</strong>
+                <small>{selectedRun ? formatTime(selectedRun.created_at) : "sin backtest"}</small>
+              </article>
+              <article>
+                <span>Buy &amp; hold</span>
+                <strong>{formatPercentage(runMetrics.benchmark_roi_pct, 2)}</strong>
+                <small>mismo rango</small>
+              </article>
+              <article>
+                <span>Alpha</span>
+                <strong>{formatPercentage(runMetrics.alpha_pct, 2)}</strong>
+                <small>ROI - benchmark</small>
+              </article>
+              <article>
+                <span>Drawdown</span>
+                <strong>{formatPercentage(runMetrics.max_drawdown_pct, 2)}</strong>
+                <small>max DD</small>
+              </article>
+              <article>
+                <span>Trades</span>
+                <strong>{runMetrics.total_trades ?? "--"}</strong>
+                <small>win {formatPercentage(runMetrics.win_rate_pct, 1)}</small>
+              </article>
+              <article>
+                <span>Profit factor</span>
+                <strong>{formatNumber(runMetrics.profit_factor, 2)}</strong>
+                <small>{isV2Run ? "sobre PnL neto" : "metrica legacy"}</small>
+              </article>
+              <article>
+                <span>Fees pagadas</span>
+                <strong>{formatNumber(runMetrics.total_fees, 2)}</strong>
+                <small>fee {formatNumber(runMetrics.fee_pct, 3)}%</small>
+              </article>
+              <article>
+                <span>Warnings</span>
+                <strong>{runWarnings.length}</strong>
+                <small>{runMetrics.data_points ?? "--"} puntos</small>
+              </article>
+              <pre>{strategyPreview}</pre>
+            </div>
           </div>
         ) : (
           <div className="map-empty">
@@ -361,30 +587,130 @@ export default function BotsPage({ selectedSymbol = "BTCUSDT" }) {
         <div className="exchange-panel-head compact">
           <div>
             <p className="eyebrow">Backtest Runs</p>
-            <h2>{backtests.length} simulaciones guardadas</h2>
+            <h2>{visibleBacktests.length} simulaciones de {selectedVersion ? `v${selectedVersion.version}` : "la version"}</h2>
           </div>
           <span>SQLite</span>
         </div>
         <div className="backtest-list">
-          {backtests.map((run) => (
-            <article key={run.id}>
+          {visibleBacktests.map((run) => (
+            <button
+              type="button"
+              className={run.id === selectedRunId ? "active" : ""}
+              key={run.id}
+              onClick={() => selectRun(run.id)}
+              aria-pressed={run.id === selectedRunId}
+            >
               <div>
                 <strong>Run #{run.id}</strong>
-                <span>{run.symbol} / {run.timeframe}</span>
+                <span>{run.symbol} / {run.timeframe} · version #{run.bot_version_id}</span>
               </div>
               <b className={Number(run.roi_pct || 0) >= 0 ? "positive" : "negative"}>{formatNumber(run.roi_pct, 2)}%</b>
               <b>{formatNumber(run.max_drawdown_pct, 2)}% DD</b>
               <b>{run.total_trades} trades</b>
               <small>{formatTime(run.created_at)}</small>
-            </article>
+            </button>
           ))}
-          {!backtests.length && (
+          {!visibleBacktests.length && (
             <div className="map-empty">
               <strong>Sin backtests todavia</strong>
-              <span>Ejecuta Run backtest para guardar el primer resultado de este bot.</span>
+              <span>Ejecuta Run backtest para guardar el primer resultado de esta version.</span>
             </div>
           )}
         </div>
+      </section>
+
+      <section className="exchange-panel backtest-analysis-panel">
+        <div className="exchange-panel-head compact">
+          <div>
+            <p className="eyebrow">Backtest Detail</p>
+            <h2>{selectedRun ? `Run #${selectedRun.id} · equity y auditoria` : "Selecciona un run"}</h2>
+          </div>
+          <span>{runDetailLoading ? "LOADING" : selectedRun?.execution_model || runMetrics.execution_model || "SQLite"}</span>
+        </div>
+        {selectedRun ? (
+          <div className="backtest-analysis-grid">
+            <BacktestEquityChart points={runEquity} />
+            <aside className="backtest-warning-panel">
+              <div>
+                <span>Rango</span>
+                <strong>{formatTime(selectedRun.input_start)} → {formatTime(selectedRun.input_end)}</strong>
+              </div>
+              <div>
+                <span>Modelo de ejecucion</span>
+                <strong>{runMetrics.execution_model || selectedRun.execution_model}</strong>
+              </div>
+              <div>
+                <span>Calidad de datos</span>
+                <strong>{selectedRun.data_quality?.rows_used ?? runMetrics.data_points ?? "--"} filas · {selectedRun.data_quality?.gap_count ?? "--"} gaps</strong>
+              </div>
+              <div className="backtest-warning-list">
+                {runWarnings.map((item, index) => (
+                  <article className={item.severity || "warning"} key={`${item.code || "warning"}-${index}`}>
+                    <b>{item.code || "WARNING"}</b>
+                    <p>{item.message}</p>
+                  </article>
+                ))}
+                {!runWarnings.length && <span className="research-empty">Sin warnings registrados para este run.</span>}
+              </div>
+            </aside>
+          </div>
+        ) : (
+          <div className="map-empty">
+            <strong>Sin detalle seleccionado</strong>
+            <span>Selecciona un run persistido para cargar su equity, benchmark, warnings y trades.</span>
+          </div>
+        )}
+      </section>
+
+      <section className="exchange-panel backtest-trades-panel">
+        <div className="exchange-panel-head compact">
+          <div>
+            <p className="eyebrow">Trades</p>
+            <h2>{selectedRun ? `${runTrades.length} operaciones persistidas` : "Tabla por backtest"}</h2>
+          </div>
+          <span>NET PNL</span>
+        </div>
+        {runTrades.length ? (
+          <div className="backtest-trades-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Entrada</th>
+                  <th>Salida</th>
+                  <th>Entry px</th>
+                  <th>Exit px</th>
+                  <th>Cantidad</th>
+                  <th>Fees</th>
+                  <th>PnL neto</th>
+                  <th>Retorno</th>
+                  <th>Motivo</th>
+                </tr>
+              </thead>
+              <tbody>
+                {runTrades.map((trade, index) => (
+                  <tr key={trade.id || trade.trade_index || index}>
+                    <td>{trade.trade_index || index + 1}</td>
+                    <td>{formatTime(trade.entry_timestamp)}</td>
+                    <td>{formatTime(trade.exit_timestamp)}</td>
+                    <td>{formatNumber(trade.entry_price, 4)}</td>
+                    <td>{formatNumber(trade.exit_price, 4)}</td>
+                    <td>{formatNumber(trade.quantity, 6)}</td>
+                    <td>{formatNumber(trade.fees_paid, 3)}</td>
+                    <td className={Number(trade.pnl || 0) >= 0 ? "positive" : "negative"}>{formatNumber(trade.pnl, 3)}</td>
+                    <td className={Number(trade.return_pct || 0) >= 0 ? "positive" : "negative"}>{formatNumber(trade.return_pct, 2)}%</td>
+                    <td>{trade.exit_reason || (trade.forced_exit ? "end_of_data" : "legacy")}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="map-empty">
+            <strong>Sin trades persistidos</strong>
+            <span>{selectedRun ? "El run no produjo operaciones o es un registro legacy sin detalle normalizado." : "Selecciona un run para ver sus operaciones."}</span>
+          </div>
+        )}
       </section>
     </section>
   );

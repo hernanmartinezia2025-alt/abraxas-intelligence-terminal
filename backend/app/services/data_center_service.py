@@ -54,7 +54,14 @@ SOURCE_CATALOG = [
         "name": "SQLite Local",
         "type": "storage",
         "status": "active",
-        "datasets": ["all_local_tables", "bots", "bot_versions", "backtest_runs"],
+        "datasets": [
+            "all_local_tables",
+            "bots",
+            "bot_versions",
+            "backtest_runs",
+            "backtest_trades",
+            "backtest_equity",
+        ],
         "purpose": "Base local para cache, auditoria y datasets analiticos.",
     },
 ]
@@ -154,6 +161,44 @@ DATASET_CATALOG = [
         "bot_ready": True,
         "description": "Resultados persistidos de simulaciones: ROI, drawdown, trades, win rate y profit factor.",
     },
+    {
+        "dataset_id": "backtest_trades",
+        "table": "backtest_trades",
+        "label": "Backtest Trades",
+        "category": "bot_forge",
+        "powerbi_ready": True,
+        "bot_ready": True,
+        "preview_columns": [
+            "backtest_id",
+            "bot_version_id",
+            "trade_index",
+            "entry_timestamp",
+            "exit_timestamp",
+            "pnl",
+            "return_pct",
+            "exit_reason",
+        ],
+        "description": "Operaciones normalizadas por run con fills, costos, PnL neto y motivo de salida.",
+    },
+    {
+        "dataset_id": "backtest_equity",
+        "table": "backtest_equity",
+        "label": "Backtest Equity",
+        "category": "bot_forge",
+        "powerbi_ready": True,
+        "bot_ready": True,
+        "preview_columns": [
+            "backtest_id",
+            "bot_version_id",
+            "point_index",
+            "timestamp",
+            "equity",
+            "benchmark_equity",
+            "drawdown_pct",
+            "in_position",
+        ],
+        "description": "Curva de equity normalizada con benchmark buy & hold y drawdown por punto.",
+    },
 ]
 
 
@@ -183,7 +228,17 @@ def get_table_stats(table_name: str) -> dict:
         ]
         timestamp_column = first_existing_column(
             columns,
-            ["timestamp", "published_at", "checked_at", "fetched_at", "open_time", "close_time", "created_at"],
+            [
+                "timestamp",
+                "exit_timestamp",
+                "entry_timestamp",
+                "published_at",
+                "checked_at",
+                "fetched_at",
+                "open_time",
+                "close_time",
+                "created_at",
+            ],
         )
         last_timestamp = None
         if timestamp_column:
@@ -291,7 +346,18 @@ def get_dataset_preview(dataset_id: str, limit: int = 25) -> dict:
 
     order_column = first_existing_column(
         stats["columns"],
-        ["timestamp", "published_at", "checked_at", "fetched_at", "open_time", "close_time", "created_at", "id"],
+        [
+            "timestamp",
+            "exit_timestamp",
+            "entry_timestamp",
+            "published_at",
+            "checked_at",
+            "fetched_at",
+            "open_time",
+            "close_time",
+            "created_at",
+            "id",
+        ],
     )
     order_sql = f"ORDER BY {order_column} DESC" if order_column else ""
     with connect() as connection:

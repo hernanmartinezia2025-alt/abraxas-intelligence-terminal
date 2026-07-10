@@ -84,7 +84,11 @@ export default function DataApiCenter({ selectedSymbol = "BTCUSDT" }) {
   );
   const exportableDatasets = datasets.filter((dataset) => dataset.exists && dataset.powerbi_ready);
   const previewRows = preview?.rows || [];
-  const previewColumns = previewRows[0] ? Object.keys(previewRows[0]).slice(0, 8) : [];
+  const availablePreviewColumns = previewRows[0] ? Object.keys(previewRows[0]) : [];
+  const preferredPreviewColumns = preview?.dataset?.preview_columns || [];
+  const previewColumns = preferredPreviewColumns.length
+    ? preferredPreviewColumns.filter((column) => availablePreviewColumns.includes(column))
+    : availablePreviewColumns.slice(0, 8);
 
   return (
     <section className="data-center-page">

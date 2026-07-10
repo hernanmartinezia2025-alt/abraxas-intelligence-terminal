@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Path, Query
 from pydantic import BaseModel, Field
 
 from backend.app.services.bot_service import (
@@ -32,11 +32,11 @@ class BotVersionRequest(BaseModel):
 
 
 class BacktestRunRequest(BaseModel):
-    version_id: int | None = None
-    initial_equity: float = 10_000
-    fee_pct: float = 0.1
-    slippage_pct: float = 0.05
-    limit: int = 500
+    version_id: int | None = Field(default=None, ge=1)
+    initial_equity: float = Field(default=10_000, gt=0, le=1_000_000_000)
+    fee_pct: float = Field(default=0.1, ge=0, le=5)
+    slippage_pct: float = Field(default=0.05, ge=0, le=5)
+    limit: int = Field(default=500, ge=60, le=1000)
 
 
 def model_payload(model: BaseModel) -> dict:
@@ -72,7 +72,7 @@ def all_bot_backtests(limit: int = Query(default=50, ge=1, le=500)) -> dict:
 
 
 @router.get("/{bot_id}")
-def bot_detail(bot_id: int) -> dict:
+def bot_detail(bot_id: int = Path(ge=1)) -> dict:
     try:
         return get_saved_bot(bot_id=bot_id)
     except ValueError as exc:
@@ -82,7 +82,7 @@ def bot_detail(bot_id: int) -> dict:
 
 
 @router.get("/{bot_id}/backtests")
-def bot_backtests(bot_id: int, limit: int = Query(default=50, ge=1, le=500)) -> dict:
+def bot_backtests(bot_id: int = Path(ge=1), limit: int = Query(default=50, ge=1, le=500)) -> dict:
     try:
         return list_saved_bot_backtests(bot_id=bot_id, limit=limit)
     except Exception as exc:
@@ -90,7 +90,7 @@ def bot_backtests(bot_id: int, limit: int = Query(default=50, ge=1, le=500)) -> 
 
 
 @router.post("/{bot_id}/backtests")
-def run_bot_backtest(bot_id: int, payload: BacktestRunRequest) -> dict:
+def run_bot_backtest(payload: BacktestRunRequest, bot_id: int = Path(ge=1)) -> dict:
     try:
         return run_saved_bot_backtest(bot_id=bot_id, **model_payload(payload))
     except ValueError as exc:
@@ -100,7 +100,7 @@ def run_bot_backtest(bot_id: int, payload: BacktestRunRequest) -> dict:
 
 
 @router.get("/backtests/{backtest_id}")
-def bot_backtest_detail(backtest_id: int) -> dict:
+def bot_backtest_detail(backtest_id: int = Path(ge=1)) -> dict:
     try:
         return get_saved_bot_backtest(backtest_id=backtest_id)
     except ValueError as exc:
@@ -110,7 +110,7 @@ def bot_backtest_detail(backtest_id: int) -> dict:
 
 
 @router.post("/{bot_id}/versions")
-def bot_version(bot_id: int, payload: BotVersionRequest) -> dict:
+def bot_version(payload: BotVersionRequest, bot_id: int = Path(ge=1)) -> dict:
     try:
         return create_saved_bot_version(bot_id=bot_id, payload=model_payload(payload))
     except ValueError as exc:

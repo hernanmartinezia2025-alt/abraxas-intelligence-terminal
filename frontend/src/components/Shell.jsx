@@ -2,13 +2,13 @@ import React, { useEffect, useState } from "react";
 import GlobalAssetSelector from "./GlobalAssetSelector.jsx";
 
 const NAV_ITEMS = [
-  ["markets", "Markets", "overview"],
-  ["trade", "Trade", "spot desk"],
-  ["map", "Map", "live world"],
-  ["research", "Research", "strategy"],
-  ["data", "Data", "sources"],
-  ["bots", "Bots", "forge"],
-  ["risk", "Risk", "limits"],
+  ["markets", "Markets", "overview", "◈"],
+  ["trade", "Trade", "spot desk", "⌁"],
+  ["map", "Map", "live world", "◎"],
+  ["research", "Research", "strategy", "∿"],
+  ["data", "Data", "sources", "▦"],
+  ["bots", "Bots", "forge", "◆"],
+  ["risk", "Risk", "limits", "△"],
 ];
 
 const ROADMAP_ITEMS = [
@@ -34,6 +34,7 @@ export default function Shell({
   onAssetChange,
 }) {
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [railCollapsed, setRailCollapsed] = useState(() => window.localStorage.getItem("abraxas-rail-collapsed") === "true");
   const [railDensity, setRailDensity] = useState(() => window.localStorage.getItem("abraxas-rail-density") || "comfortable");
 
   useEffect(() => {
@@ -41,8 +42,12 @@ export default function Shell({
     window.localStorage.setItem("abraxas-rail-density", railDensity);
   }, [railDensity]);
 
+  useEffect(() => {
+    window.localStorage.setItem("abraxas-rail-collapsed", String(railCollapsed));
+  }, [railCollapsed]);
+
   return (
-    <div className="terminal-frame">
+    <div className={`terminal-frame ${railCollapsed ? "rail-collapsed" : ""}`}>
       <aside className="side-rail">
         <div className="brand-block">
           <img className="brand-mark" src="/abraxas-emblem.png" alt="ABRAXAS emblem" />
@@ -50,10 +55,14 @@ export default function Shell({
             <strong>ABRAXAS</strong>
             <small>local intelligence</small>
           </div>
+          <button className="rail-collapse-button" type="button" onClick={() => setRailCollapsed((current) => !current)} aria-label={railCollapsed ? "Abrir rail" : "Colapsar rail"} title={railCollapsed ? "Abrir rail" : "Colapsar rail"}>
+            {railCollapsed ? "»" : "«"}
+          </button>
         </div>
         <nav className="rail-nav" aria-label="Primary modules">
-          {NAV_ITEMS.map(([key, label, meta]) => (
+          {NAV_ITEMS.map(([key, label, meta, icon]) => (
             <a className={activePage === key ? "active" : ""} href={`#${key}`} key={key}>
+              <b aria-hidden="true">{icon}</b>
               <span>{label}</span>
               <small>{meta}</small>
             </a>

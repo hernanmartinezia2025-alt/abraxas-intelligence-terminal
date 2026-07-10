@@ -108,7 +108,7 @@ export default function RadarPanel({ rows, sentiment }) {
             <span>FOMO / FUD por horizonte</span>
             <SentimentGauge value={sentiment.value} />
             <div className="sentiment-horizons">
-              {(sentiment.horizons || []).map((horizon) => <b className={horizon.status} key={horizon.key}>{horizon.label}<small>{horizon.status === "available" ? "disponible" : "sin fuente"}</small></b>)}
+              {(sentiment.horizons || []).map((horizon) => <b className={horizon.status} key={horizon.key}>{horizon.label}<small>{horizon.status === "available" ? `${horizon.regime} · ${horizon.value >= 0 ? "+" : ""}${horizon.value}%` : "sin fuente"}</small></b>)}
             </div>
           </div>
           <div className="sentiment-checklist">

@@ -6,6 +6,7 @@ from backend.app.core.config import DEFAULT_SYMBOLS
 from backend.app.market.binance import fetch_24h_tickers
 from backend.app.market.sentiment import fetch_fear_greed
 from backend.app.market.sentiment_analysis import build_sentiment_analysis
+from backend.app.market.horizon_pressure import build_horizon_pressure
 from backend.app.market.signals import build_reading, classify_risk
 from backend.app.storage.sqlite import connect, initialize_database
 
@@ -64,9 +65,12 @@ def get_latest(limit: int = 160) -> list[dict]:
 
 def get_radar() -> dict:
     rows = get_latest()
+    sentiment = build_sentiment_analysis(rows)
+    if sentiment:
+        sentiment["horizons"] = build_horizon_pressure()
     return {
         "latest_snapshots": rows,
         "symbols": sorted({row["symbol"] for row in rows}),
         "count": len(rows),
-        "sentiment": build_sentiment_analysis(rows),
+        "sentiment": sentiment,
     }

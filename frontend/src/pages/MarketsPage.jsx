@@ -10,7 +10,7 @@ export default function MarketsPage({ rows, sentiment, selectedSymbol = "BTCUSDT
   return (
     <>
       <PageSubtabs
-        tabs={[["overview", "Overview", "radar + sentimiento"], ["assets", "Asset focus", "amplitud + filtros"], ["universe", "Asset universe", "crypto + macro"]]}
+        tabs={[["overview", "Overview", "radar + sentimiento"], ["assets", "Asset focus", "amplitud + filtros"]]}
         activeTab={activeTab}
         onChange={setActiveTab}
       />
@@ -18,6 +18,7 @@ export default function MarketsPage({ rows, sentiment, selectedSymbol = "BTCUSDT
         <>
           <MarketIntelligenceBrief selectedSymbol={selectedSymbol} />
           <RadarPanel rows={rows} sentiment={sentiment} />
+          <MarketUniversePanel />
         </>
       ) : activeTab === "assets" ? <MarketReadingsPanel rows={rows} sentiment={sentiment} /> : <MarketUniversePanel />}
     </>

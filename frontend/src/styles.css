@@ -84,6 +84,7 @@ div {
   grid-template-columns: 244px minmax(0, 1fr);
   overflow-x: hidden;
 }
+.terminal-frame.rail-collapsed { grid-template-columns: 78px minmax(0, 1fr); }
 
 .side-rail {
   position: relative;
@@ -121,6 +122,8 @@ html[data-rail-density="compact"] .rail-crest {
   padding: 0 4px 18px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
+.rail-collapse-button { margin-left: auto; width: 28px; height: 28px; border: 1px solid rgba(223,192,122,.22); border-radius: 6px; background: rgba(255,255,255,.04); color: var(--brand-2); font-size: 18px; }
+.rail-collapse-button:hover { border-color: rgba(223,192,122,.62); background: rgba(223,192,122,.13); }
 
 .brand-mark {
   width: 38px;
@@ -174,6 +177,7 @@ html[data-rail-density="compact"] .rail-crest {
   font-size: 13px;
   font-weight: 760;
 }
+.rail-nav b { display: none; color: var(--brand-2); font-size: 18px; font-weight: 500; }
 .rail-nav small {
   color: rgba(247, 247, 247, 0.38);
   font-size: 10px;
@@ -338,6 +342,19 @@ html[data-rail-density="compact"] .rail-crest {
   border-color: rgba(223, 192, 122, 0.48);
   background: rgba(223, 192, 122, 0.13);
 }
+.rail-collapsed .brand-block { grid-template-columns: 1fr; justify-items: center; padding-inline: 0; }
+.rail-collapsed .brand-block > div { display: none; }
+.rail-collapsed .brand-mark { width: 42px; }
+.rail-collapsed .rail-collapse-button { margin: 0; }
+.rail-collapsed .rail-nav a { justify-items: center; padding-inline: 4px; }
+.rail-collapsed .rail-nav b { display: block; }
+.rail-collapsed .rail-nav span,
+.rail-collapsed .rail-nav small,
+.rail-collapsed .rail-crest,
+.rail-collapsed .rail-module-card,
+.rail-collapsed .rail-status-card,
+.rail-collapsed .rail-footer,
+.rail-collapsed .rail-settings { display: none; }
 
 .shell {
   width: 100%;
@@ -681,6 +698,8 @@ h2 {
 .asset-card .volume-line b,
 .asset-card p { color: rgba(244, 247, 251, 0.72); }
 .asset-card strong { color: #ffffff; font-size: clamp(21px, 2vw, 28px); }
+.asset-card.positive > strong { color: #47d9aa; }
+.asset-card.negative > strong { color: #ff8b98; }
 .asset-card .asset-meta small { color: rgba(244, 247, 251, 0.56); border-color: rgba(255,255,255,.16); background: rgba(255,255,255,.06); }
 .asset-sparkline { width: 100%; height: 30px; display: block; opacity: .92; }
 .asset-sparkline polyline { fill: none; stroke-width: 1.8; }

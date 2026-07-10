@@ -346,6 +346,37 @@ html[data-rail-density="compact"] .rail-crest {
   padding: 28px clamp(18px, 2.6vw, 34px) 52px;
 }
 
+.page-subtabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+  padding: 5px;
+  border: 1px solid rgba(223, 192, 122, 0.18);
+  border-radius: 9px;
+  background: rgba(8, 13, 19, 0.82);
+  overflow-x: auto;
+}
+.page-subtabs button {
+  min-width: 150px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: rgba(246, 248, 251, 0.54);
+  padding: 9px 12px;
+  display: grid;
+  gap: 3px;
+  text-align: left;
+  white-space: nowrap;
+}
+.page-subtabs button:hover,
+.page-subtabs button.active {
+  border-color: rgba(223, 192, 122, 0.35);
+  background: rgba(223, 192, 122, 0.12);
+  color: #ffffff;
+}
+.page-subtabs button span { font-size: 12px; font-weight: 800; }
+.page-subtabs button small { color: inherit; font-size: 10px; opacity: 0.66; }
+
 .topbar {
   display: flex;
   align-items: center;

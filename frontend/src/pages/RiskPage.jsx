@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { getRiskProfile, updateKillSwitch, updateRiskLimits, validateRiskIntent } from "../api/client.js";
+import PageSubtabs from "../components/PageSubtabs.jsx";
 
 const EMPTY = { max_position_pct: 10, max_daily_loss_pct: 3, max_drawdown_pct: 12, cooldown_minutes: 30, symbol_whitelist: [] };
 
@@ -11,6 +12,7 @@ export default function RiskPage() {
   const [error, setError] = useState("");
   const [intent, setIntent] = useState({ symbol: "BTCUSDT", requested_notional: 500, account_equity: 10000, daily_pnl: 0, current_drawdown_pct: 0 });
   const [decision, setDecision] = useState(null);
+  const [activeTab, setActiveTab] = useState("overview");
 
   const load = async () => {
     try {
@@ -70,8 +72,27 @@ export default function RiskPage() {
       </section>
 
       {error && <div className="chart-state error">{error}</div>}
+      <PageSubtabs
+        tabs={[
+          ["overview", "Overview", "estado operativo"],
+          ["controls", "Controls", "limites + kill switch"],
+          ["validator", "Validator", "pre-trade gate"],
+          ["ledger", "Ledger", "decisiones + cambios"],
+        ]}
+        activeTab={activeTab}
+        onChange={setActiveTab}
+      />
       {!profile ? <div className="chart-state">Cargando estado real del backend…</div> : <>
-        <section className="risk-workspace">
+        {activeTab === "overview" && <section className="risk-overview-grid">
+          <article><span>Kill switch</span><strong className={killActive ? "negative" : "positive"}>{killActive ? "ACTIVE" : "INACTIVE"}</strong><small>{profile.kill_switch.reason}</small></article>
+          <article><span>Paper execution</span><strong>RISK GATED</strong><small>Toda orden pasa por validacion backend.</small></article>
+          <article><span>Live execution</span><strong className="negative">BLOCKED</strong><small>Sin adapters privados ni API keys.</small></article>
+          <article><span>Position limit</span><strong>{Number(profile.limits.max_position_pct).toFixed(2)}%</strong><small>Maximo por intencion.</small></article>
+          <article><span>Daily loss</span><strong>{Number(profile.limits.max_daily_loss_pct).toFixed(2)}%</strong><small>Corte por perdida diaria.</small></article>
+          <article><span>Max drawdown</span><strong>{Number(profile.limits.max_drawdown_pct).toFixed(2)}%</strong><small>Guardrail sobre equity.</small></article>
+        </section>}
+
+        {activeTab === "controls" && <section className="risk-workspace">
           <form className="exchange-panel risk-limits-form" onSubmit={saveLimits}>
             <div className="exchange-panel-head compact"><div><p className="eyebrow">Perfil global</p><h2>Limites operativos</h2></div><span>SQLite</span></div>
             <div className="risk-fields">
@@ -93,14 +114,14 @@ export default function RiskPage() {
             <button className={killActive ? "primary-action" : "danger-action"} disabled={busy || reason.trim().length < 3} onClick={toggleKillSwitch}>{killActive ? "Desactivar corte" : "Activar corte inmediato"}</button>
             <small>Desactivar el corte no habilita paper/live; solamente prepara la capa de validacion.</small>
           </section>
-        </section>
+        </section>}
 
-        <section className="exchange-panel risk-audit-panel">
+        {activeTab === "ledger" && <section className="exchange-panel risk-audit-panel">
           <div className="exchange-panel-head compact"><div><p className="eyebrow">Audit trail</p><h2>Eventos recientes</h2></div><span>{profile.audit_log.length} eventos</span></div>
           {profile.audit_log.length ? <div className="risk-audit-list">{profile.audit_log.map((event) => <article key={event.id}><span>{event.event_type}</span><strong>{event.payload.reason || (event.payload.symbol_whitelist || []).join(", ")}</strong><time>{new Date(event.created_at).toLocaleString()}</time></article>)}</div> : <div className="chart-state">Sin modificaciones todavía. El perfil seguro inicial ya está activo.</div>}
-        </section>
+        </section>}
 
-        <section className="exchange-panel risk-validator-panel">
+        {activeTab === "validator" && <section className="exchange-panel risk-validator-panel">
           <div className="exchange-panel-head compact"><div><p className="eyebrow">Pre-trade gate</p><h2>Validar intencion</h2></div><span>NO EXECUTION</span></div>
           <div className="risk-validator-grid">
             <form className="risk-fields" onSubmit={runValidation}>
@@ -111,9 +132,9 @@ export default function RiskPage() {
               {!decision ? <p>Completa la intencion para obtener una decision backend auditable.</p> : <><span>VALIDATION #{decision.validation_id}</span><h2>{decision.decision.toUpperCase()}</h2><p>{decision.approved ? "Todos los controles aprobaron la intencion." : decision.reasons.join(" · ")}</p><div>{decision.checks.map((check) => <small className={check.passed ? "pass" : "fail"} key={check.code}>{check.passed ? "PASS" : "FAIL"} · {check.code}</small>)}</div><em>No se ejecuto ninguna orden.</em></>}
             </div>
           </div>
-        </section>
+        </section>}
 
-        <section className="exchange-panel risk-validation-history">
+        {activeTab === "ledger" && <section className="exchange-panel risk-validation-history">
           <div className="exchange-panel-head compact"><div><p className="eyebrow">Decision ledger</p><h2>Validaciones pre-trade</h2></div><span>{profile.validation_log?.length || 0} DECISIONES</span></div>
           <div className="risk-validation-list">
             {(profile.validation_log || []).map((validation) => <article className={validation.approved ? "approved" : "rejected"} key={validation.id}>
@@ -124,7 +145,7 @@ export default function RiskPage() {
             </article>)}
             {!(profile.validation_log || []).length && <div className="chart-state">Todavia no existen decisiones pre-trade persistidas.</div>}
           </div>
-        </section>
+        </section>}
       </>}
 
       <section className="exchange-panel ops-panel"><div className="ops-warning"><strong>Live execution remains locked.</strong><p>No se gestionan claves reales. Paper Trading ya consume obligatoriamente esta validacion backend antes de crear fills simulados.</p></div></section>

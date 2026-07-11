@@ -16,6 +16,28 @@ import {
   getPaperAccount,
 } from "../../api/client.js";
 
+const UI_ROUTE_SURFACES = [
+  ["/api/radar", "markets", "Markets"],
+  ["/api/market-universe", "markets", "Markets"],
+  ["/api/candles", "trade", "Trade"],
+  ["/api/order-book", "trade", "Trade"],
+  ["/api/statistics", "research", "Research"],
+  ["/api/regime", "research", "Research"],
+  ["/api/features", "research", "Research"],
+  ["/api/live-map", "map", "Map"],
+  ["/api/bots", "bots", "Bots"],
+  ["/api/paper", "bots", "Bots / Paper"],
+  ["/api/risk", "risk", "Risk"],
+  ["/api/exchanges", "data", "Data"],
+  ["/api/data", "data", "Data"],
+  ["/api/health", "data", "Data"],
+];
+
+function uiSurfaceFor(path) {
+  const match = UI_ROUTE_SURFACES.find(([prefix]) => path === prefix || path.startsWith(`${prefix}/`));
+  return match ? { page: match[1], label: match[2] } : null;
+}
+
 function countRows(payload, keys) {
   for (const key of keys) {
     if (Array.isArray(payload?.[key])) return payload[key].length;
@@ -59,6 +81,12 @@ export default function BackendSurface({ selectedSymbol = "BTCUSDT" }) {
   const [building, setBuilding] = useState(false);
   const [error, setError] = useState("");
   const [routeCatalog, setRouteCatalog] = useState({ count: 0, routes: [] });
+
+  const routeCoverage = useMemo(() => {
+    const routes = routeCatalog.routes.map((route) => ({ ...route, uiSurface: uiSurfaceFor(route.path) }));
+    const exposed = routes.filter((route) => route.uiSurface).length;
+    return { routes, exposed, backendOnly: routes.length - exposed };
+  }, [routeCatalog.routes]);
 
   const requests = useMemo(
     () => [
@@ -233,12 +261,21 @@ export default function BackendSurface({ selectedSymbol = "BTCUSDT" }) {
           <div><p className="eyebrow">FastAPI registry</p><h2>{routeCatalog.count} rutas descubiertas</h2></div>
           <span>AUTO-DISCOVERED</span>
         </div>
+        <div className="route-coverage-summary">
+          <article><span>CON SUPERFICIE UI</span><strong>{routeCoverage.exposed}</strong></article>
+          <article className={routeCoverage.backendOnly ? "attention" : "complete"}>
+            <span>SOLO BACKEND</span><strong>{routeCoverage.backendOnly}</strong>
+          </article>
+          <p>El registro se compara con las consolas declaradas. Una ruta sin superficie queda marcada para no perder motores backend.</p>
+        </div>
         {routeCatalog.error && <div className="error-box">{routeCatalog.error}</div>}
         <div className="route-catalog-list">
-          {routeCatalog.routes.map((route) => <article key={`${route.methods.join("-")}-${route.path}`}>
+          {routeCoverage.routes.map((route) => <article className={route.uiSurface ? "ui-exposed" : "backend-only"} key={`${route.methods.join("-")}-${route.path}`}>
             <div>{route.methods.map((method) => <b className={method.toLowerCase()} key={method}>{method}</b>)}</div>
             <code>{route.path}</code>
-            <span>{route.tags.join(" / ") || "api"}</span>
+            {route.uiSurface
+              ? <a href={`#${route.uiSurface.page}`}>UI · {route.uiSurface.label}</a>
+              : <span>SOLO BACKEND</span>}
           </article>)}
         </div>
       </section>

@@ -35,6 +35,66 @@ def latest_price(connection, symbol: str) -> float:
     return float(row["price"])
 
 
+def bot_performance(connection, session_started_at: str) -> list[dict]:
+    bots = [dict(row) for row in connection.execute(
+        "SELECT id, name, base_symbol, timeframe, risk_profile, status FROM bots ORDER BY id DESC"
+    ).fetchall()]
+    results = []
+    for bot in bots:
+        orders = [dict(row) for row in connection.execute(
+            "SELECT * FROM simulated_orders WHERE bot_id = ? AND created_at >= ? ORDER BY id",
+            (bot["id"], session_started_at),
+        ).fetchall()]
+        fills = [dict(row) for row in connection.execute(
+            """SELECT f.* FROM simulated_fills f JOIN simulated_orders o ON o.id = f.order_id
+            WHERE o.bot_id = ? AND f.filled_at >= ? ORDER BY f.id""",
+            (bot["id"], session_started_at),
+        ).fetchall()]
+        quantities: dict[str, float] = {}
+        cash_flow = 0.0
+        deployed = 0.0
+        fees = 0.0
+        for fill in fills:
+            symbol = fill["symbol"]
+            quantity = float(fill["quantity"])
+            notional = quantity * float(fill["price"])
+            fee = float(fill["fee"])
+            fees += fee
+            if fill["side"] == "buy":
+                quantities[symbol] = quantities.get(symbol, 0.0) + quantity
+                cash_flow -= notional + fee
+                deployed += notional + fee
+            else:
+                quantities[symbol] = quantities.get(symbol, 0.0) - quantity
+                cash_flow += notional - fee
+        open_value = 0.0
+        open_positions = []
+        for symbol, quantity in quantities.items():
+            if quantity <= 1e-12:
+                continue
+            price = latest_price(connection, symbol)
+            value = quantity * price
+            open_value += value
+            open_positions.append({"symbol": symbol, "quantity": quantity, "market_price": price, "market_value": value})
+        pnl = cash_flow + open_value
+        roi_pct = (pnl / deployed) * 100 if deployed else 0.0
+        results.append({
+            **bot,
+            "paper_status": "activity" if orders else "no_activity",
+            "roi_pct": roi_pct,
+            "pnl": pnl,
+            "deployed_capital": deployed,
+            "open_value": open_value,
+            "fees": fees,
+            "filled_orders": sum(order["status"] == "filled" for order in orders),
+            "rejected_orders": sum(order["status"] == "rejected" for order in orders),
+            "started_at": orders[0]["created_at"] if orders else None,
+            "last_activity_at": orders[-1]["created_at"] if orders else None,
+            "open_positions": open_positions,
+        })
+    return results
+
+
 def account_snapshot() -> dict:
     initialize_database()
     with connect() as connection:
@@ -64,7 +124,8 @@ def account_snapshot() -> dict:
         drawdown = ((equity / peak) - 1) * 100 if peak else 0.0
         orders = [dict(row) for row in connection.execute("SELECT * FROM simulated_orders ORDER BY id DESC LIMIT 30").fetchall()]
         fills = [dict(row) for row in connection.execute("SELECT * FROM simulated_fills ORDER BY id DESC LIMIT 30").fetchall()]
-    return {"account": account, "equity": equity, "market_value": market_value, "unrealized_pnl": unrealized_pnl, "daily_realized_pnl": daily_realized, "drawdown_pct": abs(drawdown), "positions": positions, "orders": orders, "fills": fills, "mode": "paper", "live_execution": "blocked"}
+        performance = bot_performance(connection, account["created_at"])
+    return {"account": account, "equity": equity, "market_value": market_value, "unrealized_pnl": unrealized_pnl, "daily_realized_pnl": daily_realized, "drawdown_pct": abs(drawdown), "positions": positions, "orders": orders, "fills": fills, "bot_performance": performance, "mode": "paper", "live_execution": "blocked"}
 
 
 def place_market_order(payload: dict) -> dict:

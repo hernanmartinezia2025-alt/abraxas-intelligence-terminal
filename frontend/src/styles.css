@@ -1974,6 +1974,20 @@ h2 {
 .paper-orders .backtest-trades-wrap { margin-top: 12px; }
 @media (max-width: 1050px) { .paper-account-strip { grid-template-columns: repeat(3, 1fr); } }
 @media (max-width: 760px) { .paper-workspace { grid-template-columns: 1fr; } .paper-account-strip { grid-template-columns: repeat(2, 1fr); } }
+.paper-bot-performance { padding: 18px; }
+.paper-bot-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
+.paper-bot-grid article { padding: 14px; border: 1px solid #2c3944; border-radius: 8px; background: #101920; display: grid; gap: 13px; }
+.paper-bot-grid article.activity { border-color: rgba(210,182,109,.42); }
+.paper-bot-head { display: flex; justify-content: space-between; gap: 12px; }
+.paper-bot-head > div { display: grid; gap: 5px; }
+.paper-bot-head span, .paper-bot-grid time { color: #788691; font-size: 10px; }
+.paper-bot-head b { font-size: 19px; }
+.paper-bot-metrics { display: grid; grid-template-columns: repeat(2, 1fr); gap: 7px; }
+.paper-bot-metrics span { padding: 8px; border-radius: 5px; background: #0b1218; display: grid; gap: 4px; }
+.paper-bot-metrics small { color: #788691; text-transform: uppercase; font-size: 9px; }
+.paper-bot-grid p { color: #aab4bf; font-size: 11px; }
+@media (max-width: 1050px) { .paper-bot-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 700px) { .paper-bot-grid { grid-template-columns: 1fr; } }
 .page-loading-state { min-height: 320px; display: grid; place-content: center; gap: 9px; text-align: center; border: 1px solid #27333d; border-radius: 9px; background: #0d141a; }
 .page-loading-state span { color: #d2b66d; font-size: 11px; letter-spacing: .18em; }
 .page-loading-state strong { color: #aab4bf; font-size: 14px; }

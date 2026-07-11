@@ -55,6 +55,15 @@ export default function PaperTradingPanel({ botId, defaultSymbol = "BTCUSDT" }) 
         {snapshot.positions.length ? snapshot.positions.map((position) => <article key={position.symbol}><div><strong>{position.symbol}</strong><span>{position.quantity} units</span></div><div><span>Avg {money(position.average_price)}</span><b className={position.unrealized_pnl >= 0 ? "positive" : "negative"}>{money(position.unrealized_pnl)}</b></div></article>) : <div className="chart-state">Sin posiciones abiertas.</div>}
       </section>
     </section>
+    <section className="exchange-panel paper-bot-performance">
+      <div className="exchange-panel-head compact"><div><p className="eyebrow">Bot ROI profiles</p><h2>Rendimiento por bot en esta cuenta</h2></div><span>FILLS + MARK TO MARKET</span></div>
+      <div className="paper-bot-grid">{snapshot.bot_performance.map((bot) => <article key={bot.id} className={bot.paper_status}>
+        <div className="paper-bot-head"><div><span>BOT #{bot.id}</span><strong>{bot.name}</strong></div><b className={bot.roi_pct >= 0 ? "positive" : "negative"}>{bot.roi_pct >= 0 ? "+" : ""}{Number(bot.roi_pct).toFixed(2)}%</b></div>
+        <div className="paper-bot-metrics"><span><small>PnL</small><strong>{money(bot.pnl)}</strong></span><span><small>Capital</small><strong>{money(bot.deployed_capital)}</strong></span><span><small>Fills</small><strong>{bot.filled_orders}</strong></span><span><small>Rechazos</small><strong>{bot.rejected_orders}</strong></span></div>
+        <p>{bot.base_symbol} / {bot.timeframe} / {bot.risk_profile}</p>
+        <time>{bot.started_at ? `Desde ${new Date(bot.started_at).toLocaleString()}` : "Sin actividad paper en la sesion actual"}</time>
+      </article>)}</div>
+    </section>
     <section className="exchange-panel paper-orders">
       <div className="exchange-panel-head compact"><div><p className="eyebrow">Audit</p><h2>Ordenes recientes</h2></div><button type="button" onClick={reset} disabled={busy}>Reset account</button></div>
       <div className="backtest-trades-wrap"><table><thead><tr><th>ID</th><th>Symbol</th><th>Side</th><th>Qty</th><th>Price</th><th>Status</th><th>Risk ID</th></tr></thead><tbody>{snapshot.orders.map((item) => <tr key={item.id}><td>#{item.id}</td><td>{item.symbol}</td><td>{item.side}</td><td>{item.quantity}</td><td>{money(item.fill_price || item.reference_price)}</td><td className={item.status === "filled" ? "positive" : "negative"}>{item.status}</td><td>#{item.risk_validation_id}</td></tr>)}</tbody></table>{!snapshot.orders.length && <div className="chart-state">Sin ordenes paper.</div>}</div>

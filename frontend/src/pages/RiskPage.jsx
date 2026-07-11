@@ -64,7 +64,7 @@ export default function RiskPage() {
         <div>
           <p className="eyebrow">Risk Engine · backend enforced</p>
           <h2>{killActive ? "Ejecucion detenida" : "Motor habilitado para validacion"}</h2>
-          <span>Los limites y cada cambio quedan persistidos en SQLite. Paper y live continúan bloqueados.</span>
+          <span>Los limites y cada cambio quedan persistidos en SQLite. Paper pasa por este motor; live permanece bloqueado.</span>
         </div>
         <strong>{killActive ? "KILL SWITCH ON" : "KILL SWITCH OFF"}</strong>
       </section>
@@ -112,9 +112,22 @@ export default function RiskPage() {
             </div>
           </div>
         </section>
+
+        <section className="exchange-panel risk-validation-history">
+          <div className="exchange-panel-head compact"><div><p className="eyebrow">Decision ledger</p><h2>Validaciones pre-trade</h2></div><span>{profile.validation_log?.length || 0} DECISIONES</span></div>
+          <div className="risk-validation-list">
+            {(profile.validation_log || []).map((validation) => <article className={validation.approved ? "approved" : "rejected"} key={validation.id}>
+              <header><div><span>VALIDATION #{validation.id}</span><strong>{validation.symbol} · {validation.mode.toUpperCase()}</strong></div><b>{validation.approved ? "APPROVED" : "REJECTED"}</b></header>
+              <div className="risk-validation-metrics"><span><small>Notional</small><strong>${Number(validation.request.requested_notional || 0).toLocaleString()}</strong></span><span><small>Position</small><strong>{Number(validation.decision.metrics?.position_pct || 0).toFixed(2)}%</strong></span><span><small>Drawdown</small><strong>{Number(validation.decision.metrics?.current_drawdown_pct || 0).toFixed(2)}%</strong></span></div>
+              <p>{validation.approved ? "Todos los guardrails aprobaron." : validation.decision.reasons.join(" · ")}</p>
+              <footer><code>{validation.execution_intent_id ? `INTENT ${validation.execution_intent_id.slice(0, 8)}` : "VALIDATION ONLY"}</code><span>{validation.execution_status || "no execution"}</span><time>{new Date(validation.created_at).toLocaleString()}</time></footer>
+            </article>)}
+            {!(profile.validation_log || []).length && <div className="chart-state">Todavia no existen decisiones pre-trade persistidas.</div>}
+          </div>
+        </section>
       </>}
 
-      <section className="exchange-panel ops-panel"><div className="ops-warning"><strong>Live execution remains locked.</strong><p>No se gestionan claves ni órdenes. El siguiente consumidor autorizado será Paper Trading y deberá pasar esta validación backend.</p></div></section>
+      <section className="exchange-panel ops-panel"><div className="ops-warning"><strong>Live execution remains locked.</strong><p>No se gestionan claves reales. Paper Trading ya consume obligatoriamente esta validacion backend antes de crear fills simulados.</p></div></section>
     </section>
   );
 }

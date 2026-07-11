@@ -2011,6 +2011,22 @@ h2 {
 .route-catalog-list article.backend-only { border-color: rgba(242, 191, 82, 0.52); }
 .execution-intent-audit { margin-bottom: 14px; padding-bottom: 14px; border-bottom: 1px solid #28343e; }
 .execution-intent-audit code { color: #d2b66d; font-size: 11px; }
+.risk-validation-history { margin-top: 14px; }
+.risk-validation-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+.risk-validation-list article { display: grid; gap: 9px; padding: 12px; border: 1px solid #2a3740; border-radius: 7px; background: #0e151b; }
+.risk-validation-list article.approved { border-color: rgba(38, 209, 151, 0.38); }
+.risk-validation-list article.rejected { border-color: rgba(238, 82, 106, 0.4); }
+.risk-validation-list header, .risk-validation-list footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.risk-validation-list header div { display: grid; gap: 3px; }
+.risk-validation-list header span, .risk-validation-list small { color: #82929d; font-size: 9px; }
+.risk-validation-list header b { color: #e95c70; font-size: 10px; }
+.risk-validation-list article.approved header b { color: #36d6a0; }
+.risk-validation-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.risk-validation-metrics span { display: grid; gap: 3px; padding: 7px; border: 1px solid #26343d; border-radius: 5px; }
+.risk-validation-list p { margin: 0; color: #aeb9c0; font-size: 11px; }
+.risk-validation-list footer { color: #778790; font-size: 9px; }
+.risk-validation-list footer code { color: #d2b66d; }
+@media (max-width: 850px) { .risk-validation-list { grid-template-columns: 1fr; } }
 @media (max-width: 850px) {
   .route-catalog-list { grid-template-columns: 1fr; }
   .route-coverage-summary { grid-template-columns: 1fr 1fr; }

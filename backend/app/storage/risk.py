@@ -67,8 +67,22 @@ def get_risk_profile(audit_limit: int = 20) -> dict:
             "SELECT id, event_type, payload_json, created_at FROM risk_audit_log ORDER BY id DESC LIMIT ?",
             (audit_limit,),
         ).fetchall()]
+        validations = [dict(row) for row in connection.execute(
+            """SELECT validation.id, validation.mode, validation.symbol, validation.approved,
+            validation.request_json, validation.decision_json, validation.created_at,
+            intent.id AS execution_intent_id, intent.status AS execution_status,
+            intent.result_reference
+            FROM risk_validation_log AS validation
+            LEFT JOIN execution_intents AS intent ON intent.risk_validation_id = validation.id
+            ORDER BY validation.id DESC LIMIT ?""",
+            (audit_limit,),
+        ).fetchall()]
     for event in events:
         event["payload"] = json.loads(event.pop("payload_json"))
+    for validation in validations:
+        validation["approved"] = bool(validation["approved"])
+        validation["request"] = json.loads(validation.pop("request_json"))
+        validation["decision"] = json.loads(validation.pop("decision_json"))
     return {
         "limits": limits,
         "kill_switch": {
@@ -76,8 +90,9 @@ def get_risk_profile(audit_limit: int = 20) -> dict:
             "reason": state["reason"],
             "updated_at": state["updated_at"],
         },
-        "execution": {"paper": "blocked", "live": "blocked"},
+        "execution": {"paper": "risk_gated", "live": "blocked"},
         "audit_log": events,
+        "validation_log": validations,
     }
 
 

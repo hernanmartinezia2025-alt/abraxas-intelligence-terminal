@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { datasetExportUrl, getDataCatalog, getDataHealth, getDatasetPreview } from "../../api/client.js";
 import BackendSurface from "./BackendSurface.jsx";
 import PageSubtabs from "../../components/PageSubtabs.jsx";
+import ExchangeAdapters from "./ExchangeAdapters.jsx";
 
 function formatTime(value) {
   if (!value) return "sin registro";
@@ -113,12 +114,14 @@ export default function DataApiCenter({ selectedSymbol = "BTCUSDT" }) {
           ["sources", "Sources", "registro + health"],
           ["datasets", "Datasets", "preview + CSV"],
           ["backend", "Backend Surface", "endpoints reales"],
+          ["exchanges", "Exchanges", "CCXT public read-only"],
         ]}
         activeTab={activeTab}
         onChange={setActiveTab}
       />
 
       {activeTab === "backend" && <BackendSurface selectedSymbol={selectedSymbol} />}
+      {activeTab === "exchanges" && <ExchangeAdapters />}
 
       {activeTab === "overview" && (
       <section className="data-kpi-grid">

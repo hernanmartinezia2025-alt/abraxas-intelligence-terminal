@@ -249,3 +249,17 @@ export function placePaperOrder(payload) {
 export function resetPaperAccount(payload) {
   return request("/api/paper/reset", { method: "POST", body: JSON.stringify(payload) });
 }
+
+export function getExchangeRegistry() {
+  return request("/api/exchanges");
+}
+
+export function getExchangeTicker(exchangeId, symbol) {
+  const params = new URLSearchParams({ symbol });
+  return request(`/api/exchanges/${exchangeId}/ticker?${params}`);
+}
+
+export function getExchangeOrderBook(exchangeId, symbol, limit = 20) {
+  const params = new URLSearchParams({ symbol, limit: String(limit) });
+  return request(`/api/exchanges/${exchangeId}/order-book?${params}`);
+}

@@ -411,6 +411,16 @@ CREATE TABLE IF NOT EXISTS simulated_ledger (
 CREATE INDEX IF NOT EXISTS idx_simulated_orders_created ON simulated_orders(created_at);
 CREATE INDEX IF NOT EXISTS idx_simulated_fills_filled ON simulated_fills(filled_at);
 CREATE INDEX IF NOT EXISTS idx_simulated_ledger_created ON simulated_ledger(created_at);
+
+CREATE TABLE IF NOT EXISTS exchange_source_health (
+    exchange_id TEXT NOT NULL,
+    endpoint TEXT NOT NULL,
+    ok INTEGER NOT NULL CHECK (ok IN (0, 1)),
+    latency_ms INTEGER NOT NULL,
+    error TEXT,
+    checked_at TEXT NOT NULL,
+    PRIMARY KEY(exchange_id, endpoint)
+);
 """
 
 BACKTEST_INTEGRITY_TRIGGERS = """

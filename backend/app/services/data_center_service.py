@@ -26,6 +26,14 @@ SOURCE_CATALOG = [
         "purpose": "Precios, cambio 24h, volumen y candles crypto.",
     },
     {
+        "source_id": "ccxt_public",
+        "name": "CCXT Public Adapters",
+        "type": "exchange_market",
+        "status": "active",
+        "datasets": ["exchange_source_health"],
+        "purpose": "Mercados, ticker, order book y OHLCV publicos normalizados sin credenciales.",
+    },
+    {
         "source_id": "alternative_me",
         "name": "Alternative.me",
         "type": "sentiment",
@@ -78,6 +86,7 @@ SOURCE_CATALOG = [
             "simulated_positions",
             "simulated_fills",
             "simulated_ledger",
+            "exchange_source_health",
         ],
         "purpose": "Base local para cache, auditoria y datasets analiticos.",
     },
@@ -271,6 +280,15 @@ DATASET_CATALOG = [
             ("simulated_ledger", "Ledger de caja y eventos de la cuenta paper."),
         ]
     ],
+    {
+        "dataset_id": "exchange_source_health",
+        "table": "exchange_source_health",
+        "label": "Exchange Source Health",
+        "category": "exchange_adapters",
+        "powerbi_ready": True,
+        "bot_ready": False,
+        "description": "Latencia, errores y ultimo check de cada endpoint CCXT publico.",
+    },
 ]
 
 

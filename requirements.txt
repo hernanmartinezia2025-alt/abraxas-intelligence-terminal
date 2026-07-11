@@ -3,3 +3,4 @@ uvicorn
 requests
 pandas
 numpy
+ccxt==4.5.64

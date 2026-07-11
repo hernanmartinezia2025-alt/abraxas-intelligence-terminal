@@ -3151,6 +3151,28 @@ h2 {
   margin-top: 12px;
 }
 .market-universe-panel { margin-top: 12px; }
+.macro-context-strip { display: grid; gap: 10px; margin: 10px 0; padding: 12px; border: 1px solid #2b3943; border-radius: 8px; background: #0c1319; }
+.macro-context-strip.risk_on { border-color: rgba(38, 209, 151, 0.35); }
+.macro-context-strip.risk_off { border-color: rgba(238, 82, 106, 0.4); }
+.macro-context-head { display: grid; grid-template-columns: 190px minmax(0, 1fr); gap: 12px; align-items: center; }
+.macro-context-head div { display: grid; gap: 3px; }
+.macro-context-head span { color: #82929d; font-size: 9px; font-weight: 800; }
+.macro-context-head strong { color: #f2f5f6; font-size: 20px; }
+.macro-context-head p { margin: 0; color: #a9b4ba; font-size: 12px; }
+.macro-context-assets { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+.macro-context-assets article { display: grid; gap: 3px; padding: 8px; border: 1px solid #26343d; border-radius: 6px; }
+.macro-context-assets span, .macro-context-assets small { color: #81909a; font-size: 9px; }
+.macro-context-assets strong { color: #edf2f4; font-size: 14px; }
+.macro-context-assets b { color: #36d6a0; font-size: 10px; }
+.macro-context-assets article.negative b { color: #ed6175; }
+.macro-context-assets article.planned { border-style: dashed; }
+.macro-context-assets article.planned strong { color: #d2b66d; font-size: 11px; }
+@media (max-width: 900px) { .macro-context-assets { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (max-width: 620px) {
+  .macro-context-head { grid-template-columns: 1fr; }
+  .macro-context-assets { display: flex; overflow-x: auto; }
+  .macro-context-assets article { min-width: 112px; }
+}
 .universe-tabs { display: flex; gap: 7px; padding: 10px; overflow-x: auto; border-bottom: 1px solid rgba(255,255,255,.08); }
 .universe-tabs button { min-width: 125px; border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.04); color: rgba(246,248,251,.68); border-radius: 7px; padding: 9px 10px; text-align: left; font-size: 11px; }
 .universe-tabs button.active, .universe-tabs button:hover { border-color: rgba(223,192,122,.5); background: rgba(223,192,122,.12); color: #ffffff; }

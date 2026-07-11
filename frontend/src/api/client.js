@@ -30,6 +30,11 @@ export function getMarketUniverse(category, refresh = false) {
   return request(`/api/markets/universe?${params}`);
 }
 
+export function getMarketOverview(refresh = false) {
+  const params = new URLSearchParams({ refresh: String(refresh) });
+  return request(`/api/markets/overview?${params}`);
+}
+
 export function updateRadar() {
   return request("/api/radar/update", { method: "POST" });
 }

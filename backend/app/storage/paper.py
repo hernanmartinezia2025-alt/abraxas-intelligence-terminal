@@ -95,6 +95,22 @@ def bot_performance(connection, session_started_at: str) -> list[dict]:
     return results
 
 
+def attributed_position_quantity(connection, symbol: str, bot_id: int | None, session_started_at: str) -> float:
+    if bot_id is None:
+        bot_clause = "o.bot_id IS NULL"
+        parameters = (symbol, session_started_at)
+    else:
+        bot_clause = "o.bot_id = ?"
+        parameters = (symbol, session_started_at, bot_id)
+    rows = connection.execute(
+        f"""SELECT f.side, f.quantity FROM simulated_fills f
+        JOIN simulated_orders o ON o.id = f.order_id
+        WHERE f.symbol = ? AND f.filled_at >= ? AND {bot_clause}""",
+        parameters,
+    ).fetchall()
+    return sum(float(row["quantity"]) if row["side"] == "buy" else -float(row["quantity"]) for row in rows)
+
+
 def account_snapshot() -> dict:
     initialize_database()
     with connect() as connection:
@@ -122,8 +138,12 @@ def account_snapshot() -> dict:
         if peak != float(account["peak_equity"]):
             connection.execute("UPDATE simulated_accounts SET peak_equity = ?, updated_at = ? WHERE id = ?", (peak, utc_now_iso(), ACCOUNT_ID))
         drawdown = ((equity / peak) - 1) * 100 if peak else 0.0
-        orders = [dict(row) for row in connection.execute("SELECT * FROM simulated_orders ORDER BY id DESC LIMIT 30").fetchall()]
-        fills = [dict(row) for row in connection.execute("SELECT * FROM simulated_fills ORDER BY id DESC LIMIT 30").fetchall()]
+        orders = [dict(row) for row in connection.execute(
+            "SELECT * FROM simulated_orders WHERE created_at >= ? ORDER BY id DESC LIMIT 30", (account["created_at"],)
+        ).fetchall()]
+        fills = [dict(row) for row in connection.execute(
+            "SELECT * FROM simulated_fills WHERE filled_at >= ? ORDER BY id DESC LIMIT 30", (account["created_at"],)
+        ).fetchall()]
         performance = bot_performance(connection, account["created_at"])
     return {"account": account, "equity": equity, "market_value": market_value, "unrealized_pnl": unrealized_pnl, "daily_realized_pnl": daily_realized, "drawdown_pct": abs(drawdown), "positions": positions, "orders": orders, "fills": fills, "bot_performance": performance, "mode": "paper", "live_execution": "blocked"}
 
@@ -138,6 +158,8 @@ def place_market_order(payload: dict) -> dict:
     snapshot = account_snapshot()
     with connect() as connection:
         seed_account(connection)
+        if bot_id is not None and not connection.execute("SELECT 1 FROM bots WHERE id = ?", (bot_id,)).fetchone():
+            raise ValueError(f"Bot {bot_id} does not exist")
         price = latest_price(connection, symbol)
     notional = price * quantity
     decision = validate_order_intent({
@@ -151,6 +173,7 @@ def place_market_order(payload: dict) -> dict:
         account = dict(connection.execute("SELECT * FROM simulated_accounts WHERE id = ?", (ACCOUNT_ID,)).fetchone())
         position_row = connection.execute("SELECT * FROM simulated_positions WHERE account_id = ? AND symbol = ?", (ACCOUNT_ID, symbol)).fetchone()
         position = dict(position_row) if position_row else None
+        attributed_quantity = attributed_position_quantity(connection, symbol, bot_id, account["created_at"])
         rejection = None
         fee = notional * FEE_RATE
         if not decision["approved"]:
@@ -159,6 +182,9 @@ def place_market_order(payload: dict) -> dict:
             rejection = "Insufficient simulated cash balance"
         elif side == "sell" and (not position or float(position["quantity"]) < quantity):
             rejection = "Insufficient simulated position quantity"
+        elif side == "sell" and attributed_quantity + 1e-12 < quantity:
+            owner = f"bot {bot_id}" if bot_id is not None else "manual paper desk"
+            rejection = f"Insufficient position quantity attributed to {owner}"
         status = "rejected" if rejection else "filled"
         cursor = connection.execute(
             """INSERT INTO simulated_orders

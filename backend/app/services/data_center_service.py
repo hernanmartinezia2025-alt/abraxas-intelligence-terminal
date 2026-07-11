@@ -310,6 +310,8 @@ def get_table_stats(table_name: str) -> dict:
                 "open_time",
                 "close_time",
                 "created_at",
+                "updated_at",
+                "filled_at",
             ],
         )
         last_timestamp = None
@@ -428,6 +430,8 @@ def get_dataset_preview(dataset_id: str, limit: int = 25) -> dict:
             "open_time",
             "close_time",
             "created_at",
+            "updated_at",
+            "filled_at",
             "id",
         ],
     )

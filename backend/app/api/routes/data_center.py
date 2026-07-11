@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from fastapi.responses import Response
 
 from backend.app.services.data_center_service import (
@@ -33,6 +33,26 @@ def data_health() -> dict:
 @router.get("/datasets")
 def data_datasets() -> dict:
     return get_data_datasets()
+
+
+@router.get("/routes")
+def data_routes(request: Request) -> dict:
+    routes = []
+    schema = request.app.openapi()
+    for path, operations in schema.get("paths", {}).items():
+        if not path.startswith("/api"):
+            continue
+        for method, operation in operations.items():
+            if method.upper() not in {"GET", "POST", "PUT", "PATCH", "DELETE"}:
+                continue
+            routes.append({
+                "path": path,
+                "methods": [method.upper()],
+                "name": operation.get("operationId") or operation.get("summary") or path,
+                "tags": operation.get("tags") or [],
+            })
+    routes.sort(key=lambda item: (item["path"], item["methods"]))
+    return {"count": len(routes), "routes": routes}
 
 
 @router.get("/datasets/{dataset_id}/preview")

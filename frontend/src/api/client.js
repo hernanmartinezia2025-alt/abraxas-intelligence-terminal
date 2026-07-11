@@ -208,6 +208,10 @@ export function getDataDatasets() {
   return request("/api/data/datasets");
 }
 
+export function getBackendRoutes() {
+  return request("/api/data/routes");
+}
+
 export function getDatasetPreview(datasetId, limit = 20) {
   const params = new URLSearchParams({ limit: String(limit) });
   return request(`/api/data/datasets/${datasetId}/preview?${params}`);

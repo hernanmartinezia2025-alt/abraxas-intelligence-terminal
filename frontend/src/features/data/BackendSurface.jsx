@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import {
   buildFeatures,
   getBacktests,
+  getBackendRoutes,
   getFeatures,
   getBots,
   getLiveMapAlerts,
@@ -11,6 +12,8 @@ import {
   getBotBacktests,
   getRegimeSnapshots,
   getStatisticsRuns,
+  getRiskProfile,
+  getPaperAccount,
 } from "../../api/client.js";
 
 function countRows(payload, keys) {
@@ -55,6 +58,7 @@ export default function BackendSurface({ selectedSymbol = "BTCUSDT" }) {
   const [loading, setLoading] = useState(false);
   const [building, setBuilding] = useState(false);
   const [error, setError] = useState("");
+  const [routeCatalog, setRouteCatalog] = useState({ count: 0, routes: [] });
 
   const requests = useMemo(
     () => [
@@ -130,6 +134,22 @@ export default function BackendSurface({ selectedSymbol = "BTCUSDT" }) {
         call: () => getOrderBook(selectedSymbol, 20),
         rows: ["bids"],
       },
+      {
+        label: "Risk Engine",
+        method: "GET",
+        path: "/api/risk",
+        description: "Limites, kill switch y auditoria persistidos en SQLite.",
+        call: () => getRiskProfile(12),
+        rows: ["audit_log"],
+      },
+      {
+        label: "Paper Trading",
+        method: "GET",
+        path: "/api/paper",
+        description: "Cuenta, posiciones, fills y perfiles ROI por bot bajo Risk Engine.",
+        call: () => getPaperAccount(),
+        rows: ["orders", "positions", "bot_performance"],
+      },
     ],
     [selectedSymbol]
   );
@@ -137,7 +157,8 @@ export default function BackendSurface({ selectedSymbol = "BTCUSDT" }) {
   async function loadSurface({ silent = false } = {}) {
     if (!silent) setLoading(true);
     setError("");
-    const results = await Promise.all(
+    const [results, routesResult] = await Promise.all([
+      Promise.all(
       requests.map(async (item) => {
         try {
           const payload = await item.call();
@@ -155,8 +176,11 @@ export default function BackendSurface({ selectedSymbol = "BTCUSDT" }) {
           };
         }
       })
-    );
+      ),
+      getBackendRoutes().catch((err) => ({ count: 0, routes: [], error: err.message })),
+    ]);
     setSurface(results);
+    setRouteCatalog(routesResult);
     if (!silent) setLoading(false);
   }
 
@@ -206,6 +230,21 @@ export default function BackendSurface({ selectedSymbol = "BTCUSDT" }) {
           <SurfaceCard item={item} key={item.path} />
         ))}
       </div>
+
+      <section className="route-catalog">
+        <div className="exchange-panel-head compact">
+          <div><p className="eyebrow">FastAPI registry</p><h2>{routeCatalog.count} rutas descubiertas</h2></div>
+          <span>AUTO-DISCOVERED</span>
+        </div>
+        {routeCatalog.error && <div className="error-box">{routeCatalog.error}</div>}
+        <div className="route-catalog-list">
+          {routeCatalog.routes.map((route) => <article key={`${route.methods.join("-")}-${route.path}`}>
+            <div>{route.methods.map((method) => <b className={method.toLowerCase()} key={method}>{method}</b>)}</div>
+            <code>{route.path}</code>
+            <span>{route.tags.join(" / ") || "api"}</span>
+          </article>)}
+        </div>
+      </section>
 
       {featureBuild && (
         <div className="surface-result">

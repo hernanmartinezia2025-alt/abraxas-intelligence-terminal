@@ -2009,6 +2009,8 @@ h2 {
 .route-catalog-list span { color: #788691; font-size: 10px; text-align: right; }
 .route-catalog-list a { color: #47d9aa; font-size: 10px; font-weight: 800; text-align: right; text-decoration: none; }
 .route-catalog-list article.backend-only { border-color: rgba(242, 191, 82, 0.52); }
+.execution-intent-audit { margin-bottom: 14px; padding-bottom: 14px; border-bottom: 1px solid #28343e; }
+.execution-intent-audit code { color: #d2b66d; font-size: 11px; }
 @media (max-width: 850px) {
   .route-catalog-list { grid-template-columns: 1fr; }
   .route-coverage-summary { grid-template-columns: 1fr 1fr; }

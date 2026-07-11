@@ -146,8 +146,16 @@ def account_snapshot() -> dict:
         fills = [dict(row) for row in connection.execute(
             "SELECT * FROM simulated_fills WHERE filled_at >= ? ORDER BY id DESC LIMIT 30", (account["created_at"],)
         ).fetchall()]
+        execution_intents = [dict(row) for row in connection.execute(
+            """SELECT id, environment, adapter, symbol, action, order_type, quantity,
+            bot_id, status, result_reference, created_at, updated_at
+            FROM execution_intents
+            WHERE environment = 'paper' AND created_at >= ?
+            ORDER BY created_at DESC LIMIT 30""",
+            (account["created_at"],),
+        ).fetchall()]
         performance = bot_performance(connection, account["created_at"])
-    return {"account": account, "equity": equity, "market_value": market_value, "unrealized_pnl": unrealized_pnl, "daily_realized_pnl": daily_realized, "drawdown_pct": abs(drawdown), "positions": positions, "orders": orders, "fills": fills, "bot_performance": performance, "mode": "paper", "live_execution": "blocked"}
+    return {"account": account, "equity": equity, "market_value": market_value, "unrealized_pnl": unrealized_pnl, "daily_realized_pnl": daily_realized, "drawdown_pct": abs(drawdown), "positions": positions, "orders": orders, "fills": fills, "execution_intents": execution_intents, "bot_performance": performance, "mode": "paper", "live_execution": "blocked"}
 
 
 def place_market_order(payload: dict) -> dict:

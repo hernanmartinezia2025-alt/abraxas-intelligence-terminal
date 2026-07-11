@@ -18,7 +18,7 @@ import {
 
 const UI_ROUTE_SURFACES = [
   ["/api/radar", "markets", "Markets"],
-  ["/api/market-universe", "markets", "Markets"],
+  ["/api/markets", "markets", "Markets"],
   ["/api/candles", "trade", "Trade"],
   ["/api/order-book", "trade", "Trade"],
   ["/api/statistics", "research", "Research"],

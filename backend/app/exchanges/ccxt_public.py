@@ -9,6 +9,8 @@ from backend.app.storage.sqlite import connect, initialize_database
 
 ALLOWED_EXCHANGES = {
     "binance": {"label": "Binance", "default_symbol": "BTC/USDT"},
+    "bingx": {"label": "BingX", "default_symbol": "BTC/USDT"},
+    "bybit": {"label": "Bybit", "default_symbol": "BTC/USDT"},
     "kraken": {"label": "Kraken", "default_symbol": "BTC/USD"},
     "coinbase": {"label": "Coinbase", "default_symbol": "BTC/USD"},
 }

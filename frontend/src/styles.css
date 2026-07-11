@@ -1974,6 +1974,9 @@ h2 {
 .paper-orders .backtest-trades-wrap { margin-top: 12px; }
 @media (max-width: 1050px) { .paper-account-strip { grid-template-columns: repeat(3, 1fr); } }
 @media (max-width: 760px) { .paper-workspace { grid-template-columns: 1fr; } .paper-account-strip { grid-template-columns: repeat(2, 1fr); } }
+.page-loading-state { min-height: 320px; display: grid; place-content: center; gap: 9px; text-align: center; border: 1px solid #27333d; border-radius: 9px; background: #0d141a; }
+.page-loading-state span { color: #d2b66d; font-size: 11px; letter-spacing: .18em; }
+.page-loading-state strong { color: #aab4bf; font-size: 14px; }
 
 .bot-forge-grid {
   display: grid;

@@ -1,14 +1,15 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { getRadar, updateRadar } from "./api/client.js";
 import Shell from "./components/Shell.jsx";
-import BotsPage from "./pages/BotsPage.jsx";
-import DataPage from "./pages/DataPage.jsx";
-import LiveMapPage from "./pages/LiveMapPage.jsx";
-import MarketsPage from "./pages/MarketsPage.jsx";
-import ResearchPage from "./pages/ResearchPage.jsx";
-import RiskPage from "./pages/RiskPage.jsx";
-import TradePage from "./pages/TradePage.jsx";
 import { latestRows } from "./utils/assets.js";
+
+const MarketsPage = lazy(() => import("./pages/MarketsPage.jsx"));
+const TradePage = lazy(() => import("./pages/TradePage.jsx"));
+const LiveMapPage = lazy(() => import("./pages/LiveMapPage.jsx"));
+const ResearchPage = lazy(() => import("./pages/ResearchPage.jsx"));
+const DataPage = lazy(() => import("./pages/DataPage.jsx"));
+const BotsPage = lazy(() => import("./pages/BotsPage.jsx"));
+const RiskPage = lazy(() => import("./pages/RiskPage.jsx"));
 
 const PAGE_META = {
   markets: ["Market overview", "Markets"],
@@ -110,13 +111,15 @@ export default function App() {
       onAssetChange={setSelectedSymbol}
     >
       {error && <div className="error-box">{error}</div>}
-      {activePage === "markets" && <MarketsPage rows={rows} sentiment={radar.sentiment} selectedSymbol={selectedSymbol} onSelectSymbol={setSelectedSymbol} />}
-      {activePage === "trade" && <TradePage rows={rows} selectedSymbol={selectedSymbol} onSelectSymbol={setSelectedSymbol} />}
-      {activePage === "map" && <LiveMapPage />}
-      {activePage === "research" && <ResearchPage selectedSymbol={selectedSymbol} />}
-      {activePage === "data" && <DataPage selectedSymbol={selectedSymbol} />}
-      {activePage === "bots" && <BotsPage selectedSymbol={selectedSymbol} />}
-      {activePage === "risk" && <RiskPage />}
+      <Suspense fallback={<section className="page-loading-state"><span>ABRAXAS</span><strong>Cargando modulo operativo...</strong></section>}>
+        {activePage === "markets" && <MarketsPage rows={rows} sentiment={radar.sentiment} selectedSymbol={selectedSymbol} onSelectSymbol={setSelectedSymbol} />}
+        {activePage === "trade" && <TradePage rows={rows} selectedSymbol={selectedSymbol} onSelectSymbol={setSelectedSymbol} />}
+        {activePage === "map" && <LiveMapPage />}
+        {activePage === "research" && <ResearchPage selectedSymbol={selectedSymbol} />}
+        {activePage === "data" && <DataPage selectedSymbol={selectedSymbol} />}
+        {activePage === "bots" && <BotsPage selectedSymbol={selectedSymbol} />}
+        {activePage === "risk" && <RiskPage />}
+      </Suspense>
     </Shell>
   );
 }

@@ -73,6 +73,11 @@ SOURCE_CATALOG = [
             "risk_state",
             "risk_audit_log",
             "risk_validation_log",
+            "simulated_accounts",
+            "simulated_orders",
+            "simulated_positions",
+            "simulated_fills",
+            "simulated_ledger",
         ],
         "purpose": "Base local para cache, auditoria y datasets analiticos.",
     },
@@ -256,6 +261,16 @@ DATASET_CATALOG = [
         "bot_ready": True,
         "description": "Decisiones aprobadas o rechazadas para cada intencion de orden, sin ejecutar operaciones.",
     },
+    *[
+        {"dataset_id": table, "table": table, "label": table.replace("_", " ").title(), "category": "paper_trading", "powerbi_ready": True, "bot_ready": True, "description": description}
+        for table, description in [
+            ("simulated_accounts", "Estado financiero persistido de la cuenta paper."),
+            ("simulated_orders", "Ordenes paper aprobadas o rechazadas con decision de riesgo."),
+            ("simulated_positions", "Posiciones paper, costo promedio y PnL realizado."),
+            ("simulated_fills", "Fills market simulados con precio real persistido y comision."),
+            ("simulated_ledger", "Ledger de caja y eventos de la cuenta paper."),
+        ]
+    ],
 ]
 
 

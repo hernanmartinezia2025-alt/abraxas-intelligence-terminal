@@ -338,6 +338,79 @@ CREATE TABLE IF NOT EXISTS risk_validation_log (
 
 CREATE INDEX IF NOT EXISTS idx_risk_validation_symbol_created
 ON risk_validation_log(symbol, created_at);
+
+CREATE TABLE IF NOT EXISTS simulated_accounts (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    initial_balance REAL NOT NULL,
+    cash_balance REAL NOT NULL,
+    realized_pnl REAL NOT NULL,
+    peak_equity REAL NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS simulated_orders (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    account_id INTEGER NOT NULL,
+    bot_id INTEGER,
+    symbol TEXT NOT NULL,
+    side TEXT NOT NULL CHECK (side IN ('buy', 'sell')),
+    quantity REAL NOT NULL,
+    status TEXT NOT NULL,
+    reference_price REAL NOT NULL,
+    fill_price REAL,
+    fee REAL,
+    risk_validation_id INTEGER NOT NULL,
+    rejection_reason TEXT,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY(account_id) REFERENCES simulated_accounts(id),
+    FOREIGN KEY(bot_id) REFERENCES bots(id),
+    FOREIGN KEY(risk_validation_id) REFERENCES risk_validation_log(id)
+);
+
+CREATE TABLE IF NOT EXISTS simulated_positions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    account_id INTEGER NOT NULL,
+    symbol TEXT NOT NULL,
+    quantity REAL NOT NULL,
+    average_price REAL NOT NULL,
+    realized_pnl REAL NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE(account_id, symbol),
+    FOREIGN KEY(account_id) REFERENCES simulated_accounts(id)
+);
+
+CREATE TABLE IF NOT EXISTS simulated_fills (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    order_id INTEGER NOT NULL,
+    account_id INTEGER NOT NULL,
+    symbol TEXT NOT NULL,
+    side TEXT NOT NULL,
+    quantity REAL NOT NULL,
+    price REAL NOT NULL,
+    fee REAL NOT NULL,
+    filled_at TEXT NOT NULL,
+    FOREIGN KEY(order_id) REFERENCES simulated_orders(id),
+    FOREIGN KEY(account_id) REFERENCES simulated_accounts(id)
+);
+
+CREATE TABLE IF NOT EXISTS simulated_ledger (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    account_id INTEGER NOT NULL,
+    event_type TEXT NOT NULL,
+    reference_id INTEGER,
+    symbol TEXT,
+    cash_delta REAL NOT NULL,
+    realized_pnl_delta REAL NOT NULL,
+    cash_balance REAL NOT NULL,
+    payload_json TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY(account_id) REFERENCES simulated_accounts(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_simulated_orders_created ON simulated_orders(created_at);
+CREATE INDEX IF NOT EXISTS idx_simulated_fills_filled ON simulated_fills(filled_at);
+CREATE INDEX IF NOT EXISTS idx_simulated_ledger_created ON simulated_ledger(created_at);
 """
 
 BACKTEST_INTEGRITY_TRIGGERS = """

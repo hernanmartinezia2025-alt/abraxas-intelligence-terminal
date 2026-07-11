@@ -156,10 +156,13 @@ def validate_order_intent(payload: dict) -> dict:
                 reasons.append(detail)
 
         check("kill_switch", not bool(state["kill_switch_active"]), "Kill switch inactive" if not bool(state["kill_switch_active"]) else "Kill switch is active")
-        check("mode", mode == "validation", "Validation-only mode" if mode == "validation" else f"Mode {mode} is blocked; only validation is available")
+        mode_allowed = mode in {"validation", "paper"}
+        check("mode", mode_allowed, f"{mode.title()} mode allowed" if mode_allowed else "Live mode is blocked")
         check("side", side == "long", "Long intent supported" if side == "long" else "Only long intents are supported in this phase")
         check("symbol_whitelist", symbol in limits["symbol_whitelist"], f"{symbol} is authorized" if symbol in limits["symbol_whitelist"] else f"{symbol} is outside the symbol whitelist")
-        check("max_position", position_pct <= limits["max_position_pct"], f"Position {position_pct:.2f}% within limit" if position_pct <= limits["max_position_pct"] else f"Position {position_pct:.2f}% exceeds {limits['max_position_pct']:.2f}%")
+        position_allowed = bool(payload.get("reduces_exposure")) or position_pct <= limits["max_position_pct"]
+        position_detail = "Intent reduces existing exposure" if payload.get("reduces_exposure") else (f"Position {position_pct:.2f}% within limit" if position_allowed else f"Position {position_pct:.2f}% exceeds {limits['max_position_pct']:.2f}%")
+        check("max_position", position_allowed, position_detail)
         check("max_daily_loss", daily_loss_pct < limits["max_daily_loss_pct"], f"Daily loss {daily_loss_pct:.2f}% within limit" if daily_loss_pct < limits["max_daily_loss_pct"] else f"Daily loss {daily_loss_pct:.2f}% reached limit {limits['max_daily_loss_pct']:.2f}%")
         check("max_drawdown", current_drawdown_pct < limits["max_drawdown_pct"], f"Drawdown {current_drawdown_pct:.2f}% within limit" if current_drawdown_pct < limits["max_drawdown_pct"] else f"Drawdown {current_drawdown_pct:.2f}% reached limit {limits['max_drawdown_pct']:.2f}%")
 

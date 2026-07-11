@@ -421,6 +421,27 @@ CREATE TABLE IF NOT EXISTS exchange_source_health (
     checked_at TEXT NOT NULL,
     PRIMARY KEY(exchange_id, endpoint)
 );
+
+CREATE TABLE IF NOT EXISTS execution_intents (
+    id TEXT PRIMARY KEY,
+    environment TEXT NOT NULL CHECK (environment IN ('backtest', 'paper', 'live')),
+    adapter TEXT NOT NULL,
+    symbol TEXT NOT NULL,
+    action TEXT NOT NULL CHECK (action IN ('buy', 'sell')),
+    order_type TEXT NOT NULL CHECK (order_type IN ('market', 'limit')),
+    quantity REAL NOT NULL,
+    limit_price REAL,
+    bot_id INTEGER,
+    status TEXT NOT NULL,
+    result_reference TEXT,
+    payload_json TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY(bot_id) REFERENCES bots(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_execution_intents_environment_created
+ON execution_intents(environment, created_at);
 """
 
 BACKTEST_INTEGRITY_TRIGGERS = """

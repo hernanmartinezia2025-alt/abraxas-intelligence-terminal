@@ -87,6 +87,7 @@ SOURCE_CATALOG = [
             "simulated_fills",
             "simulated_ledger",
             "exchange_source_health",
+            "execution_intents",
         ],
         "purpose": "Base local para cache, auditoria y datasets analiticos.",
     },
@@ -288,6 +289,15 @@ DATASET_CATALOG = [
         "powerbi_ready": True,
         "bot_ready": False,
         "description": "Latencia, errores y ultimo check de cada endpoint CCXT publico.",
+    },
+    {
+        "dataset_id": "execution_intents",
+        "table": "execution_intents",
+        "label": "Execution Intents",
+        "category": "execution_gateway",
+        "powerbi_ready": True,
+        "bot_ready": True,
+        "description": "Contrato auditable previo a Risk y a cualquier adapter backtest, paper o live.",
     },
 ]
 

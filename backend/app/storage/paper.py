@@ -4,6 +4,8 @@ import json
 from datetime import datetime, timezone
 
 from backend.app.storage.risk import validate_order_intent
+from backend.app.execution.contracts import OrderIntent
+from backend.app.storage.execution import save_execution_intent, update_execution_intent
 from backend.app.storage.sqlite import connect, initialize_database
 
 ACCOUNT_ID = 1
@@ -149,12 +151,22 @@ def account_snapshot() -> dict:
 
 
 def place_market_order(payload: dict) -> dict:
+    intent = OrderIntent.paper_market(payload)
+    save_execution_intent(intent)
+    try:
+        return _execute_market_intent(intent)
+    except Exception:
+        update_execution_intent(intent.id, "failed")
+        raise
+
+
+def _execute_market_intent(intent: OrderIntent) -> dict:
     initialize_database()
-    symbol = str(payload["symbol"]).strip().upper()
-    side = str(payload["side"]).strip().lower()
-    quantity = float(payload["quantity"])
-    bot_id = payload.get("bot_id")
-    now = utc_now_iso()
+    symbol = intent.symbol
+    side = intent.action
+    quantity = intent.quantity
+    bot_id = intent.bot_id
+    now = intent.created_at
     snapshot = account_snapshot()
     with connect() as connection:
         seed_account(connection)
@@ -194,7 +206,8 @@ def place_market_order(payload: dict) -> dict:
         )
         order_id = cursor.lastrowid
         if rejection:
-            return {"order_id": order_id, "status": status, "reason": rejection, "risk": decision, "execution_performed": False}
+            update_execution_intent(intent.id, "rejected", f"simulated_order:{order_id}")
+            return {"intent_id": intent.id, "order_id": order_id, "status": status, "reason": rejection, "risk": decision, "execution_performed": False}
 
         realized_delta = 0.0
         if side == "buy":
@@ -218,7 +231,8 @@ def place_market_order(payload: dict) -> dict:
         connection.execute("UPDATE simulated_accounts SET cash_balance = ?, realized_pnl = realized_pnl + ?, updated_at = ? WHERE id = ?", (new_cash, realized_delta, now, ACCOUNT_ID))
         fill_id = connection.execute("INSERT INTO simulated_fills (order_id, account_id, symbol, side, quantity, price, fee, filled_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", (order_id, ACCOUNT_ID, symbol, side, quantity, price, fee, now)).lastrowid
         connection.execute("INSERT INTO simulated_ledger (account_id, event_type, reference_id, symbol, cash_delta, realized_pnl_delta, cash_balance, payload_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", (ACCOUNT_ID, "market_fill", fill_id, symbol, cash_delta, realized_delta, new_cash, json.dumps({"order_id": order_id, "side": side, "quantity": quantity, "price": price, "fee": fee}), now))
-    return {"order_id": order_id, "fill_id": fill_id, "status": status, "risk": decision, "execution_performed": True, "account": account_snapshot()}
+    update_execution_intent(intent.id, "filled", f"simulated_fill:{fill_id}")
+    return {"intent_id": intent.id, "order_id": order_id, "fill_id": fill_id, "status": status, "risk": decision, "execution_performed": True, "account": account_snapshot()}
 
 
 def reset_account(initial_balance: float, reason: str) -> dict:

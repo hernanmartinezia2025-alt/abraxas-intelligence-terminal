@@ -159,6 +159,9 @@ def account_snapshot() -> dict:
 
 
 def place_market_order(payload: dict) -> dict:
+    initialize_database()
+    with connect() as connection:
+        seed_account(connection)
     intent = OrderIntent.paper_market(payload)
     save_execution_intent(intent)
     try:

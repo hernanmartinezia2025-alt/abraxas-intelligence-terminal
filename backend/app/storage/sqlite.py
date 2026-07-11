@@ -433,6 +433,7 @@ CREATE TABLE IF NOT EXISTS execution_intents (
     limit_price REAL,
     bot_id INTEGER,
     status TEXT NOT NULL,
+    risk_validation_id INTEGER,
     result_reference TEXT,
     payload_json TEXT NOT NULL,
     created_at TEXT NOT NULL,
@@ -720,6 +721,11 @@ def _backfill_backtest_payloads(connection: sqlite3.Connection) -> None:
 def initialize_database() -> None:
     with connect() as connection:
         connection.executescript(SCHEMA)
+        execution_columns = {
+            row["name"] for row in connection.execute("PRAGMA table_info(execution_intents)").fetchall()
+        }
+        if "risk_validation_id" not in execution_columns:
+            connection.execute("ALTER TABLE execution_intents ADD COLUMN risk_validation_id INTEGER")
         user_version = int(connection.execute("PRAGMA user_version").fetchone()[0])
         if user_version < 1:
             _backfill_backtest_payloads(connection)

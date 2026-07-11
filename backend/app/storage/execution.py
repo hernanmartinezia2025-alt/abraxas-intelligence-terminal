@@ -24,11 +24,25 @@ def save_execution_intent(intent: OrderIntent) -> dict:
     return {**payload, "status": "created", "result_reference": None}
 
 
-def update_execution_intent(intent_id: str, status: str, result_reference: str | None = None) -> None:
-    with connect() as connection:
-        updated = connection.execute(
-            "UPDATE execution_intents SET status = ?, result_reference = ?, updated_at = ? WHERE id = ?",
-            (status, result_reference, utc_now_iso(), intent_id),
+def update_execution_intent(
+    intent_id: str,
+    status: str,
+    result_reference: str | None = None,
+    risk_validation_id: int | None = None,
+    connection=None,
+) -> None:
+    def execute(active_connection) -> None:
+        updated = active_connection.execute(
+            """UPDATE execution_intents
+            SET status = ?, result_reference = ?, risk_validation_id = ?, updated_at = ?
+            WHERE id = ?""",
+            (status, result_reference, risk_validation_id, utc_now_iso(), intent_id),
         )
         if updated.rowcount != 1:
             raise ValueError(f"Execution intent not found: {intent_id}")
+
+    if connection is not None:
+        execute(connection)
+        return
+    with connect() as owned_connection:
+        execute(owned_connection)

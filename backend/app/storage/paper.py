@@ -148,7 +148,7 @@ def account_snapshot() -> dict:
         ).fetchall()]
         execution_intents = [dict(row) for row in connection.execute(
             """SELECT id, environment, adapter, symbol, action, order_type, quantity,
-            bot_id, status, result_reference, created_at, updated_at
+            bot_id, status, risk_validation_id, result_reference, created_at, updated_at
             FROM execution_intents
             WHERE environment = 'paper' AND created_at >= ?
             ORDER BY created_at DESC LIMIT 30""",
@@ -214,7 +214,13 @@ def _execute_market_intent(intent: OrderIntent) -> dict:
         )
         order_id = cursor.lastrowid
         if rejection:
-            update_execution_intent(intent.id, "rejected", f"simulated_order:{order_id}")
+            update_execution_intent(
+                intent.id,
+                "rejected",
+                f"simulated_order:{order_id}",
+                decision["validation_id"],
+                connection=connection,
+            )
             return {"intent_id": intent.id, "order_id": order_id, "status": status, "reason": rejection, "risk": decision, "execution_performed": False}
 
         realized_delta = 0.0
@@ -239,7 +245,7 @@ def _execute_market_intent(intent: OrderIntent) -> dict:
         connection.execute("UPDATE simulated_accounts SET cash_balance = ?, realized_pnl = realized_pnl + ?, updated_at = ? WHERE id = ?", (new_cash, realized_delta, now, ACCOUNT_ID))
         fill_id = connection.execute("INSERT INTO simulated_fills (order_id, account_id, symbol, side, quantity, price, fee, filled_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", (order_id, ACCOUNT_ID, symbol, side, quantity, price, fee, now)).lastrowid
         connection.execute("INSERT INTO simulated_ledger (account_id, event_type, reference_id, symbol, cash_delta, realized_pnl_delta, cash_balance, payload_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", (ACCOUNT_ID, "market_fill", fill_id, symbol, cash_delta, realized_delta, new_cash, json.dumps({"order_id": order_id, "side": side, "quantity": quantity, "price": price, "fee": fee}), now))
-    update_execution_intent(intent.id, "filled", f"simulated_fill:{fill_id}")
+    update_execution_intent(intent.id, "filled", f"simulated_fill:{fill_id}", decision["validation_id"])
     return {"intent_id": intent.id, "order_id": order_id, "fill_id": fill_id, "status": status, "risk": decision, "execution_performed": True, "account": account_snapshot()}
 
 

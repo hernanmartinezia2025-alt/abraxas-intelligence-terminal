@@ -127,3 +127,76 @@ def set_kill_switch(active: bool, reason: str) -> dict:
             ("kill_switch_changed", json.dumps(payload, sort_keys=True), now),
         )
     return get_risk_profile()
+
+
+def validate_order_intent(payload: dict) -> dict:
+    initialize_database()
+    now = datetime.now(timezone.utc)
+    symbol = str(payload["symbol"]).strip().upper()
+    mode = str(payload["mode"]).strip().lower()
+    side = str(payload["side"]).strip().lower()
+    account_equity = float(payload["account_equity"])
+    requested_notional = float(payload["requested_notional"])
+    daily_pnl = float(payload["daily_pnl"])
+    current_drawdown_pct = float(payload["current_drawdown_pct"])
+
+    with connect() as connection:
+        _seed(connection)
+        limits = _limits(connection.execute("SELECT * FROM risk_limits WHERE id = 1").fetchone())
+        state = dict(connection.execute("SELECT * FROM risk_state WHERE id = 1").fetchone())
+
+        position_pct = (requested_notional / account_equity) * 100
+        daily_loss_pct = max(0.0, (-daily_pnl / account_equity) * 100)
+        reasons = []
+        checks = []
+
+        def check(code: str, passed: bool, detail: str) -> None:
+            checks.append({"code": code, "passed": passed, "detail": detail})
+            if not passed:
+                reasons.append(detail)
+
+        check("kill_switch", not bool(state["kill_switch_active"]), "Kill switch inactive" if not bool(state["kill_switch_active"]) else "Kill switch is active")
+        check("mode", mode == "validation", "Validation-only mode" if mode == "validation" else f"Mode {mode} is blocked; only validation is available")
+        check("side", side == "long", "Long intent supported" if side == "long" else "Only long intents are supported in this phase")
+        check("symbol_whitelist", symbol in limits["symbol_whitelist"], f"{symbol} is authorized" if symbol in limits["symbol_whitelist"] else f"{symbol} is outside the symbol whitelist")
+        check("max_position", position_pct <= limits["max_position_pct"], f"Position {position_pct:.2f}% within limit" if position_pct <= limits["max_position_pct"] else f"Position {position_pct:.2f}% exceeds {limits['max_position_pct']:.2f}%")
+        check("max_daily_loss", daily_loss_pct < limits["max_daily_loss_pct"], f"Daily loss {daily_loss_pct:.2f}% within limit" if daily_loss_pct < limits["max_daily_loss_pct"] else f"Daily loss {daily_loss_pct:.2f}% reached limit {limits['max_daily_loss_pct']:.2f}%")
+        check("max_drawdown", current_drawdown_pct < limits["max_drawdown_pct"], f"Drawdown {current_drawdown_pct:.2f}% within limit" if current_drawdown_pct < limits["max_drawdown_pct"] else f"Drawdown {current_drawdown_pct:.2f}% reached limit {limits['max_drawdown_pct']:.2f}%")
+
+        last_loss_at = payload.get("last_loss_at")
+        cooldown_remaining = 0
+        if last_loss_at:
+            loss_time = datetime.fromisoformat(str(last_loss_at).replace("Z", "+00:00"))
+            if loss_time.tzinfo is None:
+                loss_time = loss_time.replace(tzinfo=timezone.utc)
+            elapsed_minutes = max(0, int((now - loss_time.astimezone(timezone.utc)).total_seconds() // 60))
+            cooldown_remaining = max(0, limits["cooldown_minutes"] - elapsed_minutes)
+        check("cooldown", cooldown_remaining == 0, "Cooldown clear" if cooldown_remaining == 0 else f"Cooldown has {cooldown_remaining} minutes remaining")
+
+        approved = not reasons
+        decision = {
+            "approved": approved,
+            "decision": "approved" if approved else "rejected",
+            "reasons": reasons,
+            "checks": checks,
+            "metrics": {
+                "position_pct": round(position_pct, 4),
+                "daily_loss_pct": round(daily_loss_pct, 4),
+                "current_drawdown_pct": round(current_drawdown_pct, 4),
+                "cooldown_remaining_minutes": cooldown_remaining,
+            },
+            "limits_version": limits["updated_at"],
+            "evaluated_at": now.isoformat(),
+            "execution_performed": False,
+        }
+        normalized_request = {**payload, "symbol": symbol, "mode": mode, "side": side}
+        cursor = connection.execute(
+            """
+            INSERT INTO risk_validation_log (
+                mode, symbol, approved, request_json, decision_json, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (mode, symbol, int(approved), json.dumps(normalized_request, sort_keys=True), json.dumps(decision, sort_keys=True), now.isoformat()),
+        )
+        decision["validation_id"] = cursor.lastrowid
+    return decision

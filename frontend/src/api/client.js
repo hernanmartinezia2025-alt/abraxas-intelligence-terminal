@@ -229,3 +229,7 @@ export function updateRiskLimits(payload) {
 export function updateKillSwitch(payload) {
   return request("/api/risk/kill-switch", { method: "POST", body: JSON.stringify(payload) });
 }
+
+export function validateRiskIntent(payload) {
+  return request("/api/risk/validate", { method: "POST", body: JSON.stringify(payload) });
+}

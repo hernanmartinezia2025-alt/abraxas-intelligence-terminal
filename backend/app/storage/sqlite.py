@@ -325,6 +325,19 @@ CREATE TABLE IF NOT EXISTS risk_audit_log (
 
 CREATE INDEX IF NOT EXISTS idx_risk_audit_log_created
 ON risk_audit_log(created_at);
+
+CREATE TABLE IF NOT EXISTS risk_validation_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    mode TEXT NOT NULL,
+    symbol TEXT NOT NULL,
+    approved INTEGER NOT NULL CHECK (approved IN (0, 1)),
+    request_json TEXT NOT NULL,
+    decision_json TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_risk_validation_symbol_created
+ON risk_validation_log(symbol, created_at);
 """
 
 BACKTEST_INTEGRITY_TRIGGERS = """

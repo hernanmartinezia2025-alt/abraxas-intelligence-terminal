@@ -72,6 +72,7 @@ SOURCE_CATALOG = [
             "risk_limits",
             "risk_state",
             "risk_audit_log",
+            "risk_validation_log",
         ],
         "purpose": "Base local para cache, auditoria y datasets analiticos.",
     },
@@ -245,6 +246,15 @@ DATASET_CATALOG = [
         "powerbi_ready": True,
         "bot_ready": True,
         "description": "Historial auditable de cambios de limites y kill switch.",
+    },
+    {
+        "dataset_id": "risk_validation_log",
+        "table": "risk_validation_log",
+        "label": "Risk Validations",
+        "category": "risk_engine",
+        "powerbi_ready": True,
+        "bot_ready": True,
+        "description": "Decisiones aprobadas o rechazadas para cada intencion de orden, sin ejecutar operaciones.",
     },
 ]
 

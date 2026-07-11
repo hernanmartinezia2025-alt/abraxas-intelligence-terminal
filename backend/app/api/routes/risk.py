@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from backend.app.storage.risk import get_risk_profile, set_kill_switch, update_risk_limits
+from backend.app.storage.risk import get_risk_profile, set_kill_switch, update_risk_limits, validate_order_intent
 
 router = APIRouter(prefix="/api/risk", tags=["risk"])
 
@@ -19,6 +19,17 @@ class RiskLimitsRequest(BaseModel):
 class KillSwitchRequest(BaseModel):
     active: bool
     reason: str = Field(min_length=3, max_length=500)
+
+
+class OrderIntentRequest(BaseModel):
+    mode: str = Field(default="validation", pattern="^(validation|paper|live)$")
+    symbol: str = Field(min_length=2, max_length=30)
+    side: str = Field(default="long", pattern="^(long|short)$")
+    requested_notional: float = Field(gt=0, le=1_000_000_000)
+    account_equity: float = Field(gt=0, le=1_000_000_000)
+    daily_pnl: float = Field(default=0, ge=-1_000_000_000, le=1_000_000_000)
+    current_drawdown_pct: float = Field(default=0, ge=0, le=100)
+    last_loss_at: str | None = None
 
 
 def model_payload(model: BaseModel) -> dict:
@@ -44,4 +55,12 @@ def risk_kill_switch(payload: KillSwitchRequest) -> dict:
         values = model_payload(payload)
         return set_kill_switch(active=values["active"], reason=values["reason"])
     except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/validate")
+def risk_validate(payload: OrderIntentRequest) -> dict:
+    try:
+        return validate_order_intent(model_payload(payload))
+    except (ValueError, TypeError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { getRiskProfile, updateKillSwitch, updateRiskLimits } from "../api/client.js";
+import { getRiskProfile, updateKillSwitch, updateRiskLimits, validateRiskIntent } from "../api/client.js";
 
 const EMPTY = { max_position_pct: 10, max_daily_loss_pct: 3, max_drawdown_pct: 12, cooldown_minutes: 30, symbol_whitelist: [] };
 
@@ -9,6 +9,8 @@ export default function RiskPage() {
   const [reason, setReason] = useState("Manual operator control");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [intent, setIntent] = useState({ symbol: "BTCUSDT", requested_notional: 500, account_equity: 10000, daily_pnl: 0, current_drawdown_pct: 0 });
+  const [decision, setDecision] = useState(null);
 
   const load = async () => {
     try {
@@ -48,6 +50,14 @@ export default function RiskPage() {
   };
 
   const killActive = profile?.kill_switch?.active ?? true;
+  const runValidation = async (event) => {
+    event.preventDefault(); setBusy(true);
+    try {
+      const result = await validateRiskIntent({ ...intent, mode: "validation", side: "long", requested_notional: Number(intent.requested_notional), account_equity: Number(intent.account_equity), daily_pnl: Number(intent.daily_pnl), current_drawdown_pct: Number(intent.current_drawdown_pct) });
+      setDecision(result); setError("");
+    } catch (requestError) { setError(requestError.message); }
+    finally { setBusy(false); }
+  };
   return (
     <section className="ops-page risk-engine-page">
       <section className={`panel-accent ops-command risk-command ${killActive ? "halted" : "armed"}`}>
@@ -88,6 +98,19 @@ export default function RiskPage() {
         <section className="exchange-panel risk-audit-panel">
           <div className="exchange-panel-head compact"><div><p className="eyebrow">Audit trail</p><h2>Eventos recientes</h2></div><span>{profile.audit_log.length} eventos</span></div>
           {profile.audit_log.length ? <div className="risk-audit-list">{profile.audit_log.map((event) => <article key={event.id}><span>{event.event_type}</span><strong>{event.payload.reason || (event.payload.symbol_whitelist || []).join(", ")}</strong><time>{new Date(event.created_at).toLocaleString()}</time></article>)}</div> : <div className="chart-state">Sin modificaciones todavía. El perfil seguro inicial ya está activo.</div>}
+        </section>
+
+        <section className="exchange-panel risk-validator-panel">
+          <div className="exchange-panel-head compact"><div><p className="eyebrow">Pre-trade gate</p><h2>Validar intencion</h2></div><span>NO EXECUTION</span></div>
+          <div className="risk-validator-grid">
+            <form className="risk-fields" onSubmit={runValidation}>
+              {[["symbol", "Symbol", "text"], ["requested_notional", "Notional solicitado", "number"], ["account_equity", "Equity cuenta", "number"], ["daily_pnl", "PnL diario", "number"], ["current_drawdown_pct", "Drawdown actual %", "number"]].map(([key, label, type]) => <label key={key}><span>{label}</span><input type={type} step="0.1" value={intent[key]} onChange={(event) => setIntent((current) => ({ ...current, [key]: event.target.value }))} /></label>)}
+              <button className="primary-action" disabled={busy} type="submit">Evaluar contra Risk Engine</button>
+            </form>
+            <div className={`risk-decision ${decision?.approved ? "approved" : "rejected"}`}>
+              {!decision ? <p>Completa la intencion para obtener una decision backend auditable.</p> : <><span>VALIDATION #{decision.validation_id}</span><h2>{decision.decision.toUpperCase()}</h2><p>{decision.approved ? "Todos los controles aprobaron la intencion." : decision.reasons.join(" · ")}</p><div>{decision.checks.map((check) => <small className={check.passed ? "pass" : "fail"} key={check.code}>{check.passed ? "PASS" : "FAIL"} · {check.code}</small>)}</div><em>No se ejecuto ninguna orden.</em></>}
+            </div>
+          </div>
         </section>
       </>}
 

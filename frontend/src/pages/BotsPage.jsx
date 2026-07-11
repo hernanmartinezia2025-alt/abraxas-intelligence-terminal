@@ -3,12 +3,13 @@ import { createBot, getBacktest, getBot, getBotBacktests, getBots, runBotBacktes
 import BacktestComparisonPanel from "../features/backtests/BacktestComparisonPanel.jsx";
 import BacktestEquityChart from "../features/charts/BacktestEquityChart.jsx";
 import PageSubtabs from "../components/PageSubtabs.jsx";
+import PaperTradingPanel from "../features/paper/PaperTradingPanel.jsx";
 
 const BOT_STAGES = [
   ["Saved Bots", "online", "Bots persistidos en SQLite con versiones auditables."],
   ["Strategy JSON", "online", "Cada version guarda reglas, parametros y perfil de riesgo."],
   ["Backtests", "online", "Runs auditables por version con costos, trades y equity persistidos."],
-  ["Paper Mode", "locked", "Simulacion en tiempo real sin tocar dinero ni claves."],
+  ["Paper Mode", "online", "Cuenta, ordenes, fills, posiciones y ledger persistidos bajo Risk Engine."],
   ["ROI Profile", "online", "ROI, benchmark, drawdown, profit factor, equity y comparacion A/B."],
   ["Live Execution", "blocked", "Bloqueado hasta tener risk engine, permisos y kill switch."],
 ];
@@ -346,6 +347,7 @@ export default function BotsPage({ selectedSymbol = "BTCUSDT" }) {
           ["forge", "Forge", "crear + configurar"],
           ["runs", "Backtest Runs", "ROI + trades + auditoría"],
           ["compare", "Compare", "versiones A/B"],
+          ["paper", "Paper Trading", "cuenta + ordenes + posiciones"],
         ]}
         activeTab={activeTab}
         onChange={setActiveTab}
@@ -741,6 +743,8 @@ export default function BotsPage({ selectedSymbol = "BTCUSDT" }) {
           versions={detailMatchesSelection ? detail.versions || [] : []}
         />
       )}
+
+      {activeTab === "paper" && <PaperTradingPanel botId={selectedBotId} defaultSymbol={detailMatchesSelection ? detail.bot.base_symbol : selectedSymbol} />}
     </section>
   );
 }

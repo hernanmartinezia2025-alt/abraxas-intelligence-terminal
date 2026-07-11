@@ -233,3 +233,15 @@ export function updateKillSwitch(payload) {
 export function validateRiskIntent(payload) {
   return request("/api/risk/validate", { method: "POST", body: JSON.stringify(payload) });
 }
+
+export function getPaperAccount() {
+  return request("/api/paper");
+}
+
+export function placePaperOrder(payload) {
+  return request("/api/paper/orders", { method: "POST", body: JSON.stringify(payload) });
+}
+
+export function resetPaperAccount(payload) {
+  return request("/api/paper/reset", { method: "POST", body: JSON.stringify(payload) });
+}

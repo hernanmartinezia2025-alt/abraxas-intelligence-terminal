@@ -1921,6 +1921,28 @@ h2 {
   margin: 0;
 }
 
+.risk-command.halted { border-color: rgba(255, 91, 111, .5); }
+.risk-command.armed { border-color: rgba(71, 217, 170, .45); }
+.risk-workspace { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(280px, .75fr); gap: 14px; }
+.risk-limits-form, .kill-switch-panel, .risk-audit-panel { padding: 18px; }
+.risk-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 18px 0; }
+.risk-fields label, .kill-switch-panel label { display: grid; gap: 7px; color: #aab4bf; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
+.risk-fields label > div { display: flex; align-items: center; border: 1px solid #2c3944; background: #0d141a; border-radius: 7px; }
+.risk-fields input, .kill-switch-panel textarea { width: 100%; color: #f1f5f7; background: #0d141a; border: 1px solid #2c3944; border-radius: 7px; padding: 11px; }
+.risk-fields label > div input { border: 0; }
+.risk-fields label > div i { padding: 0 11px; color: #d2b66d; font-style: normal; }
+.risk-fields .risk-whitelist { grid-column: 1 / -1; }
+.kill-switch-panel { display: flex; flex-direction: column; gap: 15px; }
+.kill-switch-panel textarea { min-height: 76px; resize: vertical; }
+.kill-switch-panel small { color: #788691; line-height: 1.5; }
+.danger-action { border: 1px solid rgba(255,91,111,.5); background: rgba(255,91,111,.12); color: #ff8b98; border-radius: 7px; padding: 12px; font-weight: 700; cursor: pointer; }
+.risk-audit-list { display: grid; gap: 8px; margin-top: 14px; }
+.risk-audit-list article { display: grid; grid-template-columns: 180px 1fr auto; gap: 14px; align-items: center; padding: 11px; border: 1px solid #28343e; border-radius: 7px; background: #0d141a; }
+.risk-audit-list span { color: #d2b66d; text-transform: uppercase; font-size: 11px; }
+.risk-audit-list strong { overflow-wrap: anywhere; }
+.risk-audit-list time { color: #788691; font-size: 12px; }
+@media (max-width: 900px) { .risk-workspace { grid-template-columns: 1fr; } .risk-audit-list article { grid-template-columns: 1fr; gap: 5px; } }
+
 .bot-forge-grid {
   display: grid;
   grid-template-columns: minmax(320px, 0.9fr) minmax(0, 1.1fr);

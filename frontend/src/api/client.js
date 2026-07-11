@@ -217,3 +217,15 @@ export function datasetExportUrl(datasetId, limit = 5000) {
   const params = new URLSearchParams({ limit: String(limit) });
   return `${API_BASE}/api/data/export/${datasetId}.csv?${params}`;
 }
+
+export function getRiskProfile(auditLimit = 20) {
+  return request(`/api/risk?audit_limit=${auditLimit}`);
+}
+
+export function updateRiskLimits(payload) {
+  return request("/api/risk/limits", { method: "PUT", body: JSON.stringify(payload) });
+}
+
+export function updateKillSwitch(payload) {
+  return request("/api/risk/kill-switch", { method: "POST", body: JSON.stringify(payload) });
+}

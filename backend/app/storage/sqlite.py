@@ -298,6 +298,33 @@ ON backtest_equity(backtest_id, timestamp, point_index);
 
 CREATE INDEX IF NOT EXISTS idx_backtest_equity_bot_version
 ON backtest_equity(bot_id, bot_version_id, timestamp);
+
+CREATE TABLE IF NOT EXISTS risk_limits (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    max_position_pct REAL NOT NULL CHECK (max_position_pct > 0 AND max_position_pct <= 100),
+    max_daily_loss_pct REAL NOT NULL CHECK (max_daily_loss_pct > 0 AND max_daily_loss_pct <= 100),
+    max_drawdown_pct REAL NOT NULL CHECK (max_drawdown_pct > 0 AND max_drawdown_pct <= 100),
+    cooldown_minutes INTEGER NOT NULL CHECK (cooldown_minutes >= 0),
+    symbol_whitelist TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS risk_state (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    kill_switch_active INTEGER NOT NULL CHECK (kill_switch_active IN (0, 1)),
+    reason TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS risk_audit_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_type TEXT NOT NULL,
+    payload_json TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_risk_audit_log_created
+ON risk_audit_log(created_at);
 """
 
 BACKTEST_INTEGRITY_TRIGGERS = """

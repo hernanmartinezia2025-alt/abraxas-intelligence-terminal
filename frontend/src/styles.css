@@ -3523,6 +3523,8 @@ h2 {
   .side-rail {
     position: static;
     height: auto;
+    min-height: 0;
+    width: 100%;
     flex-direction: row;
     overflow-x: auto;
     align-items: center;
@@ -3622,7 +3624,45 @@ h2 {
 }
 
 @media (max-width: 620px) {
-  .side-rail { padding: 14px; }
+  .side-rail {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    min-height: 0;
+    padding: 8px;
+    gap: 7px;
+    overflow-x: auto;
+    border-right: 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+  .brand-block {
+    min-width: 42px;
+    width: 42px;
+    grid-template-columns: 1fr;
+    padding: 0;
+    border: 0;
+  }
+  .brand-block > div,
+  .rail-collapse-button,
+  .rail-bottom { display: none; }
+  .brand-mark { width: 34px; }
+  .rail-nav { gap: 3px; }
+  .rail-nav a {
+    min-width: 62px;
+    justify-items: center;
+    padding: 6px 7px;
+  }
+  .rail-nav b { display: block; font-size: 14px; }
+  .rail-nav span { font-size: 10px; }
+  .rail-nav small { display: none; }
+  .rail-nav,
+  .page-subtabs,
+  .market-strip { scrollbar-width: none; }
+  .rail-nav::-webkit-scrollbar,
+  .page-subtabs::-webkit-scrollbar,
+  .market-strip::-webkit-scrollbar { display: none; }
+  .page-subtabs button { min-width: 132px; }
+  .terminal-frame.rail-collapsed { grid-template-columns: 1fr; }
   h1 { font-size: 30px; }
   .shell {
     padding-inline: 12px;

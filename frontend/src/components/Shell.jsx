@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import GlobalAssetSelector from "./GlobalAssetSelector.jsx";
 
 const NAV_ITEMS = [
@@ -34,6 +34,7 @@ export default function Shell({
   onAssetChange,
 }) {
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const railNavRef = useRef(null);
   const [railCollapsed, setRailCollapsed] = useState(() => window.localStorage.getItem("abraxas-rail-collapsed") === "true");
   const [railDensity, setRailDensity] = useState(() => window.localStorage.getItem("abraxas-rail-density") || "comfortable");
 
@@ -45,6 +46,13 @@ export default function Shell({
   useEffect(() => {
     window.localStorage.setItem("abraxas-rail-collapsed", String(railCollapsed));
   }, [railCollapsed]);
+
+  useEffect(() => {
+    const activeLink = railNavRef.current?.querySelector("a.active");
+    if (window.matchMedia("(max-width: 1060px)").matches) {
+      activeLink?.scrollIntoView({ block: "nearest", inline: "center" });
+    }
+  }, [activePage]);
 
   return (
     <div className={`terminal-frame ${railCollapsed ? "rail-collapsed" : ""}`}>
@@ -59,7 +67,7 @@ export default function Shell({
             {railCollapsed ? "»" : "«"}
           </button>
         </div>
-        <nav className="rail-nav" aria-label="Primary modules">
+        <nav className="rail-nav" aria-label="Primary modules" ref={railNavRef}>
           {NAV_ITEMS.map(([key, label, meta, icon]) => (
             <a className={activePage === key ? "active" : ""} href={`#${key}`} key={key}>
               <b aria-hidden="true">{icon}</b>

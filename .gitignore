@@ -23,6 +23,7 @@ runtime_*.log
 runtime_*.err.log
 frontend/runtime_*.log
 frontend/runtime_*.err.log
+.playwright-cli/
 
 # OS / editors
 .DS_Store

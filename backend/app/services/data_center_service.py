@@ -278,46 +278,44 @@ def utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def get_table_stats(table_name: str) -> dict:
-    initialize_database()
-    with connect() as connection:
-        exists = connection.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name = ?",
-            (table_name,),
-        ).fetchone()
-        if not exists:
-            return {
-                "exists": False,
-                "row_count": 0,
-                "last_timestamp": None,
-                "columns": [],
-            }
+def _get_table_stats(connection, table_name: str) -> dict:
+    exists = connection.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name = ?",
+        (table_name,),
+    ).fetchone()
+    if not exists:
+        return {
+            "exists": False,
+            "row_count": 0,
+            "last_timestamp": None,
+            "columns": [],
+        }
 
-        row_count = connection.execute(f"SELECT COUNT(*) AS count FROM {table_name}").fetchone()["count"]
-        columns = [
-            dict(row)
-            for row in connection.execute(f"PRAGMA table_info({table_name})").fetchall()
-        ]
-        timestamp_column = first_existing_column(
-            columns,
-            [
-                "timestamp",
-                "exit_timestamp",
-                "entry_timestamp",
-                "published_at",
-                "checked_at",
-                "fetched_at",
-                "open_time",
-                "close_time",
-                "created_at",
-                "updated_at",
-                "filled_at",
-            ],
-        )
-        last_timestamp = None
-        if timestamp_column:
-            result = connection.execute(f"SELECT MAX({timestamp_column}) AS last_timestamp FROM {table_name}").fetchone()
-            last_timestamp = result["last_timestamp"] if result else None
+    row_count = connection.execute(f"SELECT COUNT(*) AS count FROM {table_name}").fetchone()["count"]
+    columns = [
+        dict(row)
+        for row in connection.execute(f"PRAGMA table_info({table_name})").fetchall()
+    ]
+    timestamp_column = first_existing_column(
+        columns,
+        [
+            "timestamp",
+            "exit_timestamp",
+            "entry_timestamp",
+            "published_at",
+            "checked_at",
+            "fetched_at",
+            "open_time",
+            "close_time",
+            "created_at",
+            "updated_at",
+            "filled_at",
+        ],
+    )
+    last_timestamp = None
+    if timestamp_column:
+        result = connection.execute(f"SELECT MAX({timestamp_column}) AS last_timestamp FROM {table_name}").fetchone()
+        last_timestamp = result["last_timestamp"] if result else None
 
     return {
         "exists": True,
@@ -332,6 +330,12 @@ def get_table_stats(table_name: str) -> dict:
             for column in columns
         ],
     }
+
+
+def get_table_stats(table_name: str) -> dict:
+    initialize_database()
+    with connect() as connection:
+        return _get_table_stats(connection, table_name)
 
 
 def first_existing_column(columns: list[dict], candidates: list[str]) -> str | None:
@@ -470,21 +474,23 @@ def export_dataset_csv(dataset_id: str, limit: int = 5000) -> str:
 
 
 def build_datasets() -> list[dict]:
+    initialize_database()
     datasets = []
-    for dataset in DATASET_CATALOG:
-        stats = get_table_stats(dataset["table"])
-        status = dataset.get("status")
-        if stats["exists"] and stats["row_count"] > 0:
-            status = "ready"
-        elif stats["exists"]:
-            status = "empty"
-        elif not status:
-            status = "missing"
-        datasets.append(
-            {
-                **dataset,
-                **stats,
-                "status": status,
-            }
-        )
+    with connect() as connection:
+        for dataset in DATASET_CATALOG:
+            stats = _get_table_stats(connection, dataset["table"])
+            status = dataset.get("status")
+            if stats["exists"] and stats["row_count"] > 0:
+                status = "ready"
+            elif stats["exists"]:
+                status = "empty"
+            elif not status:
+                status = "missing"
+            datasets.append(
+                {
+                    **dataset,
+                    **stats,
+                    "status": status,
+                }
+            )
     return datasets

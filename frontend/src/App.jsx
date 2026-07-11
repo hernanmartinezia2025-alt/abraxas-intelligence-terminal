@@ -82,11 +82,20 @@ export default function App() {
 
   useEffect(() => {
     loadRadar();
-    const timer = window.setInterval(() => {
-      silentRefreshRadar();
-    }, 60000);
-    return () => window.clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    if (!['markets', 'trade'].includes(activePage)) return undefined;
+    const refreshIfVisible = () => {
+      if (document.visibilityState === 'visible') silentRefreshRadar();
+    };
+    const timer = window.setInterval(refreshIfVisible, 60000);
+    document.addEventListener('visibilitychange', refreshIfVisible);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', refreshIfVisible);
+    };
+  }, [activePage]);
 
   useEffect(() => {
     if (!window.location.hash) window.history.replaceState(null, "", "#markets");

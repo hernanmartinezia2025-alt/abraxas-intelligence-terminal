@@ -200,10 +200,6 @@ export default function BackendSurface({ selectedSymbol = "BTCUSDT" }) {
 
   useEffect(() => {
     loadSurface();
-    const timer = window.setInterval(() => {
-      loadSurface({ silent: true });
-    }, 120000);
-    return () => window.clearInterval(timer);
   }, [requests]);
 
   return (
@@ -212,6 +208,7 @@ export default function BackendSurface({ selectedSymbol = "BTCUSDT" }) {
         <div>
           <p className="eyebrow">Backend Surface</p>
           <h2>Funciones reales expuestas</h2>
+          <small>Auditoria bajo demanda para evitar llamadas externas innecesarias.</small>
         </div>
         <div className="dataset-toolbar">
           <button type="button" onClick={() => loadSurface()} disabled={loading}>

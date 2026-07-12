@@ -15,6 +15,8 @@ from backend.app.services.bot_service import (
     list_saved_bot_signals,
     create_saved_bot_paper_proposal,
     list_saved_bot_paper_proposals,
+    dismiss_saved_bot_paper_proposal,
+    submit_saved_bot_paper_proposal,
 )
 
 router = APIRouter(prefix="/api/bots", tags=["bots"])
@@ -159,6 +161,26 @@ def bot_paper_proposals(bot_id: int = Path(ge=1), limit: int = Query(default=50,
 def bot_paper_proposal(bot_id: int = Path(ge=1), evaluation_id: int = Path(ge=1)) -> dict:
     try:
         return create_saved_bot_paper_proposal(bot_id=bot_id, evaluation_id=evaluation_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@router.post("/{bot_id}/paper-proposals/{proposal_id}/submit")
+def submit_bot_paper_proposal(bot_id: int = Path(ge=1), proposal_id: int = Path(ge=1)) -> dict:
+    try:
+        return submit_saved_bot_paper_proposal(bot_id=bot_id, proposal_id=proposal_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@router.post("/{bot_id}/paper-proposals/{proposal_id}/dismiss")
+def dismiss_bot_paper_proposal(bot_id: int = Path(ge=1), proposal_id: int = Path(ge=1)) -> dict:
+    try:
+        return dismiss_saved_bot_paper_proposal(bot_id=bot_id, proposal_id=proposal_id)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:

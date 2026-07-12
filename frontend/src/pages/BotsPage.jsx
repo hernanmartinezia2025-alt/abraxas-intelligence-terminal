@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { createBot, createBotPaperProposal, evaluateBotSignal, getBacktest, getBot, getBotBacktests, getBots, getBotSignals, runBotBacktest } from "../api/client.js";
+import { createBot, createBotPaperProposal, dismissBotPaperProposal, evaluateBotSignal, getBacktest, getBot, getBotBacktests, getBots, getBotSignals, runBotBacktest, submitBotPaperProposal } from "../api/client.js";
 import BacktestComparisonPanel from "../features/backtests/BacktestComparisonPanel.jsx";
 import BacktestEquityChart from "../features/charts/BacktestEquityChart.jsx";
 import PageSubtabs from "../components/PageSubtabs.jsx";
@@ -212,6 +212,33 @@ export default function BotsPage({ selectedSymbol = "BTCUSDT" }) {
     setError("");
     try {
       setPaperProposal(await createBotPaperProposal(selectedBotId, signalEvaluation.id));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setProposingPaper(false);
+    }
+  }
+
+  async function handleSubmitProposal() {
+    if (!paperProposal || paperProposal.status !== "pending") return;
+    if (!window.confirm(`Confirmar propuesta paper #${paperProposal.id}? Pasará por Risk Engine y solo podrá ejecutar un fill simulado.`)) return;
+    setProposingPaper(true);
+    setError("");
+    try {
+      const payload = await submitBotPaperProposal(selectedBotId, paperProposal.id);
+      setPaperProposal(payload.proposal);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setProposingPaper(false);
+    }
+  }
+
+  async function handleDismissProposal() {
+    if (!paperProposal || paperProposal.status !== "pending") return;
+    setProposingPaper(true);
+    try {
+      setPaperProposal(await dismissBotPaperProposal(selectedBotId, paperProposal.id));
     } catch (err) {
       setError(err.message);
     } finally {
@@ -700,7 +727,7 @@ export default function BotsPage({ selectedSymbol = "BTCUSDT" }) {
             {signalEvaluation && <section className="paper-proposal-gate">
               <div><p className="eyebrow">Paper proposal gate</p><h3>{signalEvaluation.signal === "entry_candidate" ? "Candidato elegible" : "Sin propuesta operable"}</h3><small>Crear una propuesta no crea una orden ni pasa todavía por Risk Engine.</small></div>
               <button type="button" onClick={handlePaperProposal} disabled={signalEvaluation.signal !== "entry_candidate" || proposingPaper}>{proposingPaper ? "Calculando..." : "Crear propuesta paper"}</button>
-              {paperProposal && <div className="paper-proposal-result"><strong>PROPOSAL #{paperProposal.id} · {paperProposal.status.toUpperCase()}</strong><span>{paperProposal.action.toUpperCase()} {paperProposal.quantity} {paperProposal.symbol} · ${Number(paperProposal.proposed_notional).toLocaleString(undefined, { maximumFractionDigits: 2 })}</span><small>{paperProposal.reason}</small></div>}
+              {paperProposal && <div className="paper-proposal-result"><strong>PROPOSAL #{paperProposal.id} · {paperProposal.status.toUpperCase()}</strong><span>{paperProposal.action.toUpperCase()} {paperProposal.quantity} {paperProposal.symbol} · ${Number(paperProposal.proposed_notional).toLocaleString(undefined, { maximumFractionDigits: 2 })}</span><small>{paperProposal.reason}</small>{paperProposal.status === "pending" && <div className="paper-proposal-actions"><button type="button" onClick={handleSubmitProposal} disabled={proposingPaper}>Confirmar y validar</button><button type="button" className="secondary" onClick={handleDismissProposal} disabled={proposingPaper}>Descartar</button></div>}{paperProposal.result_reference && <small>Resultado: {paperProposal.result_reference} · Risk #{paperProposal.risk_validation_id || "--"}</small>}</div>}
             </section>}
             {signalEvaluation && <section className="signal-rule-trace">
               {["entry", "exit"].map((side) => <div key={side}><p className="eyebrow">{side} trace</p>{(signalEvaluation.trace?.[side] || []).map((rule, index) => <article key={`${side}-${index}`} className={rule.passed ? "passed" : "failed"}><code>{rule.field}</code><span>{rule.actual ?? "--"} {rule.operator} {rule.value}</span><strong>{rule.passed ? "PASS" : "NO PASS"}</strong></article>)}</div>)}

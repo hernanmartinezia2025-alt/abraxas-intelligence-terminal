@@ -244,6 +244,10 @@ CREATE TABLE IF NOT EXISTS paper_order_proposals (
     proposed_notional REAL NOT NULL,
     status TEXT NOT NULL CHECK(status IN ('pending', 'submitted', 'dismissed')),
     reason TEXT NOT NULL,
+    execution_intent_id TEXT,
+    risk_validation_id INTEGER,
+    result_reference TEXT,
+    submitted_at TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     FOREIGN KEY(signal_evaluation_id) REFERENCES strategy_signal_evaluations(id),
@@ -799,6 +803,17 @@ def initialize_database() -> None:
                 "UPDATE bot_versions SET contract_json = ?, strategy_hash = ?, validation_status = ? WHERE id = ?",
                 (json.dumps(contract, ensure_ascii=True), contract.get("strategy_hash"), contract["status"], version["id"]),
             )
+        proposal_columns = {
+            row["name"] for row in connection.execute("PRAGMA table_info(paper_order_proposals)").fetchall()
+        }
+        for name, column_type in {
+            "execution_intent_id": "TEXT",
+            "risk_validation_id": "INTEGER",
+            "result_reference": "TEXT",
+            "submitted_at": "TEXT",
+        }.items():
+            if name not in proposal_columns:
+                connection.execute(f"ALTER TABLE paper_order_proposals ADD COLUMN {name} {column_type}")
         user_version = int(connection.execute("PRAGMA user_version").fetchone()[0])
         if user_version < 1:
             _backfill_backtest_payloads(connection)

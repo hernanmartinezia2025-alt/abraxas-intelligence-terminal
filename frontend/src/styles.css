@@ -1966,6 +1966,7 @@ h2 {
 .paper-proposal-result { flex-basis: 100%; display: grid; gap: 4px; padding-top: 10px; border-top: 1px solid #30362d; }
 .paper-proposal-result strong { color: #d2b66d; }
 .paper-proposal-result small { color: #87938c; }
+.paper-proposal-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
 .risk-validator-grid { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(280px, .8fr); gap: 16px; margin-top: 14px; }
 .risk-validator-grid .risk-fields { margin: 0; }
 .risk-validator-grid .risk-fields button { grid-column: 1 / -1; }

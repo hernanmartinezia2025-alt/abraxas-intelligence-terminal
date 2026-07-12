@@ -10,8 +10,8 @@ from backend.app.storage.backtests import get_backtest, list_backtests, save_bac
 from backend.app.storage.bots import create_bot, create_bot_version, get_bot, list_bots
 from backend.app.storage.features import latest_asset_features
 from backend.app.storage.signals import get_signal_evaluation, list_signal_evaluations, save_signal_evaluation
-from backend.app.storage.paper import account_snapshot, latest_price
-from backend.app.storage.proposals import list_paper_proposals, save_paper_proposal
+from backend.app.storage.paper import account_snapshot, latest_price, place_market_order
+from backend.app.storage.proposals import claim_paper_proposal, dismiss_paper_proposal, list_paper_proposals, mark_paper_proposal_submitted, release_paper_proposal_claim, save_paper_proposal
 from backend.app.storage.sqlite import connect
 from backend.app.strategies.runtime import evaluate_strategy
 
@@ -216,3 +216,25 @@ def create_saved_bot_paper_proposal(bot_id: int, evaluation_id: int) -> dict:
 def list_saved_bot_paper_proposals(bot_id: int, limit: int = 50) -> dict:
     get_bot(bot_id=bot_id)
     return list_paper_proposals(bot_id=bot_id, limit=limit)
+
+
+def dismiss_saved_bot_paper_proposal(bot_id: int, proposal_id: int) -> dict:
+    get_bot(bot_id=bot_id)
+    return dismiss_paper_proposal(proposal_id=proposal_id, bot_id=bot_id)
+
+
+def submit_saved_bot_paper_proposal(bot_id: int, proposal_id: int) -> dict:
+    get_bot(bot_id=bot_id)
+    proposal = claim_paper_proposal(proposal_id=proposal_id, bot_id=bot_id)
+    try:
+        result = place_market_order({
+            "symbol": proposal["symbol"],
+            "side": proposal["action"],
+            "quantity": proposal["quantity"],
+            "bot_id": bot_id,
+        })
+    except Exception:
+        release_paper_proposal_claim(proposal_id)
+        raise
+    updated = mark_paper_proposal_submitted(proposal_id=proposal_id, bot_id=bot_id, result=result)
+    return {"proposal": updated, "paper_result": result, "live_execution": "blocked"}

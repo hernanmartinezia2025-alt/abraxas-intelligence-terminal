@@ -193,6 +193,14 @@ export function createBotPaperProposal(botId, evaluationId) {
   return request(`/api/bots/${botId}/signals/${evaluationId}/paper-proposal`, { method: "POST" });
 }
 
+export function submitBotPaperProposal(botId, proposalId) {
+  return request(`/api/bots/${botId}/paper-proposals/${proposalId}/submit`, { method: "POST" });
+}
+
+export function dismissBotPaperProposal(botId, proposalId) {
+  return request(`/api/bots/${botId}/paper-proposals/${proposalId}/dismiss`, { method: "POST" });
+}
+
 export function getLiveMapEvents({ refresh = false, limit = 250, types = "" } = {}) {
   const params = new URLSearchParams({ refresh: String(refresh), limit: String(limit) });
   if (types) params.set("types", types);

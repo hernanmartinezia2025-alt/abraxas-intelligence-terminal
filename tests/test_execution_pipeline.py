@@ -8,6 +8,8 @@ from backend.app.storage import sqlite as storage_sqlite
 from backend.app.storage.paper import account_snapshot, place_market_order
 from backend.app.storage.risk import get_risk_profile, set_kill_switch
 from backend.app.storage.sqlite import connect, initialize_database
+from backend.app.storage.proposals import save_paper_proposal
+from backend.app.services.bot_service import submit_saved_bot_paper_proposal
 
 
 class ExecutionPipelineTests(unittest.TestCase):
@@ -33,6 +35,17 @@ class ExecutionPipelineTests(unittest.TestCase):
                     "normal",
                     "integration fixture",
                 ),
+            )
+            connection.execute(
+                """INSERT INTO bots (id, name, description, status, mode, base_symbol, timeframe,
+                   risk_profile, created_at, updated_at) VALUES
+                   (1, 'proposal-bot', '', 'draft', 'research', 'BTCUSDT', '15m', 'balanced', ?, ?)""",
+                ("2026-07-11T00:00:00+00:00", "2026-07-11T00:00:00+00:00"),
+            )
+            connection.execute(
+                """INSERT INTO bot_versions (id, bot_id, version, strategy_json, notes, created_at)
+                   VALUES (1, 1, 1, '{}', '', ?)""",
+                ("2026-07-11T00:00:00+00:00",),
             )
 
     def tearDown(self) -> None:
@@ -70,6 +83,31 @@ class ExecutionPipelineTests(unittest.TestCase):
         self.assertEqual(intent["risk_validation_id"], result["risk"]["validation_id"])
         self.assertEqual(intent["result_reference"], f"simulated_fill:{result['fill_id']}")
         self.assertEqual(snapshot["orders"][0]["risk_validation_id"], result["risk"]["validation_id"])
+
+    def test_proposal_submission_is_risk_gated_and_cannot_repeat(self) -> None:
+        with connect() as connection:
+            signal_id = connection.execute(
+                """INSERT INTO strategy_signal_evaluations (
+                   bot_id, bot_version_id, strategy_hash, symbol, timeframe, feature_timestamp,
+                   signal, entry_passed, exit_passed, features_json, trace_json, evaluated_at
+                   ) VALUES (1, 1, 'hash', 'BTCUSDT', '15m', 1, 'entry_candidate', 1, 0, '{}', '{}', ?)""",
+                ("2026-07-11T00:00:00+00:00",),
+            ).lastrowid
+        proposal = save_paper_proposal({
+            "signal_evaluation_id": signal_id, "bot_id": 1, "bot_version_id": 1,
+            "symbol": "BTCUSDT", "action": "buy", "quantity": 0.001,
+            "reference_price": 64_000, "proposed_notional": 64,
+            "reason": "integration test",
+        })
+
+        result = submit_saved_bot_paper_proposal(1, proposal["id"])
+
+        self.assertEqual(result["proposal"]["status"], "submitted")
+        self.assertEqual(result["paper_result"]["status"], "rejected")
+        self.assertEqual(result["proposal"]["execution_intent_id"], result["paper_result"]["intent_id"])
+        self.assertEqual(result["proposal"]["risk_validation_id"], result["paper_result"]["risk"]["validation_id"])
+        with self.assertRaisesRegex(ValueError, "already processed"):
+            submit_saved_bot_paper_proposal(1, proposal["id"])
 
 
 if __name__ == "__main__":

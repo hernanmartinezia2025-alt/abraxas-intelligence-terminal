@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { createBot, evaluateBotSignal, getBacktest, getBot, getBotBacktests, getBots, runBotBacktest } from "../api/client.js";
+import { createBot, evaluateBotSignal, getBacktest, getBot, getBotBacktests, getBots, getBotSignals, runBotBacktest } from "../api/client.js";
 import BacktestComparisonPanel from "../features/backtests/BacktestComparisonPanel.jsx";
 import BacktestEquityChart from "../features/charts/BacktestEquityChart.jsx";
 import PageSubtabs from "../components/PageSubtabs.jsx";
@@ -70,6 +70,7 @@ export default function BotsPage({ selectedSymbol = "BTCUSDT" }) {
   const [backtesting, setBacktesting] = useState(false);
   const [evaluatingSignal, setEvaluatingSignal] = useState(false);
   const [signalEvaluation, setSignalEvaluation] = useState(null);
+  const [signalHistory, setSignalHistory] = useState([]);
   const [runDetailLoading, setRunDetailLoading] = useState(false);
   const [backtests, setBacktests] = useState([]);
   const [selectedRunId, setSelectedRunId] = useState(null);
@@ -172,6 +173,22 @@ export default function BotsPage({ selectedSymbol = "BTCUSDT" }) {
     }
   }
 
+  async function loadSignals(botId) {
+    if (!botId) {
+      setSignalHistory([]);
+      setSignalEvaluation(null);
+      return;
+    }
+    try {
+      const payload = await getBotSignals(botId, 20);
+      if (selectedBotIdRef.current !== botId) return;
+      setSignalHistory(payload.evaluations || []);
+      setSignalEvaluation((current) => current?.bot_id === botId ? current : payload.evaluations?.[0] || null);
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
   async function handleSignalEvaluation() {
     if (!detailMatchesSelection || !selectedVersion || !strategyReady) return;
     setEvaluatingSignal(true);
@@ -179,6 +196,7 @@ export default function BotsPage({ selectedSymbol = "BTCUSDT" }) {
     try {
       const payload = await evaluateBotSignal(selectedBotId, { version_id: selectedVersion.id });
       setSignalEvaluation(payload);
+      setSignalHistory((current) => [payload, ...current.filter((item) => item.id !== payload.id)].slice(0, 20));
     } catch (err) {
       setError(err.message);
     } finally {
@@ -248,6 +266,7 @@ export default function BotsPage({ selectedSymbol = "BTCUSDT" }) {
     setSelectedRunId(null);
     setSelectedRun(null);
     setSignalEvaluation(null);
+    setSignalHistory([]);
     setRunDetailLoading(false);
   }
 
@@ -330,6 +349,7 @@ export default function BotsPage({ selectedSymbol = "BTCUSDT" }) {
   useEffect(() => {
     loadDetail(selectedBotId);
     loadBacktests(selectedBotId);
+    loadSignals(selectedBotId);
   }, [selectedBotId]);
 
   useEffect(() => {
@@ -659,6 +679,13 @@ export default function BotsPage({ selectedSymbol = "BTCUSDT" }) {
               <div><span>Última evaluación</span><strong>{signalEvaluation.signal.replace("_", " ").toUpperCase()}</strong><small>{signalEvaluation.symbol} · {signalEvaluation.timeframe} · feature {signalEvaluation.feature_timestamp}</small></div>
               {["entry", "exit"].map((side) => <div key={side}><span>{side} rules</span><strong>{signalEvaluation[`${side}_passed`] ? "PASS" : "NO PASS"}</strong><small>{(signalEvaluation.trace?.[side] || []).filter((rule) => rule.passed).length}/{(signalEvaluation.trace?.[side] || []).length} reglas</small></div>)}
               <div><span>Execution intent</span><strong>NO CREADO</strong><small>evaluación informativa y auditable</small></div>
+            </section>}
+            {signalEvaluation && <section className="signal-rule-trace">
+              {["entry", "exit"].map((side) => <div key={side}><p className="eyebrow">{side} trace</p>{(signalEvaluation.trace?.[side] || []).map((rule, index) => <article key={`${side}-${index}`} className={rule.passed ? "passed" : "failed"}><code>{rule.field}</code><span>{rule.actual ?? "--"} {rule.operator} {rule.value}</span><strong>{rule.passed ? "PASS" : "NO PASS"}</strong></article>)}</div>)}
+            </section>}
+            {!!signalHistory.length && <section className="signal-history">
+              <div className="exchange-panel-head compact"><div><p className="eyebrow">Signal ledger</p><h3>{signalHistory.length} evaluaciones persistidas</h3></div><span>SQLITE</span></div>
+              <div className="backtest-trades-wrap"><table><thead><tr><th>ID</th><th>Version</th><th>Feature time</th><th>Signal</th><th>Entry</th><th>Exit</th><th>Intent</th></tr></thead><tbody>{signalHistory.map((item) => <tr key={item.id} onClick={() => setSignalEvaluation(item)} className={signalEvaluation?.id === item.id ? "selected" : ""}><td>#{item.id}</td><td>#{item.bot_version_id}</td><td>{formatTime(item.evaluated_at)}</td><td>{item.signal}</td><td>{item.entry_passed ? "PASS" : "NO"}</td><td>{item.exit_passed ? "PASS" : "NO"}</td><td>NO</td></tr>)}</tbody></table></div>
             </section>}
           </div>
         ) : (

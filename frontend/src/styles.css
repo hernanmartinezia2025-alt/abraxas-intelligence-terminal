@@ -1951,6 +1951,16 @@ h2 {
 .signal-evaluation-panel small { color: #788691; overflow-wrap: anywhere; }
 @media (max-width: 900px) { .signal-evaluation-panel { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 560px) { .signal-evaluation-panel { grid-template-columns: 1fr; } }
+.signal-rule-trace { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 10px; }
+.signal-rule-trace > div, .signal-history { padding: 12px; border: 1px solid #28343e; border-radius: 7px; background: #0b1116; }
+.signal-rule-trace article { display: grid; grid-template-columns: minmax(90px, .8fr) minmax(160px, 1.5fr) auto; gap: 9px; padding: 8px 0; border-top: 1px solid #202b33; align-items: center; }
+.signal-rule-trace article strong { color: #ff687e; font-size: 11px; }
+.signal-rule-trace article.passed strong { color: #47d9aa; }
+.signal-rule-trace code, .signal-rule-trace span { overflow-wrap: anywhere; }
+.signal-history { margin-top: 10px; }
+.signal-history tbody tr { cursor: pointer; }
+.signal-history tbody tr.selected { background: rgba(210, 182, 109, .1); }
+@media (max-width: 700px) { .signal-rule-trace { grid-template-columns: 1fr; } .signal-rule-trace article { grid-template-columns: 1fr; gap: 3px; } }
 .risk-validator-grid { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(280px, .8fr); gap: 16px; margin-top: 14px; }
 .risk-validator-grid .risk-fields { margin: 0; }
 .risk-validator-grid .risk-fields button { grid-column: 1 / -1; }

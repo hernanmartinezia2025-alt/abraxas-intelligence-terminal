@@ -39,6 +39,10 @@ def _pearson(left: list[float], right: list[float]) -> float | None:
 
 def _macro_correlations(connection) -> list[dict]:
     pairs = [
+        ("BTCUSDT", "SP500"),
+        ("BTCUSDT", "DCOILWTICO"),
+        ("BTCUSDT", "DTWEXBGS"),
+        ("BTCUSDT", "DGS10"),
         ("SP500", "NASDAQCOM"),
         ("SP500", "DCOILWTICO"),
         ("SP500", "DTWEXBGS"),
@@ -47,11 +51,18 @@ def _macro_correlations(connection) -> list[dict]:
     ]
     values = {}
     for series_id in {series for pair in pairs for series in pair}:
-        rows = connection.execute(
-            """SELECT observation_date, value FROM macro_observations
-            WHERE series_id = ? ORDER BY observation_date DESC LIMIT 90""",
-            (series_id,),
-        ).fetchall()
+        if series_id == "BTCUSDT":
+            rows = connection.execute(
+                """SELECT date(open_time / 1000, 'unixepoch') AS observation_date, close AS value
+                FROM market_candles WHERE symbol = 'BTCUSDT' AND timeframe = '1d'
+                ORDER BY open_time DESC LIMIT 90"""
+            ).fetchall()
+        else:
+            rows = connection.execute(
+                """SELECT observation_date, value FROM macro_observations
+                WHERE series_id = ? ORDER BY observation_date DESC LIMIT 90""",
+                (series_id,),
+            ).fetchall()
         values[series_id] = {row["observation_date"]: float(row["value"]) for row in rows}
     results = []
     for left_id, right_id in pairs:
@@ -66,8 +77,8 @@ def _macro_correlations(connection) -> list[dict]:
             right_returns.append((values[right_id][current_date] / right_previous) - 1)
         correlation = _pearson(left_returns, right_returns) if len(left_returns) >= 20 else None
         results.append({
-            "left": SERIES[left_id]["symbol"],
-            "right": SERIES[right_id]["symbol"],
+            "left": "BTC" if left_id == "BTCUSDT" else SERIES[left_id]["symbol"],
+            "right": "BTC" if right_id == "BTCUSDT" else SERIES[right_id]["symbol"],
             "correlation": round(correlation, 4) if correlation is not None else None,
             "samples": len(left_returns),
             "status": "ready" if correlation is not None else "insufficient_data",
@@ -180,5 +191,13 @@ def get_macro_overview(refresh: bool = False) -> dict:
         "guidance": guidance,
         "items": items,
         "correlations": correlations,
+        "correlation_method": {
+            "metric": "pearson",
+            "input": "aligned_daily_returns",
+            "maximum_window": 90,
+            "minimum_samples": 20,
+            "btc_source": "SQLite market_candles / Binance",
+            "macro_source": "FRED",
+        },
         "missing_sources": [{"asset": "GOLD", "status": "planned", "reason": "Spot gold source pending approval"}],
     }

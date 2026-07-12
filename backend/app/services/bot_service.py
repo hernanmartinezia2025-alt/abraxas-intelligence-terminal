@@ -9,6 +9,8 @@ from backend.app.strategies.contracts import compile_strategy
 from backend.app.storage.backtests import get_backtest, list_backtests, save_backtest_run
 from backend.app.storage.bots import create_bot, create_bot_version, get_bot, list_bots
 from backend.app.storage.features import latest_asset_features
+from backend.app.storage.signals import list_signal_evaluations, save_signal_evaluation
+from backend.app.strategies.runtime import evaluate_strategy
 
 
 FEATURE_WARMUP_BARS = 20
@@ -140,3 +142,38 @@ def list_saved_bot_backtests(bot_id: int | None = None, limit: int = 100) -> dic
 
 def get_saved_bot_backtest(backtest_id: int) -> dict:
     return get_backtest(backtest_id=backtest_id)
+
+
+def evaluate_saved_bot_signal(bot_id: int, version_id: int | None = None) -> dict:
+    detail = get_bot(bot_id=bot_id)
+    bot = detail["bot"]
+    versions = detail["versions"]
+    version = next((item for item in versions if item["id"] == version_id), None) if version_id else (versions[0] if versions else None)
+    if not version:
+        raise ValueError("Bot version not found")
+    contract = version.get("contract") or compile_strategy(version.get("strategy"))
+    if contract.get("status") != "valid":
+        raise ValueError("Bot version does not have a valid strategy contract")
+    features = latest_asset_features(symbol=bot["base_symbol"], timeframe=bot["timeframe"], limit=1)
+    if not features:
+        raise ValueError("No persisted asset features available for this bot")
+    feature = features[0]
+    missing = sorted(set(contract.get("required_fields") or []) - set(feature))
+    if missing:
+        raise ValueError(f"Strategy requires unavailable feature fields: {', '.join(missing)}")
+    evaluation = evaluate_strategy(contract, feature)
+    return save_signal_evaluation({
+        **evaluation,
+        "bot_id": bot_id,
+        "bot_version_id": version["id"],
+        "strategy_hash": contract["strategy_hash"],
+        "symbol": bot["base_symbol"],
+        "timeframe": bot["timeframe"],
+        "feature_timestamp": feature["timestamp"],
+        "features": {field: feature.get(field) for field in contract["required_fields"]},
+    })
+
+
+def list_saved_bot_signals(bot_id: int, limit: int = 50) -> dict:
+    get_bot(bot_id=bot_id)
+    return list_signal_evaluations(bot_id=bot_id, limit=limit)

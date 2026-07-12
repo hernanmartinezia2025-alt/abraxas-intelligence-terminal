@@ -11,6 +11,8 @@ from backend.app.services.bot_service import (
     list_saved_bot_backtests,
     run_saved_bot_backtest,
     list_saved_bots,
+    evaluate_saved_bot_signal,
+    list_saved_bot_signals,
 )
 
 router = APIRouter(prefix="/api/bots", tags=["bots"])
@@ -37,6 +39,10 @@ class BacktestRunRequest(BaseModel):
     fee_pct: float = Field(default=0.1, ge=0, le=5)
     slippage_pct: float = Field(default=0.05, ge=0, le=5)
     limit: int = Field(default=500, ge=60, le=1000)
+
+
+class SignalEvaluationRequest(BaseModel):
+    version_id: int | None = Field(default=None, ge=1)
 
 
 def model_payload(model: BaseModel) -> dict:
@@ -113,6 +119,26 @@ def bot_backtest_detail(backtest_id: int = Path(ge=1)) -> dict:
 def bot_version(payload: BotVersionRequest, bot_id: int = Path(ge=1)) -> dict:
     try:
         return create_saved_bot_version(bot_id=bot_id, payload=model_payload(payload))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@router.get("/{bot_id}/signals")
+def bot_signals(bot_id: int = Path(ge=1), limit: int = Query(default=50, ge=1, le=500)) -> dict:
+    try:
+        return list_saved_bot_signals(bot_id=bot_id, limit=limit)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@router.post("/{bot_id}/signals/evaluate")
+def evaluate_bot_signal(payload: SignalEvaluationRequest, bot_id: int = Path(ge=1)) -> dict:
+    try:
+        return evaluate_saved_bot_signal(bot_id=bot_id, **model_payload(payload))
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:

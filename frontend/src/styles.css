@@ -1943,6 +1943,14 @@ h2 {
 .risk-audit-list time { color: #788691; font-size: 12px; }
 @media (max-width: 900px) { .risk-workspace { grid-template-columns: 1fr; } .risk-audit-list article { grid-template-columns: 1fr; gap: 5px; } }
 .risk-validator-panel { padding: 18px; }
+.bot-runtime-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.signal-evaluation-panel { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 9px; margin-top: 12px; }
+.signal-evaluation-panel > div { display: grid; gap: 5px; padding: 12px; border: 1px solid #2c3944; border-radius: 7px; background: #0d141a; }
+.signal-evaluation-panel span { color: #d2b66d; font-size: 10px; letter-spacing: .08em; text-transform: uppercase; }
+.signal-evaluation-panel strong { color: #eef3f5; }
+.signal-evaluation-panel small { color: #788691; overflow-wrap: anywhere; }
+@media (max-width: 900px) { .signal-evaluation-panel { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .signal-evaluation-panel { grid-template-columns: 1fr; } }
 .risk-validator-grid { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(280px, .8fr); gap: 16px; margin-top: 14px; }
 .risk-validator-grid .risk-fields { margin: 0; }
 .risk-validator-grid .risk-fields button { grid-column: 1 / -1; }

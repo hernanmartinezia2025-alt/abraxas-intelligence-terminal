@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { createBot, getBacktest, getBot, getBotBacktests, getBots, runBotBacktest } from "../api/client.js";
+import { createBot, evaluateBotSignal, getBacktest, getBot, getBotBacktests, getBots, runBotBacktest } from "../api/client.js";
 import BacktestComparisonPanel from "../features/backtests/BacktestComparisonPanel.jsx";
 import BacktestEquityChart from "../features/charts/BacktestEquityChart.jsx";
 import PageSubtabs from "../components/PageSubtabs.jsx";
@@ -68,6 +68,8 @@ export default function BotsPage({ selectedSymbol = "BTCUSDT" }) {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [backtesting, setBacktesting] = useState(false);
+  const [evaluatingSignal, setEvaluatingSignal] = useState(false);
+  const [signalEvaluation, setSignalEvaluation] = useState(null);
   const [runDetailLoading, setRunDetailLoading] = useState(false);
   const [backtests, setBacktests] = useState([]);
   const [selectedRunId, setSelectedRunId] = useState(null);
@@ -151,6 +153,7 @@ export default function BotsPage({ selectedSymbol = "BTCUSDT" }) {
     const requestId = ++detailRequestRef.current;
     if (!botId) {
       setDetail(null);
+      setSignalEvaluation(null);
       setSelectedVersionId("");
       return;
     }
@@ -166,6 +169,20 @@ export default function BotsPage({ selectedSymbol = "BTCUSDT" }) {
     } catch (err) {
       if (requestId !== detailRequestRef.current) return;
       setError(err.message);
+    }
+  }
+
+  async function handleSignalEvaluation() {
+    if (!detailMatchesSelection || !selectedVersion || !strategyReady) return;
+    setEvaluatingSignal(true);
+    setError("");
+    try {
+      const payload = await evaluateBotSignal(selectedBotId, { version_id: selectedVersion.id });
+      setSignalEvaluation(payload);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setEvaluatingSignal(false);
     }
   }
 
@@ -230,6 +247,7 @@ export default function BotsPage({ selectedSymbol = "BTCUSDT" }) {
     setBacktests([]);
     setSelectedRunId(null);
     setSelectedRun(null);
+    setSignalEvaluation(null);
     setRunDetailLoading(false);
   }
 
@@ -239,6 +257,7 @@ export default function BotsPage({ selectedSymbol = "BTCUSDT" }) {
     const nextRun = backtests.find((run) => run.bot_version_id === Number(versionId));
     setSelectedRunId(nextRun?.id || null);
     setSelectedRun(null);
+    setSignalEvaluation(null);
   }
 
   function selectRun(runId) {
@@ -465,13 +484,18 @@ export default function BotsPage({ selectedSymbol = "BTCUSDT" }) {
             <p className="eyebrow">Bot Detail</p>
             <h2>{detailMatchesSelection ? detail.bot.name : "Sin bot seleccionado"}</h2>
           </div>
-          <button
-            type="button"
-            onClick={handleRunBacktest}
-            disabled={!detailMatchesSelection || !selectedVersion || !strategyReady || !backtestParamsValid || backtesting}
-          >
-            {backtesting ? "Backtesting..." : "Run backtest"}
-          </button>
+          <div className="bot-runtime-actions">
+            <button type="button" onClick={handleSignalEvaluation} disabled={!detailMatchesSelection || !selectedVersion || !strategyReady || evaluatingSignal}>
+              {evaluatingSignal ? "Evaluando..." : "Evaluar señal"}
+            </button>
+            <button
+              type="button"
+              onClick={handleRunBacktest}
+              disabled={!detailMatchesSelection || !selectedVersion || !strategyReady || !backtestParamsValid || backtesting}
+            >
+              {backtesting ? "Backtesting..." : "Run backtest"}
+            </button>
+          </div>
         </div>
         {detailMatchesSelection ? (
           <div>
@@ -631,6 +655,11 @@ export default function BotsPage({ selectedSymbol = "BTCUSDT" }) {
               </article>
               <pre>{strategyPreview}</pre>
             </div>
+            {signalEvaluation && <section className="signal-evaluation-panel">
+              <div><span>Última evaluación</span><strong>{signalEvaluation.signal.replace("_", " ").toUpperCase()}</strong><small>{signalEvaluation.symbol} · {signalEvaluation.timeframe} · feature {signalEvaluation.feature_timestamp}</small></div>
+              {["entry", "exit"].map((side) => <div key={side}><span>{side} rules</span><strong>{signalEvaluation[`${side}_passed`] ? "PASS" : "NO PASS"}</strong><small>{(signalEvaluation.trace?.[side] || []).filter((rule) => rule.passed).length}/{(signalEvaluation.trace?.[side] || []).length} reglas</small></div>)}
+              <div><span>Execution intent</span><strong>NO CREADO</strong><small>evaluación informativa y auditable</small></div>
+            </section>}
           </div>
         ) : (
           <div className="map-empty">

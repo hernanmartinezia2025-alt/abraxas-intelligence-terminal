@@ -198,6 +198,15 @@ DATASET_CATALOG = [
         "description": "Resultados persistidos de simulaciones: ROI, drawdown, trades, win rate y profit factor.",
     },
     {
+        "dataset_id": "strategy_signal_evaluations",
+        "table": "strategy_signal_evaluations",
+        "label": "Strategy Signal Evaluations",
+        "category": "bot_forge",
+        "powerbi_ready": True,
+        "bot_ready": True,
+        "description": "Evaluaciones auditables regla por regla sobre features reales; no crean ordenes ni intents.",
+    },
+    {
         "dataset_id": "backtest_trades",
         "table": "backtest_trades",
         "label": "Backtest Trades",

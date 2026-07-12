@@ -211,6 +211,27 @@ CREATE TABLE IF NOT EXISTS bot_versions (
 CREATE INDEX IF NOT EXISTS idx_bot_versions_bot
 ON bot_versions(bot_id, version);
 
+CREATE TABLE IF NOT EXISTS strategy_signal_evaluations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    bot_id INTEGER NOT NULL,
+    bot_version_id INTEGER NOT NULL,
+    strategy_hash TEXT NOT NULL,
+    symbol TEXT NOT NULL,
+    timeframe TEXT NOT NULL,
+    feature_timestamp INTEGER NOT NULL,
+    signal TEXT NOT NULL CHECK(signal IN ('entry_candidate', 'exit_candidate', 'hold')),
+    entry_passed INTEGER NOT NULL CHECK(entry_passed IN (0, 1)),
+    exit_passed INTEGER NOT NULL CHECK(exit_passed IN (0, 1)),
+    features_json TEXT NOT NULL,
+    trace_json TEXT NOT NULL,
+    evaluated_at TEXT NOT NULL,
+    FOREIGN KEY(bot_id) REFERENCES bots(id) ON DELETE CASCADE,
+    FOREIGN KEY(bot_version_id) REFERENCES bot_versions(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_strategy_signals_bot_time
+ON strategy_signal_evaluations(bot_id, evaluated_at);
+
 CREATE TABLE IF NOT EXISTS backtest_runs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     bot_id INTEGER NOT NULL,

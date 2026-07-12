@@ -3,6 +3,7 @@ from __future__ import annotations
 import unittest
 
 from backend.app.strategies.contracts import compile_strategy
+from backend.app.strategies.runtime import evaluate_strategy
 
 
 STRATEGY = {
@@ -29,6 +30,15 @@ class StrategyContractTests(unittest.TestCase):
             compile_strategy({**STRATEGY, "entry": [{"field": "return_5", "operator": "contains", "value": 0}]})
         with self.assertRaisesRegex(ValueError, "max_position_pct"):
             compile_strategy({**STRATEGY, "risk": {**STRATEGY["risk"], "max_position_pct": 150}})
+
+    def test_signal_evaluation_traces_rules_without_creating_intent(self) -> None:
+        result = evaluate_strategy(compile_strategy(STRATEGY), {"return_5": 0.4, "return_1": 0.2})
+
+        self.assertEqual(result["signal"], "entry_candidate")
+        self.assertTrue(result["entry_passed"])
+        self.assertFalse(result["exit_passed"])
+        self.assertEqual(result["trace"]["entry"][0]["actual"], 0.4)
+        self.assertFalse(result["execution_intent_created"])
 
 
 if __name__ == "__main__":

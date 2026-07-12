@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from backend.app.analytics.backtest import run_backtest
 from backend.app.services.candle_service import get_candles
 from backend.app.services.feature_service import build_features_from_candles
+from backend.app.strategies.contracts import compile_strategy
 from backend.app.storage.backtests import get_backtest, list_backtests, save_backtest_run
 from backend.app.storage.bots import create_bot, create_bot_version, get_bot, list_bots
 from backend.app.storage.features import latest_asset_features
@@ -95,12 +96,19 @@ def run_saved_bot_backtest(
         selected_version = versions[0] if versions else None
     if not selected_version:
         raise ValueError("Bot version not found")
+    contract = selected_version.get("contract") or compile_strategy(selected_version.get("strategy"))
+    if contract.get("status") != "valid" or not contract.get("capabilities", {}).get("backtest"):
+        raise ValueError("Bot version does not have a valid backtest strategy contract")
 
     rows, data_context = feature_rows_with_close(
         symbol=bot["base_symbol"],
         timeframe=bot["timeframe"],
         limit=limit,
     )
+    available_fields = set().union(*(row.keys() for row in rows)) if rows else set()
+    missing_fields = sorted(set(contract.get("required_fields") or []) - available_fields)
+    if missing_fields:
+        raise ValueError(f"Strategy requires unavailable feature fields: {', '.join(missing_fields)}")
     result = run_backtest(
         bot=bot,
         version=selected_version,
@@ -111,6 +119,8 @@ def run_saved_bot_backtest(
         requested_limit=limit,
     )
     result["data_quality"].update(data_context)
+    result["metrics"]["strategy_contract_version"] = contract["contract_version"]
+    result["metrics"]["strategy_hash"] = contract["strategy_hash"]
     result["metrics"]["data_quality"] = result["data_quality"]
     if data_context["open_candles_excluded"]:
         result["warnings"].append(

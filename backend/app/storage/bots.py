@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 
+from backend.app.strategies.contracts import compile_strategy
 from backend.app.storage.sqlite import connect, initialize_database
 
 
@@ -39,12 +40,25 @@ def normalize_version(row: dict) -> dict:
         strategy = json.loads(row.pop("strategy_json") or "{}")
     except json.JSONDecodeError:
         strategy = {}
+    contract = {}
+    try:
+        contract = json.loads(row.pop("contract_json") or "{}")
+    except json.JSONDecodeError:
+        contract = {}
+    if not contract:
+        try:
+            contract = compile_strategy(strategy)
+        except ValueError as exc:
+            contract = {"status": "invalid", "error": str(exc), "capabilities": {"backtest": False, "paper": False, "live": False}}
     return {
         **row,
         "id": int(row["id"]),
         "bot_id": int(row["bot_id"]),
         "version": int(row["version"]),
         "strategy": strategy,
+        "contract": contract,
+        "strategy_hash": row.get("strategy_hash") or contract.get("strategy_hash"),
+        "validation_status": row.get("validation_status") if row.get("validation_status") != "legacy" else contract.get("status", "legacy"),
     }
 
 
@@ -55,7 +69,8 @@ def create_bot(payload: dict) -> dict:
     if not name:
         raise ValueError("Bot name is required")
 
-    strategy = payload.get("strategy") or DEFAULT_STRATEGY
+    contract = compile_strategy(payload.get("strategy") or DEFAULT_STRATEGY)
+    strategy = contract["normalized_strategy"]
     with connect() as connection:
         cursor = connection.execute(
             """
@@ -79,13 +94,16 @@ def create_bot(payload: dict) -> dict:
         bot_id = int(cursor.lastrowid)
         connection.execute(
             """
-            INSERT INTO bot_versions (bot_id, version, strategy_json, notes, created_at)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO bot_versions (bot_id, version, strategy_json, contract_json, strategy_hash, validation_status, notes, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 bot_id,
                 1,
                 json.dumps(strategy, ensure_ascii=True),
+                json.dumps(contract, ensure_ascii=True),
+                contract["strategy_hash"],
+                contract["status"],
                 str(payload.get("notes") or "Version inicial."),
                 now,
             ),
@@ -126,7 +144,7 @@ def get_bot(bot_id: int) -> dict:
             raise ValueError("Bot not found")
         versions = connection.execute(
             """
-            SELECT id, bot_id, version, strategy_json, notes, created_at
+            SELECT id, bot_id, version, strategy_json, contract_json, strategy_hash, validation_status, notes, created_at
             FROM bot_versions
             WHERE bot_id = ?
             ORDER BY version DESC
@@ -141,9 +159,8 @@ def get_bot(bot_id: int) -> dict:
 
 def create_bot_version(bot_id: int, payload: dict) -> dict:
     initialize_database()
-    strategy = payload.get("strategy")
-    if not isinstance(strategy, dict):
-        raise ValueError("strategy must be a JSON object")
+    contract = compile_strategy(payload.get("strategy"))
+    strategy = contract["normalized_strategy"]
     now = utc_now_iso()
     with connect() as connection:
         existing = connection.execute("SELECT id FROM bots WHERE id = ?", (bot_id,)).fetchone()
@@ -156,13 +173,16 @@ def create_bot_version(bot_id: int, payload: dict) -> dict:
         next_version = int(row["latest"]) + 1
         connection.execute(
             """
-            INSERT INTO bot_versions (bot_id, version, strategy_json, notes, created_at)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO bot_versions (bot_id, version, strategy_json, contract_json, strategy_hash, validation_status, notes, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 bot_id,
                 next_version,
                 json.dumps(strategy, ensure_ascii=True),
+                json.dumps(contract, ensure_ascii=True),
+                contract["strategy_hash"],
+                contract["status"],
                 str(payload.get("notes") or f"Version {next_version}."),
                 now,
             ),

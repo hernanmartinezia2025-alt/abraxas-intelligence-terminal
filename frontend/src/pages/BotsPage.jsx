@@ -97,6 +97,8 @@ export default function BotsPage({ selectedSymbol = "BTCUSDT" }) {
   const selectedVersion = detailMatchesSelection
     ? detail?.versions?.find((version) => version.id === Number(selectedVersionId)) || latestVersion
     : null;
+  const strategyContract = selectedVersion?.contract || {};
+  const strategyReady = strategyContract.status === "valid" && strategyContract.capabilities?.backtest === true;
   const visibleBacktests = selectedVersion
     ? backtests.filter((run) => run.bot_version_id === selectedVersion.id)
     : [];
@@ -466,7 +468,7 @@ export default function BotsPage({ selectedSymbol = "BTCUSDT" }) {
           <button
             type="button"
             onClick={handleRunBacktest}
-            disabled={!detailMatchesSelection || !selectedVersion || !backtestParamsValid || backtesting}
+            disabled={!detailMatchesSelection || !selectedVersion || !strategyReady || !backtestParamsValid || backtesting}
           >
             {backtesting ? "Backtesting..." : "Run backtest"}
           </button>
@@ -551,6 +553,16 @@ export default function BotsPage({ selectedSymbol = "BTCUSDT" }) {
                 <span>Engine</span>
                 <strong>{effectiveEngineVersion || "--"}</strong>
                 <small>{runMetrics.position_mode || selectedRun?.position_mode || "long-only"}</small>
+              </article>
+              <article>
+                <span>Strategy Contract</span>
+                <strong>{strategyContract.status || "legacy"} / v{strategyContract.contract_version || "--"}</strong>
+                <small>{strategyContract.strategy_hash ? strategyContract.strategy_hash.slice(0, 12) : "sin fingerprint"}</small>
+              </article>
+              <article>
+                <span>Runtime gates</span>
+                <strong>{strategyContract.capabilities?.backtest ? "BACKTEST READY" : "BLOCKED"}</strong>
+                <small>paper {strategyContract.capabilities?.paper ? "ready" : "locked"} · live locked</small>
               </article>
               <article>
                 <span>ROI estrategia</span>

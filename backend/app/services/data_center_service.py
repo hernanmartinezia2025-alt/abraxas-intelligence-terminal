@@ -186,7 +186,7 @@ DATASET_CATALOG = [
         "category": "bot_forge",
         "powerbi_ready": True,
         "bot_ready": True,
-        "description": "Versiones auditables de estrategia JSON por bot.",
+        "description": "Versiones auditables con estrategia normalizada, contrato runtime, fingerprint y estado de validacion.",
     },
     {
         "dataset_id": "backtest_runs",

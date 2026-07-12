@@ -7,6 +7,7 @@ from contextlib import contextmanager
 from typing import Iterator
 
 from backend.app.core.config import DB_PATH
+from backend.app.strategies.contracts import compile_strategy
 
 LOGGER = logging.getLogger(__name__)
 
@@ -198,6 +199,9 @@ CREATE TABLE IF NOT EXISTS bot_versions (
     bot_id INTEGER NOT NULL,
     version INTEGER NOT NULL,
     strategy_json TEXT NOT NULL,
+    contract_json TEXT,
+    strategy_hash TEXT,
+    validation_status TEXT NOT NULL DEFAULT 'legacy',
     notes TEXT NOT NULL,
     created_at TEXT NOT NULL,
     FOREIGN KEY(bot_id) REFERENCES bots(id) ON DELETE CASCADE,
@@ -726,6 +730,32 @@ def initialize_database() -> None:
         }
         if "risk_validation_id" not in execution_columns:
             connection.execute("ALTER TABLE execution_intents ADD COLUMN risk_validation_id INTEGER")
+        version_columns = {
+            row["name"] for row in connection.execute("PRAGMA table_info(bot_versions)").fetchall()
+        }
+        if "contract_json" not in version_columns:
+            connection.execute("ALTER TABLE bot_versions ADD COLUMN contract_json TEXT")
+        if "strategy_hash" not in version_columns:
+            connection.execute("ALTER TABLE bot_versions ADD COLUMN strategy_hash TEXT")
+        if "validation_status" not in version_columns:
+            connection.execute("ALTER TABLE bot_versions ADD COLUMN validation_status TEXT NOT NULL DEFAULT 'legacy'")
+        legacy_versions = connection.execute(
+            "SELECT id, strategy_json FROM bot_versions WHERE contract_json IS NULL OR validation_status = 'legacy'"
+        ).fetchall()
+        for version in legacy_versions:
+            try:
+                strategy = json.loads(version["strategy_json"] or "{}")
+                contract = compile_strategy(strategy)
+            except (json.JSONDecodeError, ValueError) as exc:
+                contract = {
+                    "status": "invalid",
+                    "error": str(exc),
+                    "capabilities": {"backtest": False, "paper": False, "live": False},
+                }
+            connection.execute(
+                "UPDATE bot_versions SET contract_json = ?, strategy_hash = ?, validation_status = ? WHERE id = ?",
+                (json.dumps(contract, ensure_ascii=True), contract.get("strategy_hash"), contract["status"], version["id"]),
+            )
         user_version = int(connection.execute("PRAGMA user_version").fetchone()[0])
         if user_version < 1:
             _backfill_backtest_payloads(connection)

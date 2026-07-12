@@ -15,16 +15,20 @@ export default function MarketsPage({ rows, sentiment, selectedSymbol = "BTCUSDT
   return (
     <>
       <PageSubtabs
-        tabs={[["overview", "Overview", "radar + sentimiento"], ["assets", "Asset focus", "amplitud + filtros"]]}
+        tabs={[
+          ["overview", "Overview", "radar + sentimiento"],
+          ["cross-market", "Cross-market", "macro + correlaciones"],
+          ["assets", "Asset focus", "amplitud + filtros"],
+        ]}
         activeTab={activeTab}
         onChange={setActiveTab}
       />
-      {activeTab === "overview" ? (
-        <>
-          <MarketUniversePanel selected={universe} onChange={setUniverse} />
-          {universe === "crypto" && <><MarketIntelligenceBrief selectedSymbol={selectedSymbol} /><RadarPanel rows={rows} sentiment={sentiment} onOpenTrade={openTrade} /></>}
-        </>
-      ) : <MarketReadingsPanel rows={rows} sentiment={sentiment} />}
+      {activeTab === "overview" && <>
+        <MarketUniversePanel selected={universe} onChange={setUniverse} showCorrelations={false} />
+        {universe === "crypto" && <><MarketIntelligenceBrief selectedSymbol={selectedSymbol} /><RadarPanel rows={rows} sentiment={sentiment} onOpenTrade={openTrade} /></>}
+      </>}
+      {activeTab === "cross-market" && <MarketUniversePanel selected={universe} onChange={setUniverse} showCorrelations />}
+      {activeTab === "assets" && <MarketReadingsPanel rows={rows} sentiment={sentiment} />}
     </>
   );
 }

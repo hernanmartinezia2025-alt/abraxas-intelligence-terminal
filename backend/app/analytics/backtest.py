@@ -3,6 +3,8 @@ from __future__ import annotations
 import math
 from statistics import median
 
+from backend.app.analytics.performance import calculate_performance_metrics
+
 
 OPERATORS = {
     ">": lambda left, right: left > right,
@@ -358,6 +360,16 @@ def run_backtest(
             )
         )
 
+    performance = calculate_performance_metrics(equity_curve, bot["timeframe"])
+    if performance.get("status") == "ready" and performance.get("span_days", 0) < 30:
+        warnings.append(
+            warning(
+                "SHORT_PERFORMANCE_WINDOW",
+                "Annualized performance ratios use less than 30 days of history and may be unstable.",
+                severity="info",
+            )
+        )
+
     data_quality["requested_limit"] = requested_limit
     metrics = {
         "roi_pct": round(roi_pct, 4),
@@ -383,6 +395,7 @@ def run_backtest(
         "benchmark_model": "frictionless_buy_and_hold",
         "data_quality": data_quality,
         "warnings": warnings,
+        **performance,
     }
 
     return {

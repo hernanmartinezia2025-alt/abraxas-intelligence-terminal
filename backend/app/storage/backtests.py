@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 
+from backend.app.analytics.performance import calculate_performance_metrics
 from backend.app.storage.sqlite import connect, initialize_database
 
 
@@ -301,4 +302,6 @@ def get_backtest(backtest_id: int) -> dict:
         normalized["trades"] = [normalize_trade(dict(trade)) for trade in trade_rows]
     if equity_rows:
         normalized["equity_curve"] = [normalize_equity_point(dict(point)) for point in equity_rows]
+    performance = calculate_performance_metrics(normalized["equity_curve"], normalized["timeframe"])
+    normalized["metrics"] = {**performance, **normalized["metrics"]}
     return normalized

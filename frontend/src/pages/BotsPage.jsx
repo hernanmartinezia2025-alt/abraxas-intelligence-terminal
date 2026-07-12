@@ -583,6 +583,31 @@ export default function BotsPage({ selectedSymbol = "BTCUSDT" }) {
                 <small>{isV2Run ? "sobre PnL neto" : "metrica legacy"}</small>
               </article>
               <article>
+                <span>Sharpe / Sortino</span>
+                <strong>{formatNumber(runMetrics.sharpe_ratio, 2)} / {formatNumber(runMetrics.sortino_ratio, 2)}</strong>
+                <small>retornos por periodo</small>
+              </article>
+              <article>
+                <span>CAGR / Calmar</span>
+                <strong>{formatPercentage(runMetrics.cagr_pct, 2)}</strong>
+                <small>Calmar {formatNumber(runMetrics.calmar_ratio, 2)}</small>
+              </article>
+              <article>
+                <span>Ulcer / Recovery</span>
+                <strong>{formatPercentage(runMetrics.ulcer_index_pct, 2)}</strong>
+                <small>recovery {formatNumber(runMetrics.recovery_factor, 2)}</small>
+              </article>
+              <article>
+                <span>CVaR 95 periodo</span>
+                <strong>{formatPercentage(runMetrics.period_cvar_95_pct, 3)}</strong>
+                <small>VaR {formatPercentage(runMetrics.period_var_95_pct, 3)}</small>
+              </article>
+              <article>
+                <span>Win rate periodo</span>
+                <strong>{formatPercentage(runMetrics.period_win_rate_pct, 1)}</strong>
+                <small>distinto de win rate por trade</small>
+              </article>
+              <article>
                 <span>Fees pagadas</span>
                 <strong>{formatNumber(runMetrics.total_fees, 2)}</strong>
                 <small>fee {formatNumber(runMetrics.fee_pct, 3)}%</small>

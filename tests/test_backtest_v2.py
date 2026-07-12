@@ -188,6 +188,8 @@ class BacktestV2Tests(unittest.TestCase):
         self.assertEqual(equity_count, len(result["equity_curve"]))
         self.assertEqual(detail["trades"][0]["pnl"], result["trades"][0]["pnl"])
         self.assertEqual(detail["equity_curve"][0]["benchmark_equity"], result["equity_curve"][0]["benchmark_equity"])
+        self.assertEqual(detail["metrics"]["methodology"], "period_returns")
+        self.assertIn("sharpe_ratio", detail["metrics"])
         self.assertEqual(foreign_keys, 1)
 
         trade_preview = get_dataset_preview("backtest_trades", limit=10)

@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import PageSubtabs from "../components/PageSubtabs.jsx";
-import ContextPlaceholder from "../features/context/ContextPlaceholder.jsx";
+import MacroContextLab from "../features/context/MacroContextLab.jsx";
 import RegimeEngine from "../features/regime/RegimeEngine.jsx";
 import ResearchArchive from "../features/research/ResearchArchive.jsx";
 import StatisticalIntelligence from "../features/statistics/StatisticalIntelligence.jsx";
@@ -25,7 +25,7 @@ export default function ResearchPage({ selectedSymbol }) {
         </>
       )}
       {activeTab === "archive" && <ResearchArchive selectedSymbol={selectedSymbol} />}
-      {activeTab === "context" && <ContextPlaceholder />}
+      {activeTab === "context" && <MacroContextLab />}
     </section>
   );
 }

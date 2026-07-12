@@ -3172,6 +3172,13 @@ h2 {
 .macro-correlation-head { display: flex; justify-content: space-between; gap: 8px; padding-top: 9px; border-top: 1px solid #26343d; }
 .macro-correlation-head span { color: #aab6bc; font-size: 9px; font-weight: 800; }
 .macro-correlation-head small { color: #71818b; font-size: 9px; }
+.btc-correlation-reading { display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: 6px 12px; padding: 10px; border: 1px solid #30404a; border-radius: 6px; background: #111a21; }
+.btc-correlation-reading.moderate, .btc-correlation-reading.strong { border-color: rgba(223, 192, 122, 0.4); }
+.btc-correlation-reading div { display: grid; gap: 3px; }
+.btc-correlation-reading span { color: #82929d; font-size: 9px; font-weight: 800; }
+.btc-correlation-reading strong { color: #f1dfad; font-size: 16px; }
+.btc-correlation-reading p { margin: 0; color: #b9c2c7; font-size: 11px; }
+.btc-correlation-reading small { grid-column: 2; color: #73838d; font-size: 9px; }
 .macro-correlation-row { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
 .macro-correlation-row article { display: grid; grid-template-columns: 1fr auto; gap: 3px 8px; padding: 7px; border-left: 2px solid #3a4a54; background: #101820; }
 .macro-correlation-row article.positive { border-color: #36d6a0; }
@@ -3187,6 +3194,8 @@ h2 {
   .macro-correlation-row { display: flex; overflow-x: auto; }
   .macro-correlation-row article { min-width: 142px; }
   .macro-correlation-head { display: grid; }
+  .btc-correlation-reading { grid-template-columns: 1fr; }
+  .btc-correlation-reading small { grid-column: auto; }
 }
 .universe-tabs { display: flex; gap: 7px; padding: 10px; overflow-x: auto; border-bottom: 1px solid rgba(255,255,255,.08); }
 .universe-tabs button { min-width: 125px; border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.04); color: rgba(246,248,251,.68); border-radius: 7px; padding: 9px 10px; text-align: left; font-size: 11px; }

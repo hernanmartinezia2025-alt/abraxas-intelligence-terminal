@@ -87,6 +87,26 @@ def _macro_correlations(connection) -> list[dict]:
     return results
 
 
+def _correlation_reading(correlations: list[dict]) -> dict:
+    btc_pairs = [item for item in correlations if item["left"] == "BTC" and item["status"] == "ready"]
+    if not btc_pairs:
+        return {"status": "insufficient_data", "summary": "No hay suficientes retornos alineados para interpretar BTC contra macro.", "caveat": "La correlacion no implica causalidad."}
+    dominant = max(btc_pairs, key=lambda item: abs(item["correlation"]))
+    magnitude = abs(dominant["correlation"])
+    strength = "strong" if magnitude >= 0.7 else "moderate" if magnitude >= 0.4 else "weak"
+    strength_label = {"strong": "fuerte", "moderate": "moderada", "weak": "debil"}[strength]
+    direction = "moverse en la misma direccion que" if dominant["correlation"] > 0 else "moverse en direccion opuesta a"
+    return {
+        "status": "ready",
+        "dominant_pair": f"{dominant['left']} / {dominant['right']}",
+        "correlation": dominant["correlation"],
+        "samples": dominant["samples"],
+        "strength": strength,
+        "summary": f"La relacion dominante es {strength_label}: BTC tiende a {direction} {dominant['right']} en esta ventana.",
+        "caveat": "Es una relacion historica movil, no una señal de entrada ni evidencia de causalidad.",
+    }
+
+
 def refresh_macro_observations(limit: int = 180) -> int:
     initialize_database()
     fetched_at = _now()
@@ -191,6 +211,7 @@ def get_macro_overview(refresh: bool = False) -> dict:
         "guidance": guidance,
         "items": items,
         "correlations": correlations,
+        "correlation_reading": _correlation_reading(correlations),
         "correlation_method": {
             "metric": "pearson",
             "input": "aligned_daily_returns",

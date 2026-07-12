@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import io
+import math
 from datetime import datetime, timezone
 
 import requests
@@ -22,6 +23,57 @@ SERIES = {
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _pearson(left: list[float], right: list[float]) -> float | None:
+    if len(left) != len(right) or len(left) < 2:
+        return None
+    left_mean = sum(left) / len(left)
+    right_mean = sum(right) / len(right)
+    numerator = sum((x - left_mean) * (y - right_mean) for x, y in zip(left, right))
+    denominator = math.sqrt(
+        sum((x - left_mean) ** 2 for x in left) * sum((y - right_mean) ** 2 for y in right)
+    )
+    return numerator / denominator if denominator else None
+
+
+def _macro_correlations(connection) -> list[dict]:
+    pairs = [
+        ("SP500", "NASDAQCOM"),
+        ("SP500", "DCOILWTICO"),
+        ("SP500", "DTWEXBGS"),
+        ("SP500", "DGS10"),
+        ("DCOILWTICO", "DTWEXBGS"),
+    ]
+    values = {}
+    for series_id in {series for pair in pairs for series in pair}:
+        rows = connection.execute(
+            """SELECT observation_date, value FROM macro_observations
+            WHERE series_id = ? ORDER BY observation_date DESC LIMIT 90""",
+            (series_id,),
+        ).fetchall()
+        values[series_id] = {row["observation_date"]: float(row["value"]) for row in rows}
+    results = []
+    for left_id, right_id in pairs:
+        dates = sorted(set(values[left_id]) & set(values[right_id]))
+        left_returns = []
+        right_returns = []
+        for previous_date, current_date in zip(dates, dates[1:]):
+            left_previous, right_previous = values[left_id][previous_date], values[right_id][previous_date]
+            if not left_previous or not right_previous:
+                continue
+            left_returns.append((values[left_id][current_date] / left_previous) - 1)
+            right_returns.append((values[right_id][current_date] / right_previous) - 1)
+        correlation = _pearson(left_returns, right_returns) if len(left_returns) >= 20 else None
+        results.append({
+            "left": SERIES[left_id]["symbol"],
+            "right": SERIES[right_id]["symbol"],
+            "correlation": round(correlation, 4) if correlation is not None else None,
+            "samples": len(left_returns),
+            "status": "ready" if correlation is not None else "insufficient_data",
+            "relationship": "positive" if correlation is not None and correlation >= 0.35 else "inverse" if correlation is not None and correlation <= -0.35 else "weak",
+        })
+    return results
 
 
 def refresh_macro_observations(limit: int = 180) -> int:
@@ -104,6 +156,7 @@ def get_macro_overview(refresh: bool = False) -> dict:
             previous = float(rows[1]["value"]) if len(rows) > 1 else None
             change_pct = ((latest / previous) - 1) * 100 if latest is not None and previous else None
             items.append({"series_id": series_id, **metadata, "latest": latest, "change_pct": change_pct, "as_of": rows[0]["observation_date"] if rows else None})
+        correlations = _macro_correlations(connection)
 
     changes = {item["series_id"]: item["change_pct"] for item in items}
     score_inputs = []
@@ -126,5 +179,6 @@ def get_macro_overview(refresh: bool = False) -> dict:
         "score": score,
         "guidance": guidance,
         "items": items,
+        "correlations": correlations,
         "missing_sources": [{"asset": "GOLD", "status": "planned", "reason": "Spot gold source pending approval"}],
     }

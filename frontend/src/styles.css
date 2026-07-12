@@ -3151,6 +3151,8 @@ h2 {
   margin-top: 12px;
 }
 .market-universe-panel { margin-top: 12px; }
+.market-universe-panel > .exchange-panel-head button { border: 1px solid rgba(223, 192, 122, 0.4); border-radius: 6px; background: rgba(223, 192, 122, 0.1); color: #f1dfad; padding: 8px 11px; font-weight: 800; }
+.market-universe-panel > .exchange-panel-head button:hover { background: rgba(223, 192, 122, 0.18); }
 .macro-context-strip { display: grid; gap: 10px; margin: 10px 0; padding: 12px; border: 1px solid #2b3943; border-radius: 8px; background: #0c1319; }
 .macro-context-strip.risk_on { border-color: rgba(38, 209, 151, 0.35); }
 .macro-context-strip.risk_off { border-color: rgba(238, 82, 106, 0.4); }
@@ -3167,11 +3169,20 @@ h2 {
 .macro-context-assets article.negative b { color: #ed6175; }
 .macro-context-assets article.planned { border-style: dashed; }
 .macro-context-assets article.planned strong { color: #d2b66d; font-size: 11px; }
+.macro-correlation-row { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; padding-top: 9px; border-top: 1px solid #26343d; }
+.macro-correlation-row article { display: grid; grid-template-columns: 1fr auto; gap: 3px 8px; padding: 7px; border-left: 2px solid #3a4a54; background: #101820; }
+.macro-correlation-row article.positive { border-color: #36d6a0; }
+.macro-correlation-row article.inverse { border-color: #ed6175; }
+.macro-correlation-row span { color: #b4bec4; font-size: 9px; font-weight: 800; }
+.macro-correlation-row strong { color: #edf2f4; font-size: 15px; }
+.macro-correlation-row small { grid-column: 1 / -1; color: #778891; font-size: 9px; }
 @media (max-width: 900px) { .macro-context-assets { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 @media (max-width: 620px) {
   .macro-context-head { grid-template-columns: 1fr; }
   .macro-context-assets { display: flex; overflow-x: auto; }
   .macro-context-assets article { min-width: 112px; }
+  .macro-correlation-row { display: flex; overflow-x: auto; }
+  .macro-correlation-row article { min-width: 142px; }
 }
 .universe-tabs { display: flex; gap: 7px; padding: 10px; overflow-x: auto; border-bottom: 1px solid rgba(255,255,255,.08); }
 .universe-tabs button { min-width: 125px; border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.04); color: rgba(246,248,251,.68); border-radius: 7px; padding: 9px 10px; text-align: left; font-size: 11px; }

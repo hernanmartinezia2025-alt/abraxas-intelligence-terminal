@@ -189,6 +189,10 @@ export function getBotSignals(botId, limit = 50) {
   return request(`/api/bots/${botId}/signals?${params}`);
 }
 
+export function createBotPaperProposal(botId, evaluationId) {
+  return request(`/api/bots/${botId}/signals/${evaluationId}/paper-proposal`, { method: "POST" });
+}
+
 export function getLiveMapEvents({ refresh = false, limit = 250, types = "" } = {}) {
   const params = new URLSearchParams({ refresh: String(refresh), limit: String(limit) });
   if (types) params.set("types", types);

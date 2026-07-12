@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { createBot, evaluateBotSignal, getBacktest, getBot, getBotBacktests, getBots, getBotSignals, runBotBacktest } from "../api/client.js";
+import { createBot, createBotPaperProposal, evaluateBotSignal, getBacktest, getBot, getBotBacktests, getBots, getBotSignals, runBotBacktest } from "../api/client.js";
 import BacktestComparisonPanel from "../features/backtests/BacktestComparisonPanel.jsx";
 import BacktestEquityChart from "../features/charts/BacktestEquityChart.jsx";
 import PageSubtabs from "../components/PageSubtabs.jsx";
@@ -71,6 +71,8 @@ export default function BotsPage({ selectedSymbol = "BTCUSDT" }) {
   const [evaluatingSignal, setEvaluatingSignal] = useState(false);
   const [signalEvaluation, setSignalEvaluation] = useState(null);
   const [signalHistory, setSignalHistory] = useState([]);
+  const [paperProposal, setPaperProposal] = useState(null);
+  const [proposingPaper, setProposingPaper] = useState(false);
   const [runDetailLoading, setRunDetailLoading] = useState(false);
   const [backtests, setBacktests] = useState([]);
   const [selectedRunId, setSelectedRunId] = useState(null);
@@ -204,6 +206,19 @@ export default function BotsPage({ selectedSymbol = "BTCUSDT" }) {
     }
   }
 
+  async function handlePaperProposal() {
+    if (!signalEvaluation || signalEvaluation.signal !== "entry_candidate") return;
+    setProposingPaper(true);
+    setError("");
+    try {
+      setPaperProposal(await createBotPaperProposal(selectedBotId, signalEvaluation.id));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setProposingPaper(false);
+    }
+  }
+
   async function loadBacktests(botId, { preferredRunId = null } = {}) {
     const requestId = ++backtestsRequestRef.current;
     if (!botId) {
@@ -267,6 +282,7 @@ export default function BotsPage({ selectedSymbol = "BTCUSDT" }) {
     setSelectedRun(null);
     setSignalEvaluation(null);
     setSignalHistory([]);
+    setPaperProposal(null);
     setRunDetailLoading(false);
   }
 
@@ -277,6 +293,7 @@ export default function BotsPage({ selectedSymbol = "BTCUSDT" }) {
     setSelectedRunId(nextRun?.id || null);
     setSelectedRun(null);
     setSignalEvaluation(null);
+    setPaperProposal(null);
   }
 
   function selectRun(runId) {
@@ -679,6 +696,11 @@ export default function BotsPage({ selectedSymbol = "BTCUSDT" }) {
               <div><span>Última evaluación</span><strong>{signalEvaluation.signal.replace("_", " ").toUpperCase()}</strong><small>{signalEvaluation.symbol} · {signalEvaluation.timeframe} · feature {signalEvaluation.feature_timestamp}</small></div>
               {["entry", "exit"].map((side) => <div key={side}><span>{side} rules</span><strong>{signalEvaluation[`${side}_passed`] ? "PASS" : "NO PASS"}</strong><small>{(signalEvaluation.trace?.[side] || []).filter((rule) => rule.passed).length}/{(signalEvaluation.trace?.[side] || []).length} reglas</small></div>)}
               <div><span>Execution intent</span><strong>NO CREADO</strong><small>evaluación informativa y auditable</small></div>
+            </section>}
+            {signalEvaluation && <section className="paper-proposal-gate">
+              <div><p className="eyebrow">Paper proposal gate</p><h3>{signalEvaluation.signal === "entry_candidate" ? "Candidato elegible" : "Sin propuesta operable"}</h3><small>Crear una propuesta no crea una orden ni pasa todavía por Risk Engine.</small></div>
+              <button type="button" onClick={handlePaperProposal} disabled={signalEvaluation.signal !== "entry_candidate" || proposingPaper}>{proposingPaper ? "Calculando..." : "Crear propuesta paper"}</button>
+              {paperProposal && <div className="paper-proposal-result"><strong>PROPOSAL #{paperProposal.id} · {paperProposal.status.toUpperCase()}</strong><span>{paperProposal.action.toUpperCase()} {paperProposal.quantity} {paperProposal.symbol} · ${Number(paperProposal.proposed_notional).toLocaleString(undefined, { maximumFractionDigits: 2 })}</span><small>{paperProposal.reason}</small></div>}
             </section>}
             {signalEvaluation && <section className="signal-rule-trace">
               {["entry", "exit"].map((side) => <div key={side}><p className="eyebrow">{side} trace</p>{(signalEvaluation.trace?.[side] || []).map((rule, index) => <article key={`${side}-${index}`} className={rule.passed ? "passed" : "failed"}><code>{rule.field}</code><span>{rule.actual ?? "--"} {rule.operator} {rule.value}</span><strong>{rule.passed ? "PASS" : "NO PASS"}</strong></article>)}</div>)}

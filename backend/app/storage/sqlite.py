@@ -232,6 +232,28 @@ CREATE TABLE IF NOT EXISTS strategy_signal_evaluations (
 CREATE INDEX IF NOT EXISTS idx_strategy_signals_bot_time
 ON strategy_signal_evaluations(bot_id, evaluated_at);
 
+CREATE TABLE IF NOT EXISTS paper_order_proposals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    signal_evaluation_id INTEGER NOT NULL UNIQUE,
+    bot_id INTEGER NOT NULL,
+    bot_version_id INTEGER NOT NULL,
+    symbol TEXT NOT NULL,
+    action TEXT NOT NULL CHECK(action IN ('buy', 'sell')),
+    quantity REAL NOT NULL,
+    reference_price REAL NOT NULL,
+    proposed_notional REAL NOT NULL,
+    status TEXT NOT NULL CHECK(status IN ('pending', 'submitted', 'dismissed')),
+    reason TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY(signal_evaluation_id) REFERENCES strategy_signal_evaluations(id),
+    FOREIGN KEY(bot_id) REFERENCES bots(id),
+    FOREIGN KEY(bot_version_id) REFERENCES bot_versions(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_paper_proposals_bot_status
+ON paper_order_proposals(bot_id, status, created_at);
+
 CREATE TABLE IF NOT EXISTS backtest_runs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     bot_id INTEGER NOT NULL,

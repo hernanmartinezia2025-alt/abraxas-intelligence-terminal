@@ -9,7 +9,10 @@ from backend.app.strategies.contracts import compile_strategy
 from backend.app.storage.backtests import get_backtest, list_backtests, save_backtest_run
 from backend.app.storage.bots import create_bot, create_bot_version, get_bot, list_bots
 from backend.app.storage.features import latest_asset_features
-from backend.app.storage.signals import list_signal_evaluations, save_signal_evaluation
+from backend.app.storage.signals import get_signal_evaluation, list_signal_evaluations, save_signal_evaluation
+from backend.app.storage.paper import account_snapshot, latest_price
+from backend.app.storage.proposals import list_paper_proposals, save_paper_proposal
+from backend.app.storage.sqlite import connect
 from backend.app.strategies.runtime import evaluate_strategy
 
 
@@ -177,3 +180,39 @@ def evaluate_saved_bot_signal(bot_id: int, version_id: int | None = None) -> dic
 def list_saved_bot_signals(bot_id: int, limit: int = 50) -> dict:
     get_bot(bot_id=bot_id)
     return list_signal_evaluations(bot_id=bot_id, limit=limit)
+
+
+def create_saved_bot_paper_proposal(bot_id: int, evaluation_id: int) -> dict:
+    detail = get_bot(bot_id=bot_id)
+    evaluation = get_signal_evaluation(evaluation_id)
+    if evaluation["bot_id"] != bot_id:
+        raise ValueError("Signal evaluation does not belong to this bot")
+    if evaluation["signal"] != "entry_candidate":
+        raise ValueError("Only entry_candidate signals can create long-only paper proposals")
+    version = next((item for item in detail["versions"] if item["id"] == evaluation["bot_version_id"]), None)
+    if not version or version.get("strategy_hash") != evaluation["strategy_hash"]:
+        raise ValueError("Signal strategy fingerprint no longer matches its bot version")
+    snapshot = account_snapshot()
+    with connect() as connection:
+        price = latest_price(connection, evaluation["symbol"])
+    position_pct = float(version["strategy"]["risk"]["max_position_pct"])
+    target_notional = min(float(snapshot["equity"]) * position_pct / 100, float(snapshot["account"]["cash_balance"]) / 1.001)
+    quantity = round(target_notional / price, 8)
+    if quantity <= 0:
+        raise ValueError("Paper account has no available capital for this proposal")
+    return save_paper_proposal({
+        "signal_evaluation_id": evaluation_id,
+        "bot_id": bot_id,
+        "bot_version_id": evaluation["bot_version_id"],
+        "symbol": evaluation["symbol"],
+        "action": "buy",
+        "quantity": quantity,
+        "reference_price": price,
+        "proposed_notional": round(quantity * price, 8),
+        "reason": f"Entry candidate #{evaluation_id}; strategy allocation {position_pct:.2f}% of paper equity.",
+    })
+
+
+def list_saved_bot_paper_proposals(bot_id: int, limit: int = 50) -> dict:
+    get_bot(bot_id=bot_id)
+    return list_paper_proposals(bot_id=bot_id, limit=limit)

@@ -207,6 +207,15 @@ DATASET_CATALOG = [
         "description": "Evaluaciones auditables regla por regla sobre features reales; no crean ordenes ni intents.",
     },
     {
+        "dataset_id": "paper_order_proposals",
+        "table": "paper_order_proposals",
+        "label": "Paper Order Proposals",
+        "category": "paper_trading",
+        "powerbi_ready": True,
+        "bot_ready": True,
+        "description": "Propuestas pendientes derivadas de señales; no son ordenes ni intenciones de ejecucion.",
+    },
+    {
         "dataset_id": "backtest_trades",
         "table": "backtest_trades",
         "label": "Backtest Trades",

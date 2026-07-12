@@ -1961,6 +1961,11 @@ h2 {
 .signal-history tbody tr { cursor: pointer; }
 .signal-history tbody tr.selected { background: rgba(210, 182, 109, .1); }
 @media (max-width: 700px) { .signal-rule-trace { grid-template-columns: 1fr; } .signal-rule-trace article { grid-template-columns: 1fr; gap: 3px; } }
+.paper-proposal-gate { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-top: 10px; padding: 14px; border: 1px solid rgba(210, 182, 109, .35); border-radius: 7px; background: #11140f; }
+.paper-proposal-gate > div:first-child { display: grid; gap: 4px; }
+.paper-proposal-result { flex-basis: 100%; display: grid; gap: 4px; padding-top: 10px; border-top: 1px solid #30362d; }
+.paper-proposal-result strong { color: #d2b66d; }
+.paper-proposal-result small { color: #87938c; }
 .risk-validator-grid { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(280px, .8fr); gap: 16px; margin-top: 14px; }
 .risk-validator-grid .risk-fields { margin: 0; }
 .risk-validator-grid .risk-fields button { grid-column: 1 / -1; }

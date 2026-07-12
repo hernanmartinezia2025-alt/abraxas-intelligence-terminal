@@ -13,6 +13,8 @@ from backend.app.services.bot_service import (
     list_saved_bots,
     evaluate_saved_bot_signal,
     list_saved_bot_signals,
+    create_saved_bot_paper_proposal,
+    list_saved_bot_paper_proposals,
 )
 
 router = APIRouter(prefix="/api/bots", tags=["bots"])
@@ -139,6 +141,24 @@ def bot_signals(bot_id: int = Path(ge=1), limit: int = Query(default=50, ge=1, l
 def evaluate_bot_signal(payload: SignalEvaluationRequest, bot_id: int = Path(ge=1)) -> dict:
     try:
         return evaluate_saved_bot_signal(bot_id=bot_id, **model_payload(payload))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@router.get("/{bot_id}/paper-proposals")
+def bot_paper_proposals(bot_id: int = Path(ge=1), limit: int = Query(default=50, ge=1, le=500)) -> dict:
+    try:
+        return list_saved_bot_paper_proposals(bot_id=bot_id, limit=limit)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.post("/{bot_id}/signals/{evaluation_id}/paper-proposal")
+def bot_paper_proposal(bot_id: int = Path(ge=1), evaluation_id: int = Path(ge=1)) -> dict:
+    try:
+        return create_saved_bot_paper_proposal(bot_id=bot_id, evaluation_id=evaluation_id)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:

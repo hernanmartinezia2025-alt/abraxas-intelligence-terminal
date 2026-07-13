@@ -744,7 +744,7 @@ export default function BotsPage({ selectedSymbol = "BTCUSDT" }) {
               <pre>{strategyPreview}</pre>
             </div>
             {signalEvaluation && <section className="signal-evaluation-panel">
-              <div><span>Última evaluación</span><strong>{signalEvaluation.signal.replace("_", " ").toUpperCase()}</strong><small>{signalEvaluation.symbol} · {signalEvaluation.timeframe} · feature {signalEvaluation.feature_timestamp}</small></div>
+              <div><span>Última evaluación</span><strong>{signalEvaluation.conflict ? "HOLD / CONFLICT" : signalEvaluation.signal.replace("_", " ").toUpperCase()}</strong><small>{signalEvaluation.symbol} · {signalEvaluation.timeframe} · feature {signalEvaluation.feature_timestamp}</small></div>
               {["entry", "exit"].map((side) => <div key={side}><span>{side} rules</span><strong>{signalEvaluation[`${side}_passed`] ? "PASS" : "NO PASS"}</strong><small>{(signalEvaluation.trace?.[side] || []).filter((rule) => rule.passed).length}/{(signalEvaluation.trace?.[side] || []).length} reglas</small></div>)}
               <div><span>Execution intent</span><strong>NO CREADO</strong><small>evaluación informativa y auditable</small></div>
             </section>}

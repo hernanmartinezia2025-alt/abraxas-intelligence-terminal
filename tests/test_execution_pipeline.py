@@ -9,6 +9,7 @@ from backend.app.storage.paper import account_snapshot, place_market_order
 from backend.app.storage.risk import get_risk_profile, set_kill_switch
 from backend.app.storage.sqlite import connect, initialize_database
 from backend.app.storage.proposals import save_paper_proposal
+from backend.app.storage.signals import save_signal_evaluation
 from backend.app.services.bot_service import submit_saved_bot_paper_proposal
 
 
@@ -120,6 +121,22 @@ class ExecutionPipelineTests(unittest.TestCase):
         self.assertIn("Projected exposure", second["reason"])
         self.assertGreater(second["risk"]["metrics"]["position_pct"], 10)
         self.assertGreater(second["risk"]["metrics"]["current_position_pct"], 0)
+
+    def test_signal_evaluation_is_idempotent_per_version_and_feature(self) -> None:
+        payload = {
+            "bot_id": 1, "bot_version_id": 1, "strategy_hash": "stable-hash",
+            "symbol": "BTCUSDT", "timeframe": "15m", "feature_timestamp": 123,
+            "signal": "hold", "entry_passed": False, "exit_passed": False,
+            "conflict": False, "features": {"return_1": 0}, "trace": {"entry": [], "exit": []},
+        }
+
+        first = save_signal_evaluation(payload)
+        second = save_signal_evaluation(payload)
+
+        self.assertEqual(first["id"], second["id"])
+        with connect() as connection:
+            count = connection.execute("SELECT COUNT(*) FROM strategy_signal_evaluations").fetchone()[0]
+        self.assertEqual(count, 1)
 
 
 if __name__ == "__main__":

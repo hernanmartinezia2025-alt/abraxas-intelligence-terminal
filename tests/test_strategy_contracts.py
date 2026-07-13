@@ -40,6 +40,14 @@ class StrategyContractTests(unittest.TestCase):
         self.assertEqual(result["trace"]["entry"][0]["actual"], 0.4)
         self.assertFalse(result["execution_intent_created"])
 
+    def test_conflicting_entry_and_exit_is_hold(self) -> None:
+        result = evaluate_strategy(compile_strategy(STRATEGY), {"return_5": 0.4, "return_1": -0.8})
+
+        self.assertEqual(result["signal"], "hold")
+        self.assertTrue(result["conflict"])
+        self.assertTrue(result["entry_passed"])
+        self.assertTrue(result["exit_passed"])
+
 
 if __name__ == "__main__":
     unittest.main()

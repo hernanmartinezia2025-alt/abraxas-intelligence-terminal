@@ -219,9 +219,11 @@ CREATE TABLE IF NOT EXISTS strategy_signal_evaluations (
     symbol TEXT NOT NULL,
     timeframe TEXT NOT NULL,
     feature_timestamp INTEGER NOT NULL,
+    evaluation_key TEXT,
     signal TEXT NOT NULL CHECK(signal IN ('entry_candidate', 'exit_candidate', 'hold')),
     entry_passed INTEGER NOT NULL CHECK(entry_passed IN (0, 1)),
     exit_passed INTEGER NOT NULL CHECK(exit_passed IN (0, 1)),
+    conflict INTEGER NOT NULL DEFAULT 0 CHECK(conflict IN (0, 1)),
     features_json TEXT NOT NULL,
     trace_json TEXT NOT NULL,
     evaluated_at TEXT NOT NULL,
@@ -814,6 +816,16 @@ def initialize_database() -> None:
         }.items():
             if name not in proposal_columns:
                 connection.execute(f"ALTER TABLE paper_order_proposals ADD COLUMN {name} {column_type}")
+        signal_columns = {
+            row["name"] for row in connection.execute("PRAGMA table_info(strategy_signal_evaluations)").fetchall()
+        }
+        if "evaluation_key" not in signal_columns:
+            connection.execute("ALTER TABLE strategy_signal_evaluations ADD COLUMN evaluation_key TEXT")
+        if "conflict" not in signal_columns:
+            connection.execute("ALTER TABLE strategy_signal_evaluations ADD COLUMN conflict INTEGER NOT NULL DEFAULT 0 CHECK(conflict IN (0, 1))")
+        connection.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_strategy_signals_evaluation_key ON strategy_signal_evaluations(evaluation_key)"
+        )
         user_version = int(connection.execute("PRAGMA user_version").fetchone()[0])
         if user_version < 1:
             _backfill_backtest_payloads(connection)

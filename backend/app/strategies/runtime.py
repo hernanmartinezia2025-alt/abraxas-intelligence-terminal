@@ -36,11 +36,13 @@ def evaluate_strategy(contract: dict, features: dict) -> dict:
             traces[section].append({**rule, "actual": actual, "passed": passed})
         outcomes[section] = bool(traces[section]) and all(item["passed"] for item in traces[section])
 
-    signal = "entry_candidate" if outcomes["entry"] else "exit_candidate" if outcomes["exit"] else "hold"
+    conflict = outcomes["entry"] and outcomes["exit"]
+    signal = "hold" if conflict else "entry_candidate" if outcomes["entry"] else "exit_candidate" if outcomes["exit"] else "hold"
     return {
         "signal": signal,
         "entry_passed": outcomes["entry"],
         "exit_passed": outcomes["exit"],
+        "conflict": conflict,
         "trace": traces,
         "execution_intent_created": False,
     }

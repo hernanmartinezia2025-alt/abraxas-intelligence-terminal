@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { createBot, createBotPaperProposal, dismissBotPaperProposal, evaluateBotSignal, getBacktest, getBot, getBotBacktests, getBotPaperProposals, getBots, getBotSignals, runBotBacktest, submitBotPaperProposal } from "../api/client.js";
+import { createBot, createBotPaperProposal, createBotVersion, dismissBotPaperProposal, evaluateBotSignal, getBacktest, getBot, getBotBacktests, getBotPaperProposals, getBots, getBotSignals, runBotBacktest, submitBotPaperProposal } from "../api/client.js";
 import BacktestComparisonPanel from "../features/backtests/BacktestComparisonPanel.jsx";
 import BacktestEquityChart from "../features/charts/BacktestEquityChart.jsx";
 import PageSubtabs from "../components/PageSubtabs.jsx";
@@ -74,6 +74,10 @@ export default function BotsPage({ selectedSymbol = "BTCUSDT" }) {
   const [paperProposal, setPaperProposal] = useState(null);
   const [paperProposals, setPaperProposals] = useState([]);
   const [proposingPaper, setProposingPaper] = useState(false);
+  const [versionEditorOpen, setVersionEditorOpen] = useState(false);
+  const [versionDraft, setVersionDraft] = useState("");
+  const [versionNotes, setVersionNotes] = useState("");
+  const [savingVersion, setSavingVersion] = useState(false);
   const [runDetailLoading, setRunDetailLoading] = useState(false);
   const [backtests, setBacktests] = useState([]);
   const [selectedRunId, setSelectedRunId] = useState(null);
@@ -265,6 +269,38 @@ export default function BotsPage({ selectedSymbol = "BTCUSDT" }) {
       setError(err.message);
     } finally {
       setProposingPaper(false);
+    }
+  }
+
+  function openVersionEditor() {
+    if (!selectedVersion?.strategy) return;
+    setVersionDraft(JSON.stringify(selectedVersion.strategy, null, 2));
+    setVersionNotes(`Derivada de v${selectedVersion.version}.`);
+    setVersionEditorOpen(true);
+  }
+
+  async function handleCreateVersion(event) {
+    event.preventDefault();
+    let strategy;
+    try {
+      strategy = JSON.parse(versionDraft);
+    } catch {
+      setError("Strategy JSON inválido. Corrige la sintaxis antes de guardar.");
+      return;
+    }
+    setSavingVersion(true);
+    setError("");
+    try {
+      const payload = await createBotVersion(selectedBotId, { strategy, notes: versionNotes });
+      setDetail(payload);
+      setSelectedVersionId(String(payload.versions?.[0]?.id || ""));
+      setVersionEditorOpen(false);
+      await loadBots({ silent: true });
+      await loadBacktests(selectedBotId);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSavingVersion(false);
     }
   }
 
@@ -741,8 +777,17 @@ export default function BotsPage({ selectedSymbol = "BTCUSDT" }) {
                 <strong>{runWarnings.length}</strong>
                 <small>{runMetrics.data_points ?? "--"} puntos</small>
               </article>
-              <pre>{strategyPreview}</pre>
+              <div className="strategy-version-source">
+                <div className="exchange-panel-head compact"><div><span>Strategy source</span><strong>v{selectedVersion?.version || "--"}</strong></div><button type="button" onClick={openVersionEditor}>Nueva versión</button></div>
+                <pre>{strategyPreview}</pre>
+              </div>
             </div>
+            {versionEditorOpen && <form className="strategy-version-editor" onSubmit={handleCreateVersion}>
+              <div className="exchange-panel-head compact"><div><p className="eyebrow">Version builder · advanced</p><h3>Duplicar y modificar estrategia</h3></div><button type="button" className="secondary" onClick={() => setVersionEditorOpen(false)}>Cerrar</button></div>
+              <label>Strategy JSON<textarea rows="18" value={versionDraft} onChange={(event) => setVersionDraft(event.target.value)} spellCheck="false" /></label>
+              <label>Notas de auditoría<input value={versionNotes} onChange={(event) => setVersionNotes(event.target.value)} maxLength="500" /></label>
+              <div className="version-editor-actions"><small>El backend validará reglas, operadores, riesgo y generará un fingerprint nuevo.</small><button type="submit" disabled={savingVersion}>{savingVersion ? "Validando..." : "Guardar nueva versión"}</button></div>
+            </form>}
             {signalEvaluation && <section className="signal-evaluation-panel">
               <div><span>Última evaluación</span><strong>{signalEvaluation.conflict ? "HOLD / CONFLICT" : signalEvaluation.signal.replace("_", " ").toUpperCase()}</strong><small>{signalEvaluation.symbol} · {signalEvaluation.timeframe} · feature {signalEvaluation.feature_timestamp}</small></div>
               {["entry", "exit"].map((side) => <div key={side}><span>{side} rules</span><strong>{signalEvaluation[`${side}_passed`] ? "PASS" : "NO PASS"}</strong><small>{(signalEvaluation.trace?.[side] || []).filter((rule) => rule.passed).length}/{(signalEvaluation.trace?.[side] || []).length} reglas</small></div>)}

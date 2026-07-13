@@ -1967,6 +1967,14 @@ h2 {
 .paper-proposal-result strong { color: #d2b66d; }
 .paper-proposal-result small { color: #87938c; }
 .paper-proposal-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+.strategy-version-source { min-width: 0; }
+.strategy-version-source pre { max-height: 340px; overflow: auto; }
+.strategy-version-editor { display: grid; gap: 12px; margin-top: 12px; padding: 14px; border: 1px solid rgba(210, 182, 109, .38); border-radius: 7px; background: #0b1116; }
+.strategy-version-editor label { display: grid; gap: 7px; color: #aab4bf; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
+.strategy-version-editor textarea, .strategy-version-editor input { width: 100%; border: 1px solid #2c3944; border-radius: 7px; background: #080d11; color: #eef3f5; padding: 11px; }
+.strategy-version-editor textarea { resize: vertical; font-family: "IBM Plex Mono", monospace; font-size: 12px; line-height: 1.5; }
+.version-editor-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.version-editor-actions small { color: #788691; }
 .risk-validator-grid { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(280px, .8fr); gap: 16px; margin-top: 14px; }
 .risk-validator-grid .risk-fields { margin: 0; }
 .risk-validator-grid .risk-fields button { grid-column: 1 / -1; }

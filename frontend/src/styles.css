@@ -3013,6 +3013,11 @@ h2 {
   border-radius: 8px;
   overflow: hidden;
 }
+
+.chart-indicators { display: flex; gap: 6px; flex-wrap: wrap; margin-left: auto; justify-content: flex-end; }
+.chart-indicators button { border: 1px solid rgba(223,192,122,.22); background: rgba(255,255,255,.03); color: var(--muted); border-radius: 5px; padding: 5px 8px; font: inherit; font-size: 10px; cursor: pointer; }
+.chart-indicators button.active { color: #101820; background: #dfc079; border-color: #dfc079; }
+@media (max-width: 760px) { .chart-indicators { width: 100%; margin-left: 0; justify-content: flex-start; } }
 .real-chart {
   width: 100%;
   height: clamp(480px, 64vh, 760px);

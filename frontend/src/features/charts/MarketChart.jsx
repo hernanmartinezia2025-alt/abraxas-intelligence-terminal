@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { CandlestickSeries, ColorType, createChart, HistogramSeries } from "lightweight-charts";
-import { getCandles } from "../../api/client.js";
+import { CandlestickSeries, ColorType, createChart, HistogramSeries, LineSeries } from "lightweight-charts";
+import { getCandles, getPaperAccount } from "../../api/client.js";
 
 function normalizeCandles(candles) {
   return candles.map((candle) => ({
@@ -18,9 +18,25 @@ export default function MarketChart({ symbol = "BTCUSDT", interval = "15m", expa
   const chartRef = useRef(null);
   const candleSeriesRef = useRef(null);
   const volumeSeriesRef = useRef(null);
+  const overlaysRef = useRef({});
   const [candles, setCandles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [paper, setPaper] = useState(null);
+  const [indicators, setIndicators] = useState({ sma20: true, ema50: false, levels: true });
+
+  const sma = (period, exponential = false) => {
+    let ema = null;
+    return candles.map((candle, index) => {
+      if (index + 1 < period) return null;
+      if (exponential) {
+        const alpha = 2 / (period + 1);
+        ema = ema === null ? candles.slice(index + 1 - period, index + 1).reduce((sum, row) => sum + row.close, 0) / period : candle.close * alpha + ema * (1 - alpha);
+        return { time: candle.time, value: ema };
+      }
+      return { time: candle.time, value: candles.slice(index + 1 - period, index + 1).reduce((sum, row) => sum + row.close, 0) / period };
+    }).filter(Boolean);
+  };
 
   const lastCandle = candles[candles.length - 1];
   const previousCandle = candles[candles.length - 2];
@@ -52,6 +68,12 @@ export default function MarketChart({ symbol = "BTCUSDT", interval = "15m", expa
       alive = false;
     };
   }, [symbol, interval]);
+
+  useEffect(() => {
+    let alive = true;
+    getPaperAccount().then((snapshot) => alive && setPaper(snapshot)).catch(() => alive && setPaper(null));
+    return () => { alive = false; };
+  }, [symbol]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -99,6 +121,9 @@ export default function MarketChart({ symbol = "BTCUSDT", interval = "15m", expa
       scaleMargins: { top: 0.78, bottom: 0 },
     });
 
+    overlaysRef.current.sma20 = chart.addSeries(LineSeries, { color: "#e2b84f", lineWidth: 2, priceLineVisible: false, lastValueVisible: false });
+    overlaysRef.current.ema50 = chart.addSeries(LineSeries, { color: "#7aa7ff", lineWidth: 2, priceLineVisible: false, lastValueVisible: false });
+
     chartRef.current = chart;
     candleSeriesRef.current = candleSeries;
     volumeSeriesRef.current = volumeSeries;
@@ -108,6 +133,7 @@ export default function MarketChart({ symbol = "BTCUSDT", interval = "15m", expa
       chartRef.current = null;
       candleSeriesRef.current = null;
       volumeSeriesRef.current = null;
+      overlaysRef.current = {};
     };
   }, []);
 
@@ -124,8 +150,22 @@ export default function MarketChart({ symbol = "BTCUSDT", interval = "15m", expa
         color: candle.close >= candle.open ? "rgba(37, 211, 155, 0.36)" : "rgba(255, 99, 118, 0.34)",
       }))
     );
+    overlaysRef.current.sma20?.setData(indicators.sma20 ? sma(20) : []);
+    overlaysRef.current.ema50?.setData(indicators.ema50 ? sma(50, true) : []);
+    const position = (paper?.positions || []).find((item) => item.symbol === symbol);
+    const allocation = (paper?.allocations || []).find((item) => item.symbol === symbol && Number(item.quantity) > 0);
+    for (const [key, price, color, title] of [
+      ["entry", position?.average_price, "#8bd4ff", "Avg entry"],
+      ["stop", allocation?.stop_loss_price, "#ff6376", "SL"],
+      ["take", allocation?.take_profit_price, "#25d39b", "TP"],
+    ]) {
+      if (indicators.levels && price && candles.length) {
+        if (!overlaysRef.current[key]) overlaysRef.current[key] = candleSeriesRef.current.createPriceLine({ price, color, lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title });
+        else overlaysRef.current[key].applyOptions({ price, color, title });
+      } else if (overlaysRef.current[key]) { candleSeriesRef.current.removePriceLine(overlaysRef.current[key]); delete overlaysRef.current[key]; }
+    }
     chartRef.current.timeScale().fitContent();
-  }, [candles]);
+  }, [candles, indicators, paper, symbol]);
 
   return (
     <div className={`real-chart-wrap ${expanded ? "expanded" : ""}`}>
@@ -133,6 +173,9 @@ export default function MarketChart({ symbol = "BTCUSDT", interval = "15m", expa
         <span>{symbol}</span>
         <strong>{interval}</strong>
         {lastCandle && <b className={move >= 0 ? "positive" : "negative"}>{move >= 0 ? "+" : ""}{move.toFixed(2)}%</b>}
+        <div className="chart-indicators" aria-label="Indicadores del gráfico">
+          {[['sma20', 'SMA 20'], ['ema50', 'EMA 50'], ['levels', 'Posición / SL / TP']].map(([key, label]) => <button key={key} type="button" className={indicators[key] ? "active" : ""} onClick={() => setIndicators((current) => ({ ...current, [key]: !current[key] }))}>{label}</button>)}
+        </div>
       </div>
       <div className={`real-chart ${expanded ? "expanded" : ""}`} ref={containerRef} />
       {loading && <div className="chart-state">Loading candles</div>}

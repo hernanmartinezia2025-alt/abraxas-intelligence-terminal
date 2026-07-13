@@ -177,6 +177,19 @@ def account_snapshot() -> dict:
         allocations = [dict(row) for row in connection.execute(
             "SELECT * FROM simulated_position_allocations WHERE account_id = ? ORDER BY updated_at DESC", (ACCOUNT_ID,)
         ).fetchall()]
+        for allocation in allocations:
+            allocation["stop_loss_price"] = None
+            allocation["take_profit_price"] = None
+            if allocation.get("bot_version_id") and allocation.get("average_price"):
+                version = connection.execute("SELECT strategy_json FROM bot_versions WHERE id = ?", (allocation["bot_version_id"],)).fetchone()
+                if version:
+                    try:
+                        risk = json.loads(version["strategy_json"]).get("risk", {})
+                        average = float(allocation["average_price"])
+                        allocation["stop_loss_price"] = round(average * (1 - abs(float(risk.get("stop_loss_pct", 0))) / 100), 8)
+                        allocation["take_profit_price"] = round(average * (1 + abs(float(risk.get("take_profit_pct", 0))) / 100), 8)
+                    except (TypeError, ValueError, json.JSONDecodeError):
+                        pass
         proposals = [dict(row) for row in connection.execute(
             "SELECT * FROM paper_order_proposals ORDER BY id DESC LIMIT 30"
         ).fetchall()]

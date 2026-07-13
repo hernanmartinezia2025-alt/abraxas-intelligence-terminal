@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { createBot, createBotPaperProposal, dismissBotPaperProposal, evaluateBotSignal, getBacktest, getBot, getBotBacktests, getBots, getBotSignals, runBotBacktest, submitBotPaperProposal } from "../api/client.js";
+import { createBot, createBotPaperProposal, dismissBotPaperProposal, evaluateBotSignal, getBacktest, getBot, getBotBacktests, getBotPaperProposals, getBots, getBotSignals, runBotBacktest, submitBotPaperProposal } from "../api/client.js";
 import BacktestComparisonPanel from "../features/backtests/BacktestComparisonPanel.jsx";
 import BacktestEquityChart from "../features/charts/BacktestEquityChart.jsx";
 import PageSubtabs from "../components/PageSubtabs.jsx";
@@ -72,6 +72,7 @@ export default function BotsPage({ selectedSymbol = "BTCUSDT" }) {
   const [signalEvaluation, setSignalEvaluation] = useState(null);
   const [signalHistory, setSignalHistory] = useState([]);
   const [paperProposal, setPaperProposal] = useState(null);
+  const [paperProposals, setPaperProposals] = useState([]);
   const [proposingPaper, setProposingPaper] = useState(false);
   const [runDetailLoading, setRunDetailLoading] = useState(false);
   const [backtests, setBacktests] = useState([]);
@@ -191,6 +192,22 @@ export default function BotsPage({ selectedSymbol = "BTCUSDT" }) {
     }
   }
 
+  async function loadPaperProposals(botId) {
+    if (!botId) {
+      setPaperProposals([]);
+      setPaperProposal(null);
+      return;
+    }
+    try {
+      const payload = await getBotPaperProposals(botId, 20);
+      if (selectedBotIdRef.current !== botId) return;
+      setPaperProposals(payload.proposals || []);
+      setPaperProposal((current) => current?.bot_id === botId ? current : payload.proposals?.[0] || null);
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
   async function handleSignalEvaluation() {
     if (!detailMatchesSelection || !selectedVersion || !strategyReady) return;
     setEvaluatingSignal(true);
@@ -211,7 +228,9 @@ export default function BotsPage({ selectedSymbol = "BTCUSDT" }) {
     setProposingPaper(true);
     setError("");
     try {
-      setPaperProposal(await createBotPaperProposal(selectedBotId, signalEvaluation.id));
+      const payload = await createBotPaperProposal(selectedBotId, signalEvaluation.id);
+      setPaperProposal(payload);
+      setPaperProposals((current) => [payload, ...current.filter((item) => item.id !== payload.id)].slice(0, 20));
     } catch (err) {
       setError(err.message);
     } finally {
@@ -227,6 +246,7 @@ export default function BotsPage({ selectedSymbol = "BTCUSDT" }) {
     try {
       const payload = await submitBotPaperProposal(selectedBotId, paperProposal.id);
       setPaperProposal(payload.proposal);
+      setPaperProposals((current) => current.map((item) => item.id === payload.proposal.id ? payload.proposal : item));
     } catch (err) {
       setError(err.message);
     } finally {
@@ -238,7 +258,9 @@ export default function BotsPage({ selectedSymbol = "BTCUSDT" }) {
     if (!paperProposal || paperProposal.status !== "pending") return;
     setProposingPaper(true);
     try {
-      setPaperProposal(await dismissBotPaperProposal(selectedBotId, paperProposal.id));
+      const payload = await dismissBotPaperProposal(selectedBotId, paperProposal.id);
+      setPaperProposal(payload);
+      setPaperProposals((current) => current.map((item) => item.id === payload.id ? payload : item));
     } catch (err) {
       setError(err.message);
     } finally {
@@ -310,6 +332,7 @@ export default function BotsPage({ selectedSymbol = "BTCUSDT" }) {
     setSignalEvaluation(null);
     setSignalHistory([]);
     setPaperProposal(null);
+    setPaperProposals([]);
     setRunDetailLoading(false);
   }
 
@@ -394,6 +417,7 @@ export default function BotsPage({ selectedSymbol = "BTCUSDT" }) {
     loadDetail(selectedBotId);
     loadBacktests(selectedBotId);
     loadSignals(selectedBotId);
+    loadPaperProposals(selectedBotId);
   }, [selectedBotId]);
 
   useEffect(() => {
@@ -728,6 +752,10 @@ export default function BotsPage({ selectedSymbol = "BTCUSDT" }) {
               <div><p className="eyebrow">Paper proposal gate</p><h3>{signalEvaluation.signal === "entry_candidate" ? "Candidato elegible" : "Sin propuesta operable"}</h3><small>Crear una propuesta no crea una orden ni pasa todavía por Risk Engine.</small></div>
               <button type="button" onClick={handlePaperProposal} disabled={signalEvaluation.signal !== "entry_candidate" || proposingPaper}>{proposingPaper ? "Calculando..." : "Crear propuesta paper"}</button>
               {paperProposal && <div className="paper-proposal-result"><strong>PROPOSAL #{paperProposal.id} · {paperProposal.status.toUpperCase()}</strong><span>{paperProposal.action.toUpperCase()} {paperProposal.quantity} {paperProposal.symbol} · ${Number(paperProposal.proposed_notional).toLocaleString(undefined, { maximumFractionDigits: 2 })}</span><small>{paperProposal.reason}</small>{paperProposal.status === "pending" && <div className="paper-proposal-actions"><button type="button" onClick={handleSubmitProposal} disabled={proposingPaper}>Confirmar y validar</button><button type="button" className="secondary" onClick={handleDismissProposal} disabled={proposingPaper}>Descartar</button></div>}{paperProposal.result_reference && <small>Resultado: {paperProposal.result_reference} · Risk #{paperProposal.risk_validation_id || "--"}</small>}</div>}
+            </section>}
+            {!!paperProposals.length && <section className="proposal-history signal-history">
+              <div className="exchange-panel-head compact"><div><p className="eyebrow">Paper proposal ledger</p><h3>{paperProposals.length} propuestas persistidas</h3></div><span>MANUAL GATE</span></div>
+              <div className="backtest-trades-wrap"><table><thead><tr><th>ID</th><th>Signal</th><th>Action</th><th>Qty</th><th>Notional</th><th>Status</th><th>Risk</th><th>Result</th></tr></thead><tbody>{paperProposals.map((item) => <tr key={item.id} onClick={() => setPaperProposal(item)} className={paperProposal?.id === item.id ? "selected" : ""}><td>#{item.id}</td><td>#{item.signal_evaluation_id}</td><td>{item.action}</td><td>{item.quantity}</td><td>${Number(item.proposed_notional).toLocaleString(undefined, { maximumFractionDigits: 2 })}</td><td>{item.status}</td><td>{item.risk_validation_id ? `#${item.risk_validation_id}` : "--"}</td><td>{item.result_reference || "pending"}</td></tr>)}</tbody></table></div>
             </section>}
             {signalEvaluation && <section className="signal-rule-trace">
               {["entry", "exit"].map((side) => <div key={side}><p className="eyebrow">{side} trace</p>{(signalEvaluation.trace?.[side] || []).map((rule, index) => <article key={`${side}-${index}`} className={rule.passed ? "passed" : "failed"}><code>{rule.field}</code><span>{rule.actual ?? "--"} {rule.operator} {rule.value}</span><strong>{rule.passed ? "PASS" : "NO PASS"}</strong></article>)}</div>)}

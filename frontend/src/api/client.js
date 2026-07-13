@@ -193,6 +193,11 @@ export function createBotPaperProposal(botId, evaluationId) {
   return request(`/api/bots/${botId}/signals/${evaluationId}/paper-proposal`, { method: "POST" });
 }
 
+export function getBotPaperProposals(botId, limit = 50) {
+  const params = new URLSearchParams({ limit: String(limit) });
+  return request(`/api/bots/${botId}/paper-proposals?${params}`);
+}
+
 export function submitBotPaperProposal(botId, proposalId) {
   return request(`/api/bots/${botId}/paper-proposals/${proposalId}/submit`, { method: "POST" });
 }

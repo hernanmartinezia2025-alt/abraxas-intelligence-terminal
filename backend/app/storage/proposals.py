@@ -19,9 +19,9 @@ def save_paper_proposal(payload: dict) -> dict:
         ).fetchone()
         if existing:
             return dict(existing)
-        proposal_id = connection.execute(
+        connection.execute(
             """
-            INSERT INTO paper_order_proposals (
+            INSERT OR IGNORE INTO paper_order_proposals (
                 signal_evaluation_id, bot_id, bot_version_id, symbol, action,
                 quantity, reference_price, proposed_notional, status, reason,
                 created_at, updated_at
@@ -32,8 +32,10 @@ def save_paper_proposal(payload: dict) -> dict:
                 payload["symbol"], payload["action"], payload["quantity"], payload["reference_price"],
                 payload["proposed_notional"], payload["reason"], now, now,
             ),
-        ).lastrowid
-        row = connection.execute("SELECT * FROM paper_order_proposals WHERE id = ?", (proposal_id,)).fetchone()
+        )
+        row = connection.execute(
+            "SELECT * FROM paper_order_proposals WHERE signal_evaluation_id = ?", (payload["signal_evaluation_id"],)
+        ).fetchone()
     return dict(row)
 
 
@@ -65,10 +67,12 @@ def dismiss_paper_proposal(proposal_id: int, bot_id: int) -> dict:
         raise ValueError("Only pending paper proposals can be dismissed")
     now = utc_now_iso()
     with connect() as connection:
-        connection.execute(
-            "UPDATE paper_order_proposals SET status = 'dismissed', updated_at = ? WHERE id = ? AND status = 'pending'",
+        cursor = connection.execute(
+            "UPDATE paper_order_proposals SET status = 'dismissed', updated_at = ? WHERE id = ? AND status = 'pending' AND submitted_at IS NULL",
             (now, proposal_id),
         )
+        if cursor.rowcount != 1:
+            raise ValueError("Paper proposal was already processed")
     return get_paper_proposal(proposal_id)
 
 

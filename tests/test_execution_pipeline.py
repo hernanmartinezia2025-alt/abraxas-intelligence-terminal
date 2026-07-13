@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import tempfile
 import unittest
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from backend.app.storage import sqlite as storage_sqlite
 from backend.app.storage.paper import account_snapshot, place_market_order
 from backend.app.storage.risk import get_risk_profile, set_kill_switch
 from backend.app.storage.sqlite import connect, initialize_database
-from backend.app.storage.proposals import save_paper_proposal
+from backend.app.storage.proposals import claim_paper_proposal, dismiss_paper_proposal, save_paper_proposal
 from backend.app.storage.signals import save_signal_evaluation
 from backend.app.services.bot_service import submit_saved_bot_paper_proposal
 
@@ -137,6 +138,39 @@ class ExecutionPipelineTests(unittest.TestCase):
         with connect() as connection:
             count = connection.execute("SELECT COUNT(*) FROM strategy_signal_evaluations").fetchone()[0]
         self.assertEqual(count, 1)
+
+    def test_claimed_proposal_cannot_be_dismissed(self) -> None:
+        with connect() as connection:
+            signal_id = connection.execute(
+                """INSERT INTO strategy_signal_evaluations (
+                   bot_id, bot_version_id, strategy_hash, symbol, timeframe, feature_timestamp,
+                   signal, entry_passed, exit_passed, features_json, trace_json, evaluated_at
+                   ) VALUES (1, 1, 'claim-hash', 'BTCUSDT', '15m', 2, 'entry_candidate', 1, 0, '{}', '{}', ?)""",
+                ("2026-07-11T00:00:00+00:00",),
+            ).lastrowid
+        proposal = save_paper_proposal({
+            "signal_evaluation_id": signal_id, "bot_id": 1, "bot_version_id": 1,
+            "symbol": "BTCUSDT", "action": "buy", "quantity": 0.001,
+            "reference_price": 64_000, "proposed_notional": 64, "reason": "claim test",
+        })
+
+        claim_paper_proposal(proposal["id"], 1)
+
+        with self.assertRaisesRegex(ValueError, "pending"):
+            dismiss_paper_proposal(proposal["id"], 1)
+
+    def test_concurrent_orders_respect_cumulative_position_limit(self) -> None:
+        set_kill_switch(False, "Concurrent exposure integration test")
+
+        def submit() -> dict:
+            return place_market_order({"symbol": "BTCUSDT", "side": "buy", "quantity": 0.01, "bot_id": None})
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            results = list(executor.map(lambda _: submit(), range(2)))
+
+        self.assertEqual(sorted(result["status"] for result in results), ["filled", "rejected"])
+        snapshot = account_snapshot()
+        self.assertAlmostEqual(snapshot["positions"][0]["quantity"], 0.01)
 
 
 if __name__ == "__main__":

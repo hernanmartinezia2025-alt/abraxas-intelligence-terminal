@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from threading import Lock
 from datetime import datetime, timezone
 
 from backend.app.storage.risk import validate_order_intent
@@ -11,6 +12,7 @@ from backend.app.storage.sqlite import connect, initialize_database
 ACCOUNT_ID = 1
 DEFAULT_BALANCE = 10_000.0
 FEE_RATE = 0.001
+PAPER_EXECUTION_LOCK = Lock()
 
 
 def utc_now_iso() -> str:
@@ -172,6 +174,11 @@ def place_market_order(payload: dict) -> dict:
 
 
 def _execute_market_intent(intent: OrderIntent) -> dict:
+    with PAPER_EXECUTION_LOCK:
+        return _execute_market_intent_serialized(intent)
+
+
+def _execute_market_intent_serialized(intent: OrderIntent) -> dict:
     initialize_database()
     symbol = intent.symbol
     side = intent.action

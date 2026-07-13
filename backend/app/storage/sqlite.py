@@ -474,6 +474,15 @@ CREATE TABLE IF NOT EXISTS simulated_position_allocations (
 CREATE INDEX IF NOT EXISTS idx_position_allocations_bot_symbol
 ON simulated_position_allocations(bot_id, bot_version_id, symbol, quantity);
 
+CREATE TABLE IF NOT EXISTS paper_position_protections (
+    allocation_id INTEGER PRIMARY KEY,
+    stop_loss_price REAL,
+    take_profit_price REAL,
+    trailing_distance_pct REAL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY(allocation_id) REFERENCES simulated_position_allocations(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS simulated_fills (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     order_id INTEGER NOT NULL,

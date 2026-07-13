@@ -141,6 +141,28 @@ def get_position_allocation(symbol: str, bot_id: int, bot_version_id: int, strat
         return position_allocation(connection, symbol.upper(), bot_id, bot_version_id, strategy_hash)
 
 
+def update_position_protection(allocation_id: int, stop_loss_price: float | None, take_profit_price: float | None, trailing_distance_pct: float | None) -> dict:
+    initialize_database()
+    now = utc_now_iso()
+    with connect() as connection:
+        allocation = connection.execute("SELECT * FROM simulated_position_allocations WHERE id = ? AND quantity > 0", (allocation_id,)).fetchone()
+        if not allocation:
+            raise ValueError("Open paper allocation not found")
+        average = float(allocation["average_price"])
+        if stop_loss_price is not None and not 0 < stop_loss_price < average:
+            raise ValueError("Stop loss must be below the allocation average price")
+        if take_profit_price is not None and take_profit_price <= average:
+            raise ValueError("Take profit must be above the allocation average price")
+        if trailing_distance_pct is not None and not 0 < trailing_distance_pct <= 50:
+            raise ValueError("Trailing distance must be between 0 and 50 percent")
+        connection.execute("""INSERT INTO paper_position_protections (allocation_id, stop_loss_price, take_profit_price, trailing_distance_pct, updated_at)
+            VALUES (?, ?, ?, ?, ?) ON CONFLICT(allocation_id) DO UPDATE SET stop_loss_price=excluded.stop_loss_price,
+            take_profit_price=excluded.take_profit_price, trailing_distance_pct=excluded.trailing_distance_pct, updated_at=excluded.updated_at""",
+            (allocation_id, stop_loss_price, take_profit_price, trailing_distance_pct, now))
+        row = connection.execute("SELECT * FROM paper_position_protections WHERE allocation_id = ?", (allocation_id,)).fetchone()
+        return dict(row)
+
+
 def account_snapshot() -> dict:
     initialize_database()
     with connect() as connection:
@@ -180,6 +202,9 @@ def account_snapshot() -> dict:
         for allocation in allocations:
             allocation["stop_loss_price"] = None
             allocation["take_profit_price"] = None
+            protection = connection.execute("SELECT stop_loss_price, take_profit_price, trailing_distance_pct, updated_at FROM paper_position_protections WHERE allocation_id = ?", (allocation["id"],)).fetchone()
+            if protection:
+                allocation.update(dict(protection))
             if allocation.get("bot_version_id") and allocation.get("average_price"):
                 version = connection.execute("SELECT strategy_json FROM bot_versions WHERE id = ?", (allocation["bot_version_id"],)).fetchone()
                 if version:

@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
-from backend.app.storage.paper import account_snapshot, place_market_order, reconcile_paper_runtime, reset_account
+from backend.app.storage.paper import account_snapshot, place_market_order, reconcile_paper_runtime, reset_account, update_position_protection
 
 router = APIRouter(prefix="/api/paper", tags=["paper-trading"])
 
@@ -18,6 +18,12 @@ class PaperOrderRequest(BaseModel):
 class PaperResetRequest(BaseModel):
     initial_balance: float = Field(default=10_000, gt=0, le=1_000_000_000)
     reason: str = Field(min_length=3, max_length=500)
+
+
+class PaperProtectionRequest(BaseModel):
+    stop_loss_price: float | None = Field(default=None, gt=0)
+    take_profit_price: float | None = Field(default=None, gt=0)
+    trailing_distance_pct: float | None = Field(default=None, gt=0, le=50)
 
 
 def values(model: BaseModel) -> dict:
@@ -46,3 +52,11 @@ def paper_reset(payload: PaperResetRequest) -> dict:
 @router.post("/reconcile")
 def paper_reconcile() -> dict:
     return reconcile_paper_runtime()
+
+
+@router.patch("/allocations/{allocation_id}/protection")
+def paper_protection(payload: PaperProtectionRequest, allocation_id: int) -> dict:
+    try:
+        return update_position_protection(allocation_id, **values(payload))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc

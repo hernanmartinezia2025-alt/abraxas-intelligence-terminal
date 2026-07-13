@@ -284,6 +284,10 @@ export function resetPaperAccount(payload) {
   return request("/api/paper/reset", { method: "POST", body: JSON.stringify(payload) });
 }
 
+export function updatePaperProtection(allocationId, payload) {
+  return request(`/api/paper/allocations/${allocationId}/protection`, { method: "PATCH", body: JSON.stringify(payload) });
+}
+
 export function getExchangeRegistry() {
   return request("/api/exchanges");
 }

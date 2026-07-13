@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { CandlestickSeries, ColorType, createChart, HistogramSeries, LineSeries } from "lightweight-charts";
-import { getCandles, getPaperAccount } from "../../api/client.js";
+import { getCandles, getPaperAccount, updatePaperProtection } from "../../api/client.js";
 
 function normalizeCandles(candles) {
   return candles.map((candle) => ({
@@ -24,6 +24,8 @@ export default function MarketChart({ symbol = "BTCUSDT", interval = "15m", expa
   const [error, setError] = useState("");
   const [paper, setPaper] = useState(null);
   const [indicators, setIndicators] = useState({ sma20: true, ema50: false, levels: true });
+  const [protectionDraft, setProtectionDraft] = useState({ stop_loss_price: "", take_profit_price: "", trailing_distance_pct: "" });
+  const [protectionMessage, setProtectionMessage] = useState("");
 
   const sma = (period, exponential = false) => {
     let ema = null;
@@ -40,6 +42,7 @@ export default function MarketChart({ symbol = "BTCUSDT", interval = "15m", expa
 
   const lastCandle = candles[candles.length - 1];
   const previousCandle = candles[candles.length - 2];
+  const allocation = (paper?.allocations || []).find((item) => item.symbol === symbol && Number(item.quantity) > 0);
   const move = useMemo(() => {
     if (!lastCandle || !previousCandle) return 0;
     return ((lastCandle.close - previousCandle.close) / previousCandle.close) * 100;
@@ -74,6 +77,23 @@ export default function MarketChart({ symbol = "BTCUSDT", interval = "15m", expa
     getPaperAccount().then((snapshot) => alive && setPaper(snapshot)).catch(() => alive && setPaper(null));
     return () => { alive = false; };
   }, [symbol]);
+
+  useEffect(() => {
+    if (!allocation) return;
+    setProtectionDraft({ stop_loss_price: allocation.stop_loss_price || "", take_profit_price: allocation.take_profit_price || "", trailing_distance_pct: allocation.trailing_distance_pct || "" });
+  }, [allocation?.id, allocation?.updated_at]);
+
+  async function saveProtection(event) {
+    event.preventDefault();
+    if (!allocation) return;
+    setProtectionMessage("Guardando...");
+    try {
+      await updatePaperProtection(allocation.id, Object.fromEntries(Object.entries(protectionDraft).map(([key, value]) => [key, value === "" ? null : Number(value)])));
+      const next = await getPaperAccount();
+      setPaper(next);
+      setProtectionMessage("Protección persistida");
+    } catch (err) { setProtectionMessage(err.message); }
+  }
 
   useEffect(() => {
     const container = containerRef.current;
@@ -178,6 +198,13 @@ export default function MarketChart({ symbol = "BTCUSDT", interval = "15m", expa
         </div>
       </div>
       <div className={`real-chart ${expanded ? "expanded" : ""}`} ref={containerRef} />
+      {allocation && <form className="chart-protection-editor" onSubmit={saveProtection}>
+        <span className="eyebrow">Protección paper · asignación #{allocation.id}</span>
+        <label>SL <input type="number" step="any" value={protectionDraft.stop_loss_price} onChange={(e) => setProtectionDraft((v) => ({ ...v, stop_loss_price: e.target.value }))} placeholder="precio" /></label>
+        <label>TP <input type="number" step="any" value={protectionDraft.take_profit_price} onChange={(e) => setProtectionDraft((v) => ({ ...v, take_profit_price: e.target.value }))} placeholder="precio" /></label>
+        <label>Trailing % <input type="number" step="0.01" min="0" max="50" value={protectionDraft.trailing_distance_pct} onChange={(e) => setProtectionDraft((v) => ({ ...v, trailing_distance_pct: e.target.value }))} placeholder="opcional" /></label>
+        <button type="submit">Guardar niveles</button><small>{protectionMessage}</small>
+      </form>}
       {loading && <div className="chart-state">Loading candles</div>}
       {error && <div className="chart-state error">Chart error: {error}</div>}
       {!loading && !error && candles.length === 0 && <div className="chart-state">No candles</div>}

@@ -109,6 +109,18 @@ class ExecutionPipelineTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "already processed"):
             submit_saved_bot_paper_proposal(1, proposal["id"])
 
+    def test_accumulated_position_cannot_exceed_risk_limit(self) -> None:
+        set_kill_switch(False, "Accumulated exposure integration test")
+
+        first = place_market_order({"symbol": "BTCUSDT", "side": "buy", "quantity": 0.01, "bot_id": None})
+        second = place_market_order({"symbol": "BTCUSDT", "side": "buy", "quantity": 0.01, "bot_id": None})
+
+        self.assertEqual(first["status"], "filled")
+        self.assertEqual(second["status"], "rejected")
+        self.assertIn("Projected exposure", second["reason"])
+        self.assertGreater(second["risk"]["metrics"]["position_pct"], 10)
+        self.assertGreater(second["risk"]["metrics"]["current_position_pct"], 0)
+
 
 if __name__ == "__main__":
     unittest.main()

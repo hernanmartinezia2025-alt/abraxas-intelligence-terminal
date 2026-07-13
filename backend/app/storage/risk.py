@@ -152,6 +152,7 @@ def validate_order_intent(payload: dict) -> dict:
     side = str(payload["side"]).strip().lower()
     account_equity = float(payload["account_equity"])
     requested_notional = float(payload["requested_notional"])
+    current_exposure_notional = max(0.0, float(payload.get("current_exposure_notional") or 0))
     daily_pnl = float(payload["daily_pnl"])
     current_drawdown_pct = float(payload["current_drawdown_pct"])
 
@@ -160,7 +161,10 @@ def validate_order_intent(payload: dict) -> dict:
         limits = _limits(connection.execute("SELECT * FROM risk_limits WHERE id = 1").fetchone())
         state = dict(connection.execute("SELECT * FROM risk_state WHERE id = 1").fetchone())
 
-        position_pct = (requested_notional / account_equity) * 100
+        reduces_exposure = bool(payload.get("reduces_exposure"))
+        projected_exposure_notional = max(0.0, current_exposure_notional - requested_notional) if reduces_exposure else current_exposure_notional + requested_notional
+        current_position_pct = (current_exposure_notional / account_equity) * 100
+        position_pct = (projected_exposure_notional / account_equity) * 100
         daily_loss_pct = max(0.0, (-daily_pnl / account_equity) * 100)
         reasons = []
         checks = []
@@ -175,8 +179,8 @@ def validate_order_intent(payload: dict) -> dict:
         check("mode", mode_allowed, f"{mode.title()} mode allowed" if mode_allowed else "Live mode is blocked")
         check("side", side == "long", "Long intent supported" if side == "long" else "Only long intents are supported in this phase")
         check("symbol_whitelist", symbol in limits["symbol_whitelist"], f"{symbol} is authorized" if symbol in limits["symbol_whitelist"] else f"{symbol} is outside the symbol whitelist")
-        position_allowed = bool(payload.get("reduces_exposure")) or position_pct <= limits["max_position_pct"]
-        position_detail = "Intent reduces existing exposure" if payload.get("reduces_exposure") else (f"Position {position_pct:.2f}% within limit" if position_allowed else f"Position {position_pct:.2f}% exceeds {limits['max_position_pct']:.2f}%")
+        position_allowed = reduces_exposure or position_pct <= limits["max_position_pct"]
+        position_detail = f"Exposure reduces from {current_position_pct:.2f}% to {position_pct:.2f}%" if reduces_exposure else (f"Projected exposure {position_pct:.2f}% within limit" if position_allowed else f"Projected exposure {position_pct:.2f}% exceeds {limits['max_position_pct']:.2f}%")
         check("max_position", position_allowed, position_detail)
         check("max_daily_loss", daily_loss_pct < limits["max_daily_loss_pct"], f"Daily loss {daily_loss_pct:.2f}% within limit" if daily_loss_pct < limits["max_daily_loss_pct"] else f"Daily loss {daily_loss_pct:.2f}% reached limit {limits['max_daily_loss_pct']:.2f}%")
         check("max_drawdown", current_drawdown_pct < limits["max_drawdown_pct"], f"Drawdown {current_drawdown_pct:.2f}% within limit" if current_drawdown_pct < limits["max_drawdown_pct"] else f"Drawdown {current_drawdown_pct:.2f}% reached limit {limits['max_drawdown_pct']:.2f}%")
@@ -199,6 +203,8 @@ def validate_order_intent(payload: dict) -> dict:
             "checks": checks,
             "metrics": {
                 "position_pct": round(position_pct, 4),
+                "current_position_pct": round(current_position_pct, 4),
+                "projected_exposure_notional": round(projected_exposure_notional, 8),
                 "daily_loss_pct": round(daily_loss_pct, 4),
                 "current_drawdown_pct": round(current_drawdown_pct, 4),
                 "cooldown_remaining_minutes": cooldown_remaining,

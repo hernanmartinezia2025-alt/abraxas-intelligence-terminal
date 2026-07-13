@@ -185,10 +185,21 @@ def _execute_market_intent(intent: OrderIntent) -> dict:
             raise ValueError(f"Bot {bot_id} does not exist")
         price = latest_price(connection, symbol)
     notional = price * quantity
+    existing_position = next((item for item in snapshot["positions"] if item["symbol"] == symbol), None)
+    existing_exposure_notional = float(existing_position["market_value"]) if existing_position else 0.0
+    with connect() as connection:
+        last_loss_row = connection.execute(
+            """SELECT created_at FROM simulated_ledger
+               WHERE account_id = ? AND realized_pnl_delta < 0
+               ORDER BY created_at DESC, id DESC LIMIT 1""",
+            (ACCOUNT_ID,),
+        ).fetchone()
     decision = validate_order_intent({
         "mode": "paper", "symbol": symbol, "side": "long", "requested_notional": notional,
         "account_equity": snapshot["equity"], "daily_pnl": snapshot["daily_realized_pnl"],
-        "current_drawdown_pct": snapshot["drawdown_pct"], "last_loss_at": None,
+        "current_drawdown_pct": snapshot["drawdown_pct"],
+        "current_exposure_notional": existing_exposure_notional,
+        "last_loss_at": last_loss_row["created_at"] if last_loss_row else None,
         "reduces_exposure": side == "sell",
     })
     with connect() as connection:

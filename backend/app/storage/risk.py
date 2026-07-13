@@ -174,7 +174,8 @@ def validate_order_intent(payload: dict) -> dict:
             if not passed:
                 reasons.append(detail)
 
-        check("kill_switch", not bool(state["kill_switch_active"]), "Kill switch inactive" if not bool(state["kill_switch_active"]) else "Kill switch is active")
+        kill_allowed = reduces_exposure or not bool(state["kill_switch_active"])
+        check("kill_switch", kill_allowed, "Close-only reduction allowed while kill switch is active" if reduces_exposure and bool(state["kill_switch_active"]) else ("Kill switch inactive" if not bool(state["kill_switch_active"]) else "Kill switch is active"))
         mode_allowed = mode in {"validation", "paper"}
         check("mode", mode_allowed, f"{mode.title()} mode allowed" if mode_allowed else "Live mode is blocked")
         check("side", side == "long", "Long intent supported" if side == "long" else "Only long intents are supported in this phase")
@@ -182,8 +183,10 @@ def validate_order_intent(payload: dict) -> dict:
         position_allowed = reduces_exposure or position_pct <= limits["max_position_pct"]
         position_detail = f"Exposure reduces from {current_position_pct:.2f}% to {position_pct:.2f}%" if reduces_exposure else (f"Projected exposure {position_pct:.2f}% within limit" if position_allowed else f"Projected exposure {position_pct:.2f}% exceeds {limits['max_position_pct']:.2f}%")
         check("max_position", position_allowed, position_detail)
-        check("max_daily_loss", daily_loss_pct < limits["max_daily_loss_pct"], f"Daily loss {daily_loss_pct:.2f}% within limit" if daily_loss_pct < limits["max_daily_loss_pct"] else f"Daily loss {daily_loss_pct:.2f}% reached limit {limits['max_daily_loss_pct']:.2f}%")
-        check("max_drawdown", current_drawdown_pct < limits["max_drawdown_pct"], f"Drawdown {current_drawdown_pct:.2f}% within limit" if current_drawdown_pct < limits["max_drawdown_pct"] else f"Drawdown {current_drawdown_pct:.2f}% reached limit {limits['max_drawdown_pct']:.2f}%")
+        daily_allowed = reduces_exposure or daily_loss_pct < limits["max_daily_loss_pct"]
+        drawdown_allowed = reduces_exposure or current_drawdown_pct < limits["max_drawdown_pct"]
+        check("max_daily_loss", daily_allowed, "Close-only reduction bypasses entry loss limit" if reduces_exposure else (f"Daily loss {daily_loss_pct:.2f}% within limit" if daily_allowed else f"Daily loss {daily_loss_pct:.2f}% reached limit {limits['max_daily_loss_pct']:.2f}%"))
+        check("max_drawdown", drawdown_allowed, "Close-only reduction bypasses entry drawdown limit" if reduces_exposure else (f"Drawdown {current_drawdown_pct:.2f}% within limit" if drawdown_allowed else f"Drawdown {current_drawdown_pct:.2f}% reached limit {limits['max_drawdown_pct']:.2f}%"))
 
         last_loss_at = payload.get("last_loss_at")
         cooldown_remaining = 0
@@ -193,7 +196,8 @@ def validate_order_intent(payload: dict) -> dict:
                 loss_time = loss_time.replace(tzinfo=timezone.utc)
             elapsed_minutes = max(0, int((now - loss_time.astimezone(timezone.utc)).total_seconds() // 60))
             cooldown_remaining = max(0, limits["cooldown_minutes"] - elapsed_minutes)
-        check("cooldown", cooldown_remaining == 0, "Cooldown clear" if cooldown_remaining == 0 else f"Cooldown has {cooldown_remaining} minutes remaining")
+        cooldown_allowed = reduces_exposure or cooldown_remaining == 0
+        check("cooldown", cooldown_allowed, "Close-only reduction bypasses entry cooldown" if reduces_exposure else ("Cooldown clear" if cooldown_allowed else f"Cooldown has {cooldown_remaining} minutes remaining"))
 
         approved = not reasons
         decision = {
@@ -208,6 +212,7 @@ def validate_order_intent(payload: dict) -> dict:
                 "daily_loss_pct": round(daily_loss_pct, 4),
                 "current_drawdown_pct": round(current_drawdown_pct, 4),
                 "cooldown_remaining_minutes": cooldown_remaining,
+                "close_only": reduces_exposure,
             },
             "limits_version": limits["updated_at"],
             "evaluated_at": now.isoformat(),

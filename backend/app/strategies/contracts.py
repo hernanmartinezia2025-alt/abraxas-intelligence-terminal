@@ -65,7 +65,7 @@ def compile_strategy(strategy: object) -> dict:
         "engine": engine,
         "strategy_hash": hashlib.sha256(canonical.encode("utf-8")).hexdigest(),
         "required_fields": fields,
-        "capabilities": {"backtest": True, "paper": False, "live": False},
+        "capabilities": {"backtest": True, "paper_proposal": True, "paper_close_only": True, "paper_auto": False, "live": False},
         "execution_model": "signal_close_fill_next_open",
         "position_mode": "long_only",
         "normalized_strategy": normalized,

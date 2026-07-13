@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 
 from backend.app.strategies.contracts import compile_strategy
-from backend.app.strategies.runtime import evaluate_strategy
+from backend.app.strategies.runtime import evaluate_position_protection, evaluate_strategy
 
 
 STRATEGY = {
@@ -22,7 +22,8 @@ class StrategyContractTests(unittest.TestCase):
         self.assertEqual(first["strategy_hash"], second["strategy_hash"])
         self.assertEqual(first["required_fields"], ["return_1", "return_5"])
         self.assertTrue(first["capabilities"]["backtest"])
-        self.assertFalse(first["capabilities"]["paper"])
+        self.assertTrue(first["capabilities"]["paper_proposal"])
+        self.assertFalse(first["capabilities"]["paper_auto"])
         self.assertFalse(first["capabilities"]["live"])
 
     def test_invalid_rules_and_risk_are_rejected(self) -> None:
@@ -47,6 +48,14 @@ class StrategyContractTests(unittest.TestCase):
         self.assertTrue(result["conflict"])
         self.assertTrue(result["entry_passed"])
         self.assertTrue(result["exit_passed"])
+
+    def test_position_protection_detects_stop_and_take_profit(self) -> None:
+        allocation = {"quantity": 1, "average_price": 100}
+        risk = {"stop_loss_pct": 2, "take_profit_pct": 4}
+
+        self.assertEqual(evaluate_position_protection(allocation, 98, risk)["trigger_reason"], "stop_loss")
+        self.assertEqual(evaluate_position_protection(allocation, 104, risk)["trigger_reason"], "take_profit")
+        self.assertIsNone(evaluate_position_protection(allocation, 101, risk)["trigger_reason"])
 
 
 if __name__ == "__main__":

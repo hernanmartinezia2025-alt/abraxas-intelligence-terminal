@@ -295,6 +295,7 @@ DATASET_CATALOG = [
             ("simulated_accounts", "Estado financiero persistido de la cuenta paper."),
             ("simulated_orders", "Ordenes paper aprobadas o rechazadas con decision de riesgo."),
             ("simulated_positions", "Posiciones paper, costo promedio y PnL realizado."),
+            ("simulated_position_allocations", "Asignaciones contables por bot, version y estrategia para PnL y protecciones exactas."),
             ("simulated_fills", "Fills market simulados con precio real persistido y comision."),
             ("simulated_ledger", "Ledger de caja y eventos de la cuenta paper."),
         ]

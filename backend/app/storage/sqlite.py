@@ -224,6 +224,9 @@ CREATE TABLE IF NOT EXISTS strategy_signal_evaluations (
     entry_passed INTEGER NOT NULL CHECK(entry_passed IN (0, 1)),
     exit_passed INTEGER NOT NULL CHECK(exit_passed IN (0, 1)),
     conflict INTEGER NOT NULL DEFAULT 0 CHECK(conflict IN (0, 1)),
+    trigger_reason TEXT,
+    price_timestamp TEXT,
+    position_return_pct REAL,
     features_json TEXT NOT NULL,
     trace_json TEXT NOT NULL,
     evaluated_at TEXT NOT NULL,
@@ -246,10 +249,20 @@ CREATE TABLE IF NOT EXISTS paper_order_proposals (
     proposed_notional REAL NOT NULL,
     status TEXT NOT NULL CHECK(status IN ('pending', 'submitted', 'dismissed')),
     reason TEXT NOT NULL,
+    strategy_hash TEXT,
+    price_timestamp TEXT,
+    expires_at TEXT,
+    allocation_id INTEGER,
+    allocation_revision INTEGER,
+    trigger_reason TEXT,
     execution_intent_id TEXT,
     risk_validation_id INTEGER,
     result_reference TEXT,
     submitted_at TEXT,
+    claim_token TEXT,
+    claimed_at TEXT,
+    attempt_count INTEGER NOT NULL DEFAULT 0,
+    last_error TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     FOREIGN KEY(signal_evaluation_id) REFERENCES strategy_signal_evaluations(id),
@@ -406,6 +419,10 @@ CREATE TABLE IF NOT EXISTS simulated_orders (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     account_id INTEGER NOT NULL,
     bot_id INTEGER,
+    bot_version_id INTEGER,
+    strategy_hash TEXT,
+    signal_evaluation_id INTEGER,
+    proposal_id INTEGER,
     symbol TEXT NOT NULL,
     side TEXT NOT NULL CHECK (side IN ('buy', 'sell')),
     quantity REAL NOT NULL,
@@ -432,6 +449,30 @@ CREATE TABLE IF NOT EXISTS simulated_positions (
     UNIQUE(account_id, symbol),
     FOREIGN KEY(account_id) REFERENCES simulated_accounts(id)
 );
+
+CREATE TABLE IF NOT EXISTS simulated_position_allocations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    account_id INTEGER NOT NULL,
+    symbol TEXT NOT NULL,
+    owner_key TEXT NOT NULL,
+    bot_id INTEGER,
+    bot_version_id INTEGER,
+    strategy_hash TEXT,
+    quantity REAL NOT NULL,
+    average_price REAL NOT NULL,
+    entry_fee_remaining REAL NOT NULL DEFAULT 0,
+    realized_pnl REAL NOT NULL DEFAULT 0,
+    revision INTEGER NOT NULL DEFAULT 1,
+    opened_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY(account_id) REFERENCES simulated_accounts(id),
+    FOREIGN KEY(bot_id) REFERENCES bots(id),
+    FOREIGN KEY(bot_version_id) REFERENCES bot_versions(id),
+    UNIQUE(account_id, symbol, owner_key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_position_allocations_bot_symbol
+ON simulated_position_allocations(bot_id, bot_version_id, symbol, quantity);
 
 CREATE TABLE IF NOT EXISTS simulated_fills (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -485,13 +526,20 @@ CREATE TABLE IF NOT EXISTS execution_intents (
     quantity REAL NOT NULL,
     limit_price REAL,
     bot_id INTEGER,
+    bot_version_id INTEGER,
+    strategy_hash TEXT,
+    signal_evaluation_id INTEGER,
+    proposal_id INTEGER,
     status TEXT NOT NULL,
     risk_validation_id INTEGER,
     result_reference TEXT,
     payload_json TEXT NOT NULL,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
-    FOREIGN KEY(bot_id) REFERENCES bots(id)
+    FOREIGN KEY(bot_id) REFERENCES bots(id),
+    FOREIGN KEY(bot_version_id) REFERENCES bot_versions(id),
+    FOREIGN KEY(signal_evaluation_id) REFERENCES strategy_signal_evaluations(id),
+    FOREIGN KEY(proposal_id) REFERENCES paper_order_proposals(id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_execution_intents_environment_created
@@ -779,6 +827,31 @@ def initialize_database() -> None:
         }
         if "risk_validation_id" not in execution_columns:
             connection.execute("ALTER TABLE execution_intents ADD COLUMN risk_validation_id INTEGER")
+        for name, column_type in {
+            "bot_version_id": "INTEGER",
+            "strategy_hash": "TEXT",
+            "signal_evaluation_id": "INTEGER",
+            "proposal_id": "INTEGER",
+        }.items():
+            if name not in execution_columns:
+                connection.execute(f"ALTER TABLE execution_intents ADD COLUMN {name} {column_type}")
+        connection.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_execution_intents_proposal ON execution_intents(proposal_id) WHERE proposal_id IS NOT NULL"
+        )
+        order_columns = {
+            row["name"] for row in connection.execute("PRAGMA table_info(simulated_orders)").fetchall()
+        }
+        for name, column_type in {
+            "bot_version_id": "INTEGER",
+            "strategy_hash": "TEXT",
+            "signal_evaluation_id": "INTEGER",
+            "proposal_id": "INTEGER",
+        }.items():
+            if name not in order_columns:
+                connection.execute(f"ALTER TABLE simulated_orders ADD COLUMN {name} {column_type}")
+        connection.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_simulated_orders_proposal ON simulated_orders(proposal_id) WHERE proposal_id IS NOT NULL"
+        )
         version_columns = {
             row["name"] for row in connection.execute("PRAGMA table_info(bot_versions)").fetchall()
         }
@@ -789,7 +862,8 @@ def initialize_database() -> None:
         if "validation_status" not in version_columns:
             connection.execute("ALTER TABLE bot_versions ADD COLUMN validation_status TEXT NOT NULL DEFAULT 'legacy'")
         legacy_versions = connection.execute(
-            "SELECT id, strategy_json FROM bot_versions WHERE contract_json IS NULL OR validation_status = 'legacy'"
+            """SELECT id, strategy_json FROM bot_versions
+               WHERE contract_json IS NULL OR validation_status = 'legacy' OR contract_json NOT LIKE '%paper_proposal%'"""
         ).fetchall()
         for version in legacy_versions:
             try:
@@ -813,6 +887,16 @@ def initialize_database() -> None:
             "risk_validation_id": "INTEGER",
             "result_reference": "TEXT",
             "submitted_at": "TEXT",
+            "strategy_hash": "TEXT",
+            "price_timestamp": "TEXT",
+            "expires_at": "TEXT",
+            "allocation_id": "INTEGER",
+            "allocation_revision": "INTEGER",
+            "trigger_reason": "TEXT",
+            "claim_token": "TEXT",
+            "claimed_at": "TEXT",
+            "attempt_count": "INTEGER NOT NULL DEFAULT 0",
+            "last_error": "TEXT",
         }.items():
             if name not in proposal_columns:
                 connection.execute(f"ALTER TABLE paper_order_proposals ADD COLUMN {name} {column_type}")
@@ -823,6 +907,13 @@ def initialize_database() -> None:
             connection.execute("ALTER TABLE strategy_signal_evaluations ADD COLUMN evaluation_key TEXT")
         if "conflict" not in signal_columns:
             connection.execute("ALTER TABLE strategy_signal_evaluations ADD COLUMN conflict INTEGER NOT NULL DEFAULT 0 CHECK(conflict IN (0, 1))")
+        for name, column_type in {
+            "trigger_reason": "TEXT",
+            "price_timestamp": "TEXT",
+            "position_return_pct": "REAL",
+        }.items():
+            if name not in signal_columns:
+                connection.execute(f"ALTER TABLE strategy_signal_evaluations ADD COLUMN {name} {column_type}")
         connection.execute(
             "CREATE UNIQUE INDEX IF NOT EXISTS idx_strategy_signals_evaluation_key ON strategy_signal_evaluations(evaluation_key)"
         )

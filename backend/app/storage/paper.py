@@ -4,9 +4,10 @@ import json
 from threading import Lock
 from datetime import datetime, timezone
 
-from backend.app.storage.risk import validate_order_intent
+from backend.app.storage.risk import get_risk_profile, validate_order_intent
+from backend.app.market.freshness import MAX_PRICE_DRIFT_PCT, PRICE_MAX_AGE_SECONDS, PROPOSAL_TTL_SECONDS
 from backend.app.execution.contracts import OrderIntent
-from backend.app.storage.execution import save_execution_intent, update_execution_intent
+from backend.app.storage.execution import get_execution_intent, save_execution_intent, update_execution_intent
 from backend.app.storage.sqlite import connect, initialize_database
 
 ACCOUNT_ID = 1
@@ -30,13 +31,17 @@ def seed_account(connection) -> None:
 
 
 def latest_price(connection, symbol: str) -> float:
+    return latest_price_record(connection, symbol)["price"]
+
+
+def latest_price_record(connection, symbol: str) -> dict:
     row = connection.execute(
-        "SELECT price FROM market_snapshots WHERE symbol = ? ORDER BY timestamp DESC, id DESC LIMIT 1",
+        "SELECT price, timestamp FROM market_snapshots WHERE symbol = ? ORDER BY timestamp DESC, id DESC LIMIT 1",
         (symbol,),
     ).fetchone()
     if not row:
         raise ValueError(f"No persisted market snapshot is available for {symbol}")
-    return float(row["price"])
+    return {"price": float(row["price"]), "timestamp": row["timestamp"]}
 
 
 def bot_performance(connection, session_started_at: str) -> list[dict]:
@@ -115,6 +120,27 @@ def attributed_position_quantity(connection, symbol: str, bot_id: int | None, se
     return sum(float(row["quantity"]) if row["side"] == "buy" else -float(row["quantity"]) for row in rows)
 
 
+def allocation_owner_key(bot_id: int | None, bot_version_id: int | None, strategy_hash: str | None) -> str:
+    if bot_id is None:
+        return "manual"
+    return f"bot:{bot_id}:version:{bot_version_id or 'legacy'}:hash:{strategy_hash or 'legacy'}"
+
+
+def position_allocation(connection, symbol: str, bot_id: int | None, bot_version_id: int | None, strategy_hash: str | None) -> dict | None:
+    owner_key = allocation_owner_key(bot_id, bot_version_id, strategy_hash)
+    row = connection.execute(
+        "SELECT * FROM simulated_position_allocations WHERE account_id = ? AND symbol = ? AND owner_key = ?",
+        (ACCOUNT_ID, symbol, owner_key),
+    ).fetchone()
+    return dict(row) if row else None
+
+
+def get_position_allocation(symbol: str, bot_id: int, bot_version_id: int, strategy_hash: str) -> dict | None:
+    initialize_database()
+    with connect() as connection:
+        return position_allocation(connection, symbol.upper(), bot_id, bot_version_id, strategy_hash)
+
+
 def account_snapshot() -> dict:
     initialize_database()
     with connect() as connection:
@@ -148,16 +174,79 @@ def account_snapshot() -> dict:
         fills = [dict(row) for row in connection.execute(
             "SELECT * FROM simulated_fills WHERE filled_at >= ? ORDER BY id DESC LIMIT 30", (account["created_at"],)
         ).fetchall()]
+        allocations = [dict(row) for row in connection.execute(
+            "SELECT * FROM simulated_position_allocations WHERE account_id = ? ORDER BY updated_at DESC", (ACCOUNT_ID,)
+        ).fetchall()]
+        proposals = [dict(row) for row in connection.execute(
+            "SELECT * FROM paper_order_proposals ORDER BY id DESC LIMIT 30"
+        ).fetchall()]
+        ledger = [dict(row) for row in connection.execute(
+            "SELECT * FROM simulated_ledger WHERE account_id = ? AND created_at >= ? ORDER BY id DESC LIMIT 50",
+            (ACCOUNT_ID, account["created_at"]),
+        ).fetchall()]
         execution_intents = [dict(row) for row in connection.execute(
             """SELECT id, environment, adapter, symbol, action, order_type, quantity,
-            bot_id, status, risk_validation_id, result_reference, created_at, updated_at
+            bot_id, bot_version_id, strategy_hash, signal_evaluation_id, proposal_id,
+            status, risk_validation_id, result_reference, created_at, updated_at
             FROM execution_intents
             WHERE environment = 'paper' AND created_at >= ?
             ORDER BY created_at DESC LIMIT 30""",
             (account["created_at"],),
         ).fetchall()]
         performance = bot_performance(connection, account["created_at"])
-    return {"account": account, "equity": equity, "market_value": market_value, "unrealized_pnl": unrealized_pnl, "daily_realized_pnl": daily_realized, "drawdown_pct": abs(drawdown), "positions": positions, "orders": orders, "fills": fills, "execution_intents": execution_intents, "bot_performance": performance, "mode": "paper", "live_execution": "blocked"}
+    risk_profile = get_risk_profile(audit_limit=1)
+    protections = {
+        "risk_required": True,
+        "kill_switch_active": risk_profile["kill_switch"]["active"],
+        "price_max_age_seconds": PRICE_MAX_AGE_SECONDS,
+        "proposal_ttl_seconds": PROPOSAL_TTL_SECONDS,
+        "max_price_drift_pct": MAX_PRICE_DRIFT_PCT,
+        "execution_serialization": "single_process_lock",
+        "live_execution": "blocked",
+    }
+    return {"account": account, "equity": equity, "market_value": market_value, "unrealized_pnl": unrealized_pnl, "daily_realized_pnl": daily_realized, "drawdown_pct": abs(drawdown), "positions": positions, "allocations": allocations, "proposals": proposals, "orders": orders, "fills": fills, "ledger": ledger, "execution_intents": execution_intents, "bot_performance": performance, "protections": protections, "mode": "paper", "live_execution": "blocked"}
+
+
+def reconcile_paper_runtime(stale_after_seconds: int = 60) -> dict:
+    initialize_database()
+    now = datetime.now(timezone.utc)
+    stale_before = (now.timestamp() - stale_after_seconds)
+    summary = {"orders_reconciled": 0, "leases_released": 0, "proposals_repaired": 0, "execution_performed": False}
+    with connect() as connection:
+        proposals = [dict(row) for row in connection.execute(
+            "SELECT * FROM paper_order_proposals WHERE status IN ('pending', 'submitted') ORDER BY id"
+        ).fetchall()]
+        for proposal in proposals:
+            intent = connection.execute("SELECT * FROM execution_intents WHERE proposal_id = ?", (proposal["id"],)).fetchone()
+            order = connection.execute("SELECT * FROM simulated_orders WHERE proposal_id = ?", (proposal["id"],)).fetchone()
+            if order:
+                order = dict(order)
+                fill = connection.execute("SELECT id FROM simulated_fills WHERE order_id = ?", (order["id"],)).fetchone()
+                intent_status = "filled" if fill else "rejected"
+                reference = f"simulated_fill:{fill['id']}" if fill else f"simulated_order:{order['id']}"
+                if intent:
+                    update_execution_intent(intent["id"], intent_status, reference, order["risk_validation_id"], connection=connection)
+                connection.execute(
+                    """UPDATE paper_order_proposals SET status = 'submitted', execution_intent_id = ?,
+                       risk_validation_id = ?, result_reference = ?, submitted_at = COALESCE(submitted_at, ?),
+                       claim_token = NULL, claimed_at = NULL, last_error = NULL, updated_at = ? WHERE id = ?""",
+                    (intent["id"] if intent else None, order["risk_validation_id"], reference, now.isoformat(), now.isoformat(), proposal["id"]),
+                )
+                summary["orders_reconciled"] += 1
+                if proposal["status"] != "submitted" or not proposal.get("result_reference"):
+                    summary["proposals_repaired"] += 1
+                continue
+            if proposal["status"] == "pending" and proposal.get("claimed_at"):
+                claimed = datetime.fromisoformat(str(proposal["claimed_at"]).replace("Z", "+00:00"))
+                if claimed.tzinfo is None:
+                    claimed = claimed.replace(tzinfo=timezone.utc)
+                if claimed.timestamp() < stale_before:
+                    connection.execute(
+                        "UPDATE paper_order_proposals SET claim_token = NULL, claimed_at = NULL, last_error = ?, updated_at = ? WHERE id = ?",
+                        ("Stale lease released by reconciler", now.isoformat(), proposal["id"]),
+                    )
+                    summary["leases_released"] += 1
+    return summary
 
 
 def place_market_order(payload: dict) -> dict:
@@ -165,12 +254,35 @@ def place_market_order(payload: dict) -> dict:
     with connect() as connection:
         seed_account(connection)
     intent = OrderIntent.paper_market(payload)
+    existing = get_execution_intent(intent.id)
+    if existing and existing["status"] != "created":
+        return recovered_execution_result(existing)
     save_execution_intent(intent)
     try:
         return _execute_market_intent(intent)
     except Exception:
         update_execution_intent(intent.id, "failed")
         raise
+
+
+def recovered_execution_result(intent: dict) -> dict:
+    reference = str(intent.get("result_reference") or "")
+    order_id = int(reference.split(":", 1)[1]) if reference.startswith("simulated_order:") else None
+    fill_id = int(reference.split(":", 1)[1]) if reference.startswith("simulated_fill:") else None
+    with connect() as connection:
+        if fill_id and not order_id:
+            row = connection.execute("SELECT order_id FROM simulated_fills WHERE id = ?", (fill_id,)).fetchone()
+            order_id = int(row["order_id"]) if row else None
+        order = connection.execute(
+            "SELECT status, rejection_reason FROM simulated_orders WHERE id = ?", (order_id,)
+        ).fetchone() if order_id else None
+    return {
+        "intent_id": intent["id"], "order_id": order_id, "fill_id": fill_id,
+        "status": order["status"] if order else intent["status"],
+        "reason": order["rejection_reason"] if order else None,
+        "risk": {"validation_id": intent.get("risk_validation_id")},
+        "execution_performed": bool(fill_id), "recovered": True,
+    }
 
 
 def _execute_market_intent(intent: OrderIntent) -> dict:
@@ -180,6 +292,23 @@ def _execute_market_intent(intent: OrderIntent) -> dict:
 
 def _execute_market_intent_serialized(intent: OrderIntent) -> dict:
     initialize_database()
+    if intent.proposal_id:
+        with connect() as connection:
+            existing_order = connection.execute(
+                "SELECT * FROM simulated_orders WHERE proposal_id = ?", (intent.proposal_id,)
+            ).fetchone()
+            if existing_order:
+                order = dict(existing_order)
+                fill = connection.execute("SELECT id FROM simulated_fills WHERE order_id = ?", (order["id"],)).fetchone()
+                terminal_status = "filled" if order["status"] == "filled" else "rejected"
+                reference = f"simulated_fill:{fill['id']}" if fill else f"simulated_order:{order['id']}"
+                update_execution_intent(intent.id, terminal_status, reference, order["risk_validation_id"], connection=connection)
+                return {
+                    "intent_id": intent.id, "order_id": order["id"], "fill_id": fill["id"] if fill else None,
+                    "status": order["status"], "reason": order["rejection_reason"],
+                    "risk": {"validation_id": order["risk_validation_id"]},
+                    "execution_performed": bool(fill), "recovered": True,
+                }
     symbol = intent.symbol
     side = intent.action
     quantity = intent.quantity
@@ -214,7 +343,8 @@ def _execute_market_intent_serialized(intent: OrderIntent) -> dict:
         account = dict(connection.execute("SELECT * FROM simulated_accounts WHERE id = ?", (ACCOUNT_ID,)).fetchone())
         position_row = connection.execute("SELECT * FROM simulated_positions WHERE account_id = ? AND symbol = ?", (ACCOUNT_ID, symbol)).fetchone()
         position = dict(position_row) if position_row else None
-        attributed_quantity = attributed_position_quantity(connection, symbol, bot_id, account["created_at"])
+        allocation = position_allocation(connection, symbol, bot_id, intent.bot_version_id, intent.strategy_hash)
+        attributed_quantity = float(allocation["quantity"]) if allocation else attributed_position_quantity(connection, symbol, bot_id, account["created_at"])
         rejection = None
         fee = notional * FEE_RATE
         if not decision["approved"]:
@@ -229,9 +359,13 @@ def _execute_market_intent_serialized(intent: OrderIntent) -> dict:
         status = "rejected" if rejection else "filled"
         cursor = connection.execute(
             """INSERT INTO simulated_orders
-            (account_id, bot_id, symbol, side, quantity, status, reference_price, fill_price, fee, risk_validation_id, rejection_reason, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (ACCOUNT_ID, bot_id, symbol, side, quantity, status, price, price if not rejection else None, fee if not rejection else None, decision["validation_id"], rejection, now),
+            (account_id, bot_id, bot_version_id, strategy_hash, signal_evaluation_id, proposal_id,
+             symbol, side, quantity, status, reference_price, fill_price, fee,
+             risk_validation_id, rejection_reason, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (ACCOUNT_ID, bot_id, intent.bot_version_id, intent.strategy_hash, intent.signal_evaluation_id,
+             intent.proposal_id, symbol, side, quantity, status, price, price if not rejection else None,
+             fee if not rejection else None, decision["validation_id"], rejection, now),
         )
         order_id = cursor.lastrowid
         if rejection:
@@ -256,17 +390,45 @@ def _execute_market_intent_serialized(intent: OrderIntent) -> dict:
                 quantity = excluded.quantity, average_price = excluded.average_price, updated_at = excluded.updated_at""",
                 (ACCOUNT_ID, symbol, new_qty, new_avg, now),
             )
+            owner_key = allocation_owner_key(bot_id, intent.bot_version_id, intent.strategy_hash)
+            old_alloc_qty = float(allocation["quantity"]) if allocation else 0.0
+            old_alloc_avg = float(allocation["average_price"]) if allocation else 0.0
+            new_alloc_qty = old_alloc_qty + quantity
+            new_alloc_avg = ((old_alloc_qty * old_alloc_avg) + notional) / new_alloc_qty
+            connection.execute(
+                """INSERT INTO simulated_position_allocations (
+                   account_id, symbol, owner_key, bot_id, bot_version_id, strategy_hash,
+                   quantity, average_price, entry_fee_remaining, realized_pnl, revision, opened_at, updated_at
+                   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 1, ?, ?)
+                   ON CONFLICT(account_id, symbol, owner_key) DO UPDATE SET
+                   quantity = excluded.quantity, average_price = excluded.average_price,
+                   entry_fee_remaining = simulated_position_allocations.entry_fee_remaining + excluded.entry_fee_remaining,
+                   revision = simulated_position_allocations.revision + 1, updated_at = excluded.updated_at""",
+                (ACCOUNT_ID, symbol, owner_key, bot_id, intent.bot_version_id, intent.strategy_hash,
+                 new_alloc_qty, new_alloc_avg, fee, now, now),
+            )
             cash_delta = -(notional + fee)
         else:
-            realized_delta = quantity * (price - float(position["average_price"])) - fee
+            allocation_avg = float(allocation["average_price"]) if allocation else float(position["average_price"])
+            entry_fee_alloc = (float(allocation["entry_fee_remaining"]) * quantity / float(allocation["quantity"])) if allocation and float(allocation["quantity"]) else 0.0
+            realized_delta = quantity * (price - allocation_avg) - fee - entry_fee_alloc
             new_qty = float(position["quantity"]) - quantity
-            connection.execute("UPDATE simulated_positions SET quantity = ?, realized_pnl = realized_pnl + ?, updated_at = ? WHERE id = ?", (new_qty, realized_delta, now, position["id"]))
+            remaining_cost = (float(position["quantity"]) * float(position["average_price"])) - (quantity * allocation_avg)
+            new_global_avg = remaining_cost / new_qty if new_qty > 1e-12 else 0.0
+            connection.execute("UPDATE simulated_positions SET quantity = ?, average_price = ?, realized_pnl = realized_pnl + ?, updated_at = ? WHERE id = ?", (new_qty, new_global_avg, realized_delta, now, position["id"]))
+            if allocation:
+                connection.execute(
+                    """UPDATE simulated_position_allocations SET quantity = quantity - ?,
+                       entry_fee_remaining = MAX(0, entry_fee_remaining - ?),
+                       realized_pnl = realized_pnl + ?, revision = revision + 1, updated_at = ? WHERE id = ?""",
+                    (quantity, entry_fee_alloc, realized_delta, now, allocation["id"]),
+                )
             cash_delta = notional - fee
         new_cash = float(account["cash_balance"]) + cash_delta
         connection.execute("UPDATE simulated_accounts SET cash_balance = ?, realized_pnl = realized_pnl + ?, updated_at = ? WHERE id = ?", (new_cash, realized_delta, now, ACCOUNT_ID))
         fill_id = connection.execute("INSERT INTO simulated_fills (order_id, account_id, symbol, side, quantity, price, fee, filled_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", (order_id, ACCOUNT_ID, symbol, side, quantity, price, fee, now)).lastrowid
         connection.execute("INSERT INTO simulated_ledger (account_id, event_type, reference_id, symbol, cash_delta, realized_pnl_delta, cash_balance, payload_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", (ACCOUNT_ID, "market_fill", fill_id, symbol, cash_delta, realized_delta, new_cash, json.dumps({"order_id": order_id, "side": side, "quantity": quantity, "price": price, "fee": fee}), now))
-    update_execution_intent(intent.id, "filled", f"simulated_fill:{fill_id}", decision["validation_id"])
+        update_execution_intent(intent.id, "filled", f"simulated_fill:{fill_id}", decision["validation_id"], connection=connection)
     return {"intent_id": intent.id, "order_id": order_id, "fill_id": fill_id, "status": status, "risk": decision, "execution_performed": True, "account": account_snapshot()}
 
 
@@ -276,6 +438,12 @@ def reset_account(initial_balance: float, reason: str) -> dict:
     with connect() as connection:
         seed_account(connection)
         connection.execute("DELETE FROM simulated_positions WHERE account_id = ?", (ACCOUNT_ID,))
+        connection.execute("DELETE FROM simulated_position_allocations WHERE account_id = ?", (ACCOUNT_ID,))
+        connection.execute(
+            """UPDATE paper_order_proposals SET status = 'dismissed', reason = reason || ' Account reset invalidated proposal.',
+               claim_token = NULL, claimed_at = NULL, updated_at = ? WHERE status = 'pending'""",
+            (now,),
+        )
         connection.execute("UPDATE simulated_accounts SET initial_balance = ?, cash_balance = ?, realized_pnl = 0, peak_equity = ?, created_at = ?, updated_at = ? WHERE id = ?", (initial_balance, initial_balance, initial_balance, now, now, ACCOUNT_ID))
         connection.execute("INSERT INTO simulated_ledger (account_id, event_type, reference_id, symbol, cash_delta, realized_pnl_delta, cash_balance, payload_json, created_at) VALUES (?, 'account_reset', NULL, NULL, 0, 0, ?, ?, ?)", (ACCOUNT_ID, initial_balance, json.dumps({"reason": reason, "initial_balance": initial_balance}), now))
     return account_snapshot()

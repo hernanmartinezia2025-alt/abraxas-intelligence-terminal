@@ -11,17 +11,30 @@ def save_execution_intent(intent: OrderIntent) -> dict:
     payload = intent.to_dict()
     with connect() as connection:
         connection.execute(
-            """INSERT INTO execution_intents (
+            """INSERT OR IGNORE INTO execution_intents (
                 id, environment, adapter, symbol, action, order_type, quantity,
-                limit_price, bot_id, status, result_reference, payload_json, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'created', NULL, ?, ?, ?)""",
+                limit_price, bot_id, bot_version_id, strategy_hash, signal_evaluation_id,
+                proposal_id, status, result_reference, payload_json, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'created', NULL, ?, ?, ?)""",
             (
                 intent.id, intent.environment, intent.adapter, intent.symbol, intent.action,
                 intent.order_type, intent.quantity, intent.limit_price, intent.bot_id,
+                intent.bot_version_id, intent.strategy_hash, intent.signal_evaluation_id, intent.proposal_id,
                 json.dumps(payload, sort_keys=True), intent.created_at, intent.created_at,
             ),
         )
     return {**payload, "status": "created", "result_reference": None}
+
+
+def get_execution_intent(intent_id: str) -> dict | None:
+    initialize_database()
+    with connect() as connection:
+        row = connection.execute("SELECT * FROM execution_intents WHERE id = ?", (intent_id,)).fetchone()
+    if not row:
+        return None
+    result = dict(row)
+    result["payload"] = json.loads(result.pop("payload_json") or "{}")
+    return result
 
 
 def update_execution_intent(

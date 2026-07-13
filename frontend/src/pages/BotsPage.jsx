@@ -228,7 +228,7 @@ export default function BotsPage({ selectedSymbol = "BTCUSDT" }) {
   }
 
   async function handlePaperProposal() {
-    if (!signalEvaluation || signalEvaluation.signal !== "entry_candidate") return;
+    if (!signalEvaluation || !["entry_candidate", "exit_candidate"].includes(signalEvaluation.signal)) return;
     setProposingPaper(true);
     setError("");
     try {
@@ -710,7 +710,7 @@ export default function BotsPage({ selectedSymbol = "BTCUSDT" }) {
               <article>
                 <span>Runtime gates</span>
                 <strong>{strategyContract.capabilities?.backtest ? "BACKTEST READY" : "BLOCKED"}</strong>
-                <small>paper {strategyContract.capabilities?.paper ? "ready" : "locked"} · live locked</small>
+                <small>paper proposal {strategyContract.capabilities?.paper_proposal ? "ready" : "locked"} · auto/live locked</small>
               </article>
               <article>
                 <span>ROI estrategia</span>
@@ -789,13 +789,13 @@ export default function BotsPage({ selectedSymbol = "BTCUSDT" }) {
               <div className="version-editor-actions"><small>El backend validará reglas, operadores, riesgo y generará un fingerprint nuevo.</small><button type="submit" disabled={savingVersion}>{savingVersion ? "Validando..." : "Guardar nueva versión"}</button></div>
             </form>}
             {signalEvaluation && <section className="signal-evaluation-panel">
-              <div><span>Última evaluación</span><strong>{signalEvaluation.conflict ? "HOLD / CONFLICT" : signalEvaluation.signal.replace("_", " ").toUpperCase()}</strong><small>{signalEvaluation.symbol} · {signalEvaluation.timeframe} · feature {signalEvaluation.feature_timestamp}</small></div>
+              <div><span>Última evaluación</span><strong>{signalEvaluation.conflict ? "HOLD / CONFLICT" : signalEvaluation.signal.replace("_", " ").toUpperCase()}</strong><small>{signalEvaluation.trigger_reason || "strategy rules"} · {signalEvaluation.position_return_pct == null ? "sin posición" : `${Number(signalEvaluation.position_return_pct).toFixed(2)}% posición`}</small></div>
               {["entry", "exit"].map((side) => <div key={side}><span>{side} rules</span><strong>{signalEvaluation[`${side}_passed`] ? "PASS" : "NO PASS"}</strong><small>{(signalEvaluation.trace?.[side] || []).filter((rule) => rule.passed).length}/{(signalEvaluation.trace?.[side] || []).length} reglas</small></div>)}
               <div><span>Execution intent</span><strong>NO CREADO</strong><small>evaluación informativa y auditable</small></div>
             </section>}
             {signalEvaluation && <section className="paper-proposal-gate">
-              <div><p className="eyebrow">Paper proposal gate</p><h3>{signalEvaluation.signal === "entry_candidate" ? "Candidato elegible" : "Sin propuesta operable"}</h3><small>Crear una propuesta no crea una orden ni pasa todavía por Risk Engine.</small></div>
-              <button type="button" onClick={handlePaperProposal} disabled={signalEvaluation.signal !== "entry_candidate" || proposingPaper}>{proposingPaper ? "Calculando..." : "Crear propuesta paper"}</button>
+              <div><p className="eyebrow">Paper proposal gate</p><h3>{["entry_candidate", "exit_candidate"].includes(signalEvaluation.signal) ? `Candidato de ${signalEvaluation.signal.startsWith("entry") ? "entrada" : "salida"}` : "Sin propuesta operable"}</h3><small>Crear una propuesta no crea una orden ni pasa todavía por Risk Engine.</small></div>
+              <button type="button" onClick={handlePaperProposal} disabled={!["entry_candidate", "exit_candidate"].includes(signalEvaluation.signal) || proposingPaper}>{proposingPaper ? "Calculando..." : `Crear propuesta de ${signalEvaluation.signal?.startsWith("exit") ? "salida" : "entrada"}`}</button>
               {paperProposal && <div className="paper-proposal-result"><strong>PROPOSAL #{paperProposal.id} · {paperProposal.status.toUpperCase()}</strong><span>{paperProposal.action.toUpperCase()} {paperProposal.quantity} {paperProposal.symbol} · ${Number(paperProposal.proposed_notional).toLocaleString(undefined, { maximumFractionDigits: 2 })}</span><small>{paperProposal.reason}</small>{paperProposal.status === "pending" && <div className="paper-proposal-actions"><button type="button" onClick={handleSubmitProposal} disabled={proposingPaper}>Confirmar y validar</button><button type="button" className="secondary" onClick={handleDismissProposal} disabled={proposingPaper}>Descartar</button></div>}{paperProposal.result_reference && <small>Resultado: {paperProposal.result_reference} · Risk #{paperProposal.risk_validation_id || "--"}</small>}</div>}
             </section>}
             {!!paperProposals.length && <section className="proposal-history signal-history">

@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
-from backend.app.storage.paper import account_snapshot, place_market_order, reset_account
+from backend.app.storage.paper import account_snapshot, place_market_order, reconcile_paper_runtime, reset_account
 
 router = APIRouter(prefix="/api/paper", tags=["paper-trading"])
 
@@ -41,3 +41,8 @@ def paper_order(payload: PaperOrderRequest) -> dict:
 def paper_reset(payload: PaperResetRequest) -> dict:
     data = values(payload)
     return reset_account(data["initial_balance"], data["reason"])
+
+
+@router.post("/reconcile")
+def paper_reconcile() -> dict:
+    return reconcile_paper_runtime()

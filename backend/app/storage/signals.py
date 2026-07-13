@@ -14,8 +14,9 @@ def utc_now_iso() -> str:
 def save_signal_evaluation(payload: dict) -> dict:
     initialize_database()
     evaluated_at = utc_now_iso()
+    protective_suffix = f":{payload.get('price_timestamp')}:{payload.get('trigger_reason')}" if payload.get("trigger_reason") in {"stop_loss", "take_profit"} else ""
     evaluation_key = hashlib.sha256(
-        f"{payload['bot_version_id']}:{payload['strategy_hash']}:{payload['feature_timestamp']}".encode("utf-8")
+        f"{payload['bot_version_id']}:{payload['strategy_hash']}:{payload['feature_timestamp']}{protective_suffix}".encode("utf-8")
     ).hexdigest()
     with connect() as connection:
         connection.execute(
@@ -23,14 +24,16 @@ def save_signal_evaluation(payload: dict) -> dict:
             INSERT INTO strategy_signal_evaluations (
                 bot_id, bot_version_id, strategy_hash, symbol, timeframe,
                 feature_timestamp, evaluation_key, signal, entry_passed, exit_passed, conflict,
+                trigger_reason, price_timestamp, position_return_pct,
                 features_json, trace_json, evaluated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(evaluation_key) DO NOTHING
             """,
             (
                 payload["bot_id"], payload["bot_version_id"], payload["strategy_hash"],
                 payload["symbol"], payload["timeframe"], payload["feature_timestamp"], evaluation_key,
                 payload["signal"], int(payload["entry_passed"]), int(payload["exit_passed"]), int(payload.get("conflict", False)),
+                payload.get("trigger_reason"), payload.get("price_timestamp"), payload.get("position_return_pct"),
                 json.dumps(payload["features"], ensure_ascii=True),
                 json.dumps(payload["trace"], ensure_ascii=True), evaluated_at,
             ),
@@ -53,6 +56,7 @@ def _normalize(row: dict) -> dict:
         "entry_passed": bool(row["entry_passed"]),
         "exit_passed": bool(row["exit_passed"]),
         "conflict": bool(row.get("conflict")),
+        "position_return_pct": float(row["position_return_pct"]) if row.get("position_return_pct") is not None else None,
         "features": features,
         "trace": trace,
         "execution_intent_created": False,

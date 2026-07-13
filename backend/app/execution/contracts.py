@@ -25,6 +25,10 @@ class OrderIntent:
     quantity: float
     limit_price: float | None
     bot_id: int | None
+    bot_version_id: int | None
+    strategy_hash: str | None
+    signal_evaluation_id: int | None
+    proposal_id: int | None
     created_at: str
 
     @classmethod
@@ -37,7 +41,7 @@ class OrderIntent:
         if quantity <= 0:
             raise ValueError("Order quantity must be greater than zero")
         return cls(
-            id=str(uuid4()),
+            id=f"paper-proposal-{int(payload['proposal_id'])}" if payload.get("proposal_id") else str(uuid4()),
             environment="paper",
             adapter="paper_market_snapshot",
             symbol=symbol,
@@ -46,6 +50,10 @@ class OrderIntent:
             quantity=quantity,
             limit_price=None,
             bot_id=payload.get("bot_id"),
+            bot_version_id=payload.get("bot_version_id"),
+            strategy_hash=payload.get("strategy_hash"),
+            signal_evaluation_id=payload.get("signal_evaluation_id"),
+            proposal_id=payload.get("proposal_id"),
             created_at=utc_now_iso(),
         )
 

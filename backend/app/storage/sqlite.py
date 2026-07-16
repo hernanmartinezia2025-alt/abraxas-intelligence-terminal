@@ -479,6 +479,7 @@ CREATE TABLE IF NOT EXISTS paper_position_protections (
     stop_loss_price REAL,
     take_profit_price REAL,
     trailing_distance_pct REAL,
+    highest_price REAL,
     updated_at TEXT NOT NULL,
     FOREIGN KEY(allocation_id) REFERENCES simulated_position_allocations(id) ON DELETE CASCADE
 );
@@ -909,6 +910,9 @@ def initialize_database() -> None:
         }.items():
             if name not in proposal_columns:
                 connection.execute(f"ALTER TABLE paper_order_proposals ADD COLUMN {name} {column_type}")
+        protection_columns = {row["name"] for row in connection.execute("PRAGMA table_info(paper_position_protections)").fetchall()}
+        if protection_columns and "highest_price" not in protection_columns:
+            connection.execute("ALTER TABLE paper_position_protections ADD COLUMN highest_price REAL")
         signal_columns = {
             row["name"] for row in connection.execute("PRAGMA table_info(strategy_signal_evaluations)").fetchall()
         }

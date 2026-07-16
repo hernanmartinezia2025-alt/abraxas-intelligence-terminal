@@ -155,8 +155,8 @@ def update_position_protection(allocation_id: int, stop_loss_price: float | None
             raise ValueError("Take profit must be above the allocation average price")
         if trailing_distance_pct is not None and not 0 < trailing_distance_pct <= 50:
             raise ValueError("Trailing distance must be between 0 and 50 percent")
-        connection.execute("""INSERT INTO paper_position_protections (allocation_id, stop_loss_price, take_profit_price, trailing_distance_pct, updated_at)
-            VALUES (?, ?, ?, ?, ?) ON CONFLICT(allocation_id) DO UPDATE SET stop_loss_price=excluded.stop_loss_price,
+        connection.execute("""INSERT INTO paper_position_protections (allocation_id, stop_loss_price, take_profit_price, trailing_distance_pct, highest_price, updated_at)
+            VALUES (?, ?, ?, ?, NULL, ?) ON CONFLICT(allocation_id) DO UPDATE SET stop_loss_price=excluded.stop_loss_price,
             take_profit_price=excluded.take_profit_price, trailing_distance_pct=excluded.trailing_distance_pct, updated_at=excluded.updated_at""",
             (allocation_id, stop_loss_price, take_profit_price, trailing_distance_pct, now))
         row = connection.execute("SELECT * FROM paper_position_protections WHERE allocation_id = ?", (allocation_id,)).fetchone()
@@ -165,6 +165,7 @@ def update_position_protection(allocation_id: int, stop_loss_price: float | None
 
 def account_snapshot() -> dict:
     initialize_database()
+    now = utc_now_iso()
     with connect() as connection:
         seed_account(connection)
         account = dict(connection.execute("SELECT * FROM simulated_accounts WHERE id = ?", (ACCOUNT_ID,)).fetchone())
@@ -202,9 +203,18 @@ def account_snapshot() -> dict:
         for allocation in allocations:
             allocation["stop_loss_price"] = None
             allocation["take_profit_price"] = None
-            protection = connection.execute("SELECT stop_loss_price, take_profit_price, trailing_distance_pct, updated_at FROM paper_position_protections WHERE allocation_id = ?", (allocation["id"],)).fetchone()
+            protection = connection.execute("SELECT stop_loss_price, take_profit_price, trailing_distance_pct, highest_price, updated_at FROM paper_position_protections WHERE allocation_id = ?", (allocation["id"],)).fetchone()
             if protection:
                 allocation.update(dict(protection))
+                mark_row = connection.execute("SELECT price FROM market_snapshots WHERE symbol = ? ORDER BY timestamp DESC, id DESC LIMIT 1", (allocation["symbol"],)).fetchone()
+                mark = float(mark_row["price"]) if mark_row else None
+                if mark and allocation.get("trailing_distance_pct"):
+                    high = max(float(protection["highest_price"] or 0), mark)
+                    trailing_stop = high * (1 - float(protection["trailing_distance_pct"]) / 100)
+                    if high > float(protection["highest_price"] or 0) or not allocation.get("stop_loss_price") or trailing_stop > float(allocation["stop_loss_price"]):
+                        connection.execute("UPDATE paper_position_protections SET highest_price = ?, stop_loss_price = MAX(COALESCE(stop_loss_price, 0), ?), updated_at = ? WHERE allocation_id = ?", (high, trailing_stop, now, allocation["id"]))
+                        allocation["highest_price"] = high
+                        allocation["stop_loss_price"] = max(float(allocation.get("stop_loss_price") or 0), trailing_stop)
             if allocation.get("bot_version_id") and allocation.get("average_price"):
                 version = connection.execute("SELECT strategy_json FROM bot_versions WHERE id = ?", (allocation["bot_version_id"],)).fetchone()
                 if version:

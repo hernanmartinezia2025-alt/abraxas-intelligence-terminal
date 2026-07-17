@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { evaluateSLHunter, getSLHunterEvaluations, getSLHunterReadiness } from "../../api/client.js";
+import { evaluateSLHunter, getMicrostructureStatus, getSLHunterEvaluations, getSLHunterReadiness } from "../../api/client.js";
 
-const STATE_ORDER = ["scanning", "sweep_unconfirmed", "exhaustion_pending", "observation_candidate", "executing"];
+const STATE_ORDER = ["scanning", "sweep_unconfirmed", "flow_pending", "exhaustion_pending", "observation_candidate", "executing"];
 
 function number(value, digits = 2) {
   if (value === null || value === undefined || Number.isNaN(Number(value))) return "--";
@@ -12,6 +12,7 @@ function stateLabel(state) {
   return {
     scanning: "Escaneando",
     sweep_unconfirmed: "Barrido sin confirmar",
+    flow_pending: "Flujo agresor pendiente",
     exhaustion_pending: "Agotamiento pendiente",
     target_pending: "Muro objetivo pendiente",
     observation_candidate: "Candidato observable",
@@ -22,6 +23,7 @@ function stateLabel(state) {
 export default function SLHunterPanel({ defaultSymbol = "BTCUSDT" }) {
   const [readiness, setReadiness] = useState(null);
   const [history, setHistory] = useState([]);
+  const [microstructure, setMicrostructure] = useState(null);
   const [evaluation, setEvaluation] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -29,8 +31,13 @@ export default function SLHunterPanel({ defaultSymbol = "BTCUSDT" }) {
 
   async function loadContext() {
     try {
-      const [ready, runs] = await Promise.all([getSLHunterReadiness(), getSLHunterEvaluations({ limit: 8, symbol: form.symbol })]);
+      const [ready, runs, micro] = await Promise.all([
+        getSLHunterReadiness(),
+        getSLHunterEvaluations({ limit: 8, symbol: form.symbol }),
+        getMicrostructureStatus(form.symbol),
+      ]);
       setReadiness(ready);
+      setMicrostructure(micro);
       setHistory(runs.evaluations || []);
       if (!evaluation && runs.evaluations?.[0]) setEvaluation(runs.evaluations[0]);
     } catch (loadError) {
@@ -53,6 +60,7 @@ export default function SLHunterPanel({ defaultSymbol = "BTCUSDT" }) {
       setEvaluation(result);
       const runs = await getSLHunterEvaluations({ limit: 8, symbol: form.symbol });
       setHistory(runs.evaluations || []);
+      setMicrostructure(await getMicrostructureStatus(form.symbol));
     } catch (evaluationError) {
       setError(evaluationError.message);
     } finally {
@@ -64,6 +72,7 @@ export default function SLHunterPanel({ defaultSymbol = "BTCUSDT" }) {
   const sweep = result?.evidence?.sweep || {};
   const exhaustion = result?.evidence?.exhaustion || {};
   const depth = result?.evidence?.depth || {};
+  const tradeFlow = result?.evidence?.trade_flow || {};
   const plan = result?.risk_plan;
   const currentIndex = useMemo(() => {
     if (!result) return -1;
@@ -76,9 +85,9 @@ export default function SLHunterPanel({ defaultSymbol = "BTCUSDT" }) {
     <section className="sl-hunter-lab">
       <section className="exchange-panel sl-hunter-command">
         <div>
-          <p className="eyebrow">Liquidity Sweep Observer v1</p>
+          <p className="eyebrow">Liquidity Sweep Observer v2</p>
           <h2>SL Hunter · evidencia antes que narrativa</h2>
-          <span>Vela cerrada + volumen + Squeeze/ADX + snapshot Binance Depth. No prueba intencion institucional.</span>
+          <span>Vela cerrada + aggTrades + Squeeze/ADX + snapshots Binance Depth. No prueba intencion institucional.</span>
         </div>
         <div className="sl-hunter-lock"><b>NO ORDER</b><span>LIVE / PAPER LOCKED</span></div>
       </section>
@@ -88,7 +97,7 @@ export default function SLHunterPanel({ defaultSymbol = "BTCUSDT" }) {
       <section className="exchange-panel">
         <div className="exchange-panel-head compact">
           <div><p className="eyebrow">Capability Gate</p><h2>Qué datos existen realmente</h2></div>
-          <span>{readiness?.status || "checking"}</span>
+          <span>{number(microstructure?.aggregate_trades?.row_count, 0)} trades · {number(microstructure?.order_book_snapshots?.row_count, 0)} L2 snapshots</span>
         </div>
         <div className="sl-capability-grid">
           {(readiness?.available || []).map((item) => <article className="available" key={item}><b>REAL</b><strong>{item.replaceAll("_", " ")}</strong></article>)}
@@ -109,8 +118,8 @@ export default function SLHunterPanel({ defaultSymbol = "BTCUSDT" }) {
       <section className="sl-state-machine">
         {[
           ["scanning", "01", "Targeting"], ["sweep_unconfirmed", "02", "Wick + volumen"],
-          ["exhaustion_pending", "03", "Squeeze + ADX"], ["observation_candidate", "04", "Plan de riesgo"],
-          ["executing", "05", "Execution locked"],
+          ["flow_pending", "03", "Aggressor flow"], ["exhaustion_pending", "04", "Squeeze + ADX"],
+          ["observation_candidate", "05", "Plan de riesgo"], ["executing", "06", "Execution locked"],
         ].map(([state, index, label], position) => (
           <article className={`${position <= currentIndex ? "reached" : ""} ${state === "executing" ? "locked" : ""}`} key={state}>
             <span>{index}</span><strong>{label}</strong><small>{state === visibleState ? "ESTADO ACTUAL" : state === "executing" ? "INACCESIBLE" : ""}</small>
@@ -128,6 +137,9 @@ export default function SLHunterPanel({ defaultSymbol = "BTCUSDT" }) {
             <div><span>Squeeze</span><strong>{exhaustion.squeeze?.direction || "--"}</strong><small>{exhaustion.squeeze_passed ? "PASS" : "WAIT"}</small></div>
             <div><span>ADX</span><strong>{number(exhaustion.adx)}</strong><small>{exhaustion.adx_slope || "--"}</small></div>
             <div><span>Wall target</span><strong>{depth.target_wall ? `$${number(depth.target_wall.price)}` : "--"}</strong><small>snapshot L2</small></div>
+            <div><span>AggTrades</span><strong>{number(tradeFlow.trade_count, 0)}</strong><small>{tradeFlow.coverage || "--"}</small></div>
+            <div><span>Flow imbalance</span><strong>{number(tradeFlow.imbalance_pct)}%</strong><small>buy − sell</small></div>
+            <div><span>Post-extreme</span><strong>{number(tradeFlow.post_extreme_delta_notional, 0)}</strong><small>{tradeFlow.reversal_aligned ? "ALIGNED" : "WAIT"}</small></div>
           </div>
           <p className="sl-claim-boundary">{result?.claim_boundary || "Ejecutá una evaluación para leer la última vela cerrada y el Depth actual."}</p>
         </article>

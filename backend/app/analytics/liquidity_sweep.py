@@ -136,9 +136,83 @@ def analyze_depth(order_book: dict | None, direction: str, entry: float) -> dict
     }
 
 
+def analyze_aggregate_trade_flow(trades: list[dict] | None, direction: str) -> dict:
+    if not trades:
+        return {
+            "available": False,
+            "confirmed": False,
+            "trade_count": 0,
+            "warning": "No aggregate trades are available for the closed-candle window.",
+        }
+    ordered = sorted(trades, key=lambda item: (int(item["event_time"]), int(item["aggregate_trade_id"])))
+    buy_notional = sum(float(item["quote_quantity"]) for item in ordered if item["aggressor_side"] == "buy")
+    sell_notional = sum(float(item["quote_quantity"]) for item in ordered if item["aggressor_side"] == "sell")
+    total_notional = buy_notional + sell_notional
+    delta = buy_notional - sell_notional
+    coverage_complete = len(ordered) < 1000
+
+    if direction == "bullish_reversal":
+        extreme_index = min(range(len(ordered)), key=lambda index: float(ordered[index]["price"]))
+        impulse_notional = sell_notional
+        impulse_share = sell_notional / total_notional if total_notional else 0.0
+        expected_reversal = "buy"
+    elif direction == "bearish_reversal":
+        extreme_index = max(range(len(ordered)), key=lambda index: float(ordered[index]["price"]))
+        impulse_notional = buy_notional
+        impulse_share = buy_notional / total_notional if total_notional else 0.0
+        expected_reversal = "sell"
+    else:
+        extreme_index = len(ordered) - 1
+        impulse_notional = 0.0
+        impulse_share = 0.0
+        expected_reversal = "none"
+
+    after_extreme = ordered[extreme_index + 1:]
+    post_buy = sum(float(item["quote_quantity"]) for item in after_extreme if item["aggressor_side"] == "buy")
+    post_sell = sum(float(item["quote_quantity"]) for item in after_extreme if item["aggressor_side"] == "sell")
+    post_delta = post_buy - post_sell
+    reversal_aligned = (
+        direction == "bullish_reversal" and post_delta > 0
+    ) or (
+        direction == "bearish_reversal" and post_delta < 0
+    )
+    confirmed = (
+        coverage_complete
+        and direction != "none"
+        and impulse_share >= 0.55
+        and len(after_extreme) >= 5
+        and reversal_aligned
+    )
+    return {
+        "available": True,
+        "confirmed": confirmed,
+        "source": "binance_agg_trades_rest",
+        "trade_count": len(ordered),
+        "coverage": "complete_under_limit" if coverage_complete else "possibly_truncated_at_1000",
+        "first_event_time": int(ordered[0]["event_time"]),
+        "last_event_time": int(ordered[-1]["event_time"]),
+        "buy_notional": buy_notional,
+        "sell_notional": sell_notional,
+        "delta_notional": delta,
+        "imbalance_pct": delta / total_notional * 100 if total_notional else 0.0,
+        "impulse_notional": impulse_notional,
+        "impulse_side_share": impulse_share,
+        "impulse_share_threshold": 0.55,
+        "extreme_trade_price": float(ordered[extreme_index]["price"]),
+        "extreme_trade_time": int(ordered[extreme_index]["event_time"]),
+        "trades_after_extreme": len(after_extreme),
+        "post_extreme_delta_notional": post_delta,
+        "expected_reversal_side": expected_reversal,
+        "reversal_aligned": reversal_aligned,
+        "warning": "Aggregate REST trades expose aggressor-side evidence, not trader identity, stop orders or liquidation intent.",
+    }
+
+
 def build_liquidity_sweep_evaluation(
     candles: list[dict],
     order_book: dict | None,
+    aggregate_trades: list[dict] | None,
+    microstructure_status: dict | None,
     symbol: str,
     timeframe: str,
     account_equity: float = 10_000,
@@ -155,6 +229,7 @@ def build_liquidity_sweep_evaluation(
     technical_confirmed = squeeze_passed and adx_passed
     entry = float(sweep.get("close") or candles[-1]["close"])
     depth = analyze_depth(order_book, direction, entry) if direction != "none" else analyze_depth(order_book, "bullish_reversal", entry)
+    trade_flow = analyze_aggregate_trade_flow(aggregate_trades, direction)
 
     risk_plan = None
     if sweep.get("qualified") and sweep.get("extreme") is not None:
@@ -182,6 +257,8 @@ def build_liquidity_sweep_evaluation(
         state = "scanning"
     elif not sweep.get("qualified"):
         state = "sweep_unconfirmed"
+    elif not trade_flow.get("confirmed"):
+        state = "flow_pending"
     elif not technical_confirmed:
         state = "exhaustion_pending"
     elif depth.get("target_price") is None:
@@ -190,7 +267,7 @@ def build_liquidity_sweep_evaluation(
         state = "observation_candidate"
 
     return {
-        "contract": "liquidity_sweep_observer_v1",
+        "contract": "liquidity_sweep_observer_v2",
         "symbol": symbol.upper(),
         "timeframe": timeframe,
         "state": state,
@@ -202,8 +279,16 @@ def build_liquidity_sweep_evaluation(
             "closed_ohlcv": {"status": "available", "source": "Binance + SQLite cache"},
             "squeeze_adx": {"status": "available", "source": "ABRAXAS deterministic analytics"},
             "current_l2_snapshot": {"status": "available" if order_book else "degraded", "source": "Binance Depth"},
-            "realtime_trade_flow": {"status": "missing", "reason": "No aggressor trade stream is persisted."},
-            "historical_l2": {"status": "missing", "reason": "No L2 deltas or heatmap history is persisted."},
+            "closed_candle_aggregate_trade_flow": {
+                "status": "available" if trade_flow.get("available") else "degraded",
+                "source": "Binance aggregate trades REST",
+            },
+            "persisted_l2_snapshots": {
+                "status": "available" if (microstructure_status or {}).get("order_book_snapshots", {}).get("row_count", 0) else "collecting",
+                "snapshot_count": (microstructure_status or {}).get("order_book_snapshots", {}).get("row_count", 0),
+            },
+            "realtime_trade_flow": {"status": "missing", "reason": "REST windows are persisted, but no continuous WebSocket trade stream exists yet."},
+            "historical_l2": {"status": "collecting" if (microstructure_status or {}).get("order_book_snapshots", {}).get("row_count", 0) else "missing", "reason": "Snapshots are accumulating; continuous L2 deltas and replay are not implemented."},
             "liquidation_clusters": {"status": "missing", "reason": "No liquidation feed is integrated."},
         },
         "evidence": {
@@ -218,11 +303,13 @@ def build_liquidity_sweep_evaluation(
                 "adx_slope": "falling" if adx_passed else "rising_flat_or_unavailable",
             },
             "depth": depth,
+            "trade_flow": trade_flow,
         },
         "risk_plan": risk_plan,
         "state_machine": [
             {"state": "scanning", "label": "Targeting", "reachable": True},
             {"state": "sweep_unconfirmed", "label": "Wick observed", "reachable": True},
+            {"state": "flow_pending", "label": "Aggressor flow", "reachable": True},
             {"state": "exhaustion_pending", "label": "Exhaustion", "reachable": True},
             {"state": "observation_candidate", "label": "Risk plan", "reachable": True},
             {"state": "executing", "label": "Execution", "reachable": False, "reason": "Live execution is locked by design."},

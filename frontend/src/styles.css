@@ -4060,7 +4060,7 @@ button, a, input, select, textarea {
 .sl-hunter-lock { display: grid; justify-items: end; gap: 3px; }
 .sl-hunter-lock b { color: #e45b70; font: 800 22px var(--font-num); }
 .sl-hunter-lock span { color: #e45b70; font-size: 8px; }
-.sl-capability-grid { display: grid; grid-template-columns: repeat(7,minmax(0,1fr)); gap: 7px; padding: 12px; }
+.sl-capability-grid { display: grid; grid-template-columns: repeat(6,minmax(0,1fr)); gap: 7px; padding: 12px; }
 .sl-capability-grid article { display: grid; gap: 8px; min-height: 78px; padding: 10px; border: 1px solid rgba(255,255,255,.07); border-radius: 6px; background: rgba(255,255,255,.025); }
 .sl-capability-grid b { font-size: 8px; color: var(--positive); }
 .sl-capability-grid strong { color: #e9edef; font-size: 10px; text-transform: uppercase; overflow-wrap: anywhere; }
@@ -4070,7 +4070,7 @@ button, a, input, select, textarea {
 .sl-hunter-controls label { display: grid; gap: 5px; color: var(--muted); font-size: 9px; text-transform: uppercase; }
 .sl-hunter-controls input,.sl-hunter-controls select { min-width: 0; padding: 9px; border: 1px solid rgba(223,192,122,.2); border-radius: 5px; background: #0e171f; color: #eef2f4; font: 600 11px var(--font-num); }
 .sl-hunter-controls button { padding: 10px 14px; border: 1px solid rgba(223,192,122,.55); border-radius: 5px; background: rgba(223,192,122,.12); color: var(--brand-2); font-weight: 800; cursor: pointer; }
-.sl-state-machine { display: grid; grid-template-columns: repeat(5,1fr); gap: 5px; }
+.sl-state-machine { display: grid; grid-template-columns: repeat(6,1fr); gap: 5px; }
 .sl-state-machine article { position: relative; display: grid; gap: 4px; min-height: 74px; padding: 10px; border: 1px solid rgba(255,255,255,.06); border-radius: 5px; background: #0d151c; opacity: .5; }
 .sl-state-machine article.reached { opacity: 1; border-color: rgba(223,192,122,.32); background: linear-gradient(145deg,rgba(223,192,122,.09),#0d151c); }
 .sl-state-machine article.locked { border-color: rgba(217,76,98,.22); }
@@ -4091,4 +4091,4 @@ button, a, input, select, textarea {
 .sl-history span,.sl-history small { color: var(--muted); font: 500 9px var(--font-num); }
 .sl-history b { color: var(--brand-2); font-size: 9px; text-transform: uppercase; }
 @media (max-width: 1050px) { .sl-capability-grid { grid-template-columns: repeat(4,1fr); } .sl-hunter-controls { grid-template-columns: repeat(2,1fr); } .sl-hunter-controls button { grid-column: span 2; } .sl-hunter-grid { grid-template-columns: 1fr; } }
-@media (max-width: 620px) { .sl-hunter-command { align-items: flex-start; flex-direction: column; } .sl-hunter-lock { justify-items: start; } .sl-capability-grid,.sl-state-machine,.sl-hunter-controls,.sl-metric-grid,.sl-plan-values { grid-template-columns: 1fr; } .sl-hunter-controls button { grid-column: auto; } .sl-state-machine { overflow-x: auto; grid-template-columns: repeat(5,150px); } .sl-history button { grid-template-columns: 42px 1fr; } }
+@media (max-width: 620px) { .sl-hunter-command { align-items: flex-start; flex-direction: column; } .sl-hunter-lock { justify-items: start; } .sl-capability-grid,.sl-state-machine,.sl-hunter-controls,.sl-metric-grid,.sl-plan-values { grid-template-columns: 1fr; } .sl-hunter-controls button { grid-column: auto; } .sl-state-machine { overflow-x: auto; grid-template-columns: repeat(6,150px); } .sl-history button { grid-template-columns: 42px 1fr; } }

@@ -2,7 +2,11 @@ from __future__ import annotations
 
 import unittest
 
-from backend.app.analytics.liquidity_sweep import build_liquidity_sweep_evaluation, detect_sweep
+from backend.app.analytics.liquidity_sweep import (
+    analyze_aggregate_trade_flow,
+    build_liquidity_sweep_evaluation,
+    detect_sweep,
+)
 
 
 def candles_with_last(last: dict) -> list[dict]:
@@ -61,11 +65,60 @@ class LiquiditySweepTests(unittest.TestCase):
             ],
             "bids": [],
         }
-        result = build_liquidity_sweep_evaluation(candles, order_book, "BTCUSDT", "1m")
+        result = build_liquidity_sweep_evaluation(
+            candles=candles,
+            order_book=order_book,
+            aggregate_trades=[],
+            microstructure_status=None,
+            symbol="BTCUSDT",
+            timeframe="1m",
+        )
         self.assertFalse(result["order_allowed"])
         self.assertFalse(result["execution_performed"])
         self.assertEqual(result["capabilities"]["liquidation_clusters"]["status"], "missing")
         self.assertFalse(result["state_machine"][-1]["reachable"])
+
+    def test_aggregate_trade_flow_requires_impulse_then_reversal(self) -> None:
+        trades = []
+        for index in range(60):
+            trades.append(
+                {
+                    "aggregate_trade_id": index,
+                    "event_time": index,
+                    "price": 100 - index * 0.01,
+                    "quote_quantity": 100,
+                    "aggressor_side": "sell",
+                }
+            )
+        for index in range(60, 85):
+            trades.append(
+                {
+                    "aggregate_trade_id": index,
+                    "event_time": index,
+                    "price": 99.41 + (index - 59) * 0.02,
+                    "quote_quantity": 100,
+                    "aggressor_side": "buy",
+                }
+            )
+        result = analyze_aggregate_trade_flow(trades, "bullish_reversal")
+        self.assertTrue(result["confirmed"])
+        self.assertTrue(result["reversal_aligned"])
+        self.assertGreaterEqual(result["impulse_side_share"], 0.55)
+
+    def test_rest_limit_blocks_flow_confirmation(self) -> None:
+        trades = [
+            {
+                "aggregate_trade_id": index,
+                "event_time": index,
+                "price": 100 - index * 0.0001,
+                "quote_quantity": 100,
+                "aggressor_side": "sell" if index < 700 else "buy",
+            }
+            for index in range(1000)
+        ]
+        result = analyze_aggregate_trade_flow(trades, "bullish_reversal")
+        self.assertFalse(result["confirmed"])
+        self.assertEqual(result["coverage"], "possibly_truncated_at_1000")
 
 
 if __name__ == "__main__":

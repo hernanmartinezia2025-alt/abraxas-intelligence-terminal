@@ -65,6 +65,25 @@ export function getSLHunterEvaluations({ limit = 20, symbol = "" } = {}) {
   return request(`/api/sl-hunter/evaluations?${params}`);
 }
 
+export function getMicrostructureStatus(symbol = "BTCUSDT") {
+  const params = new URLSearchParams({ symbol });
+  return request(`/api/microstructure/status?${params}`);
+}
+
+export function captureMicrostructure(payload) {
+  return request("/api/microstructure/capture", { method: "POST", body: JSON.stringify(payload) });
+}
+
+export function getMicrostructureTrades({ symbol = "BTCUSDT", startTime, endTime, limit = 1000 }) {
+  const params = new URLSearchParams({
+    symbol,
+    start_time: String(startTime),
+    end_time: String(endTime),
+    limit: String(limit),
+  });
+  return request(`/api/microstructure/trades?${params}`);
+}
+
 export function getStatistics({
   symbol = "BTCUSDT",
   interval = "15m",

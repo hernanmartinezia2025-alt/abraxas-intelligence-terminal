@@ -4052,3 +4052,43 @@ button, a, input, select, textarea {
 @media (max-width: 760px) { .market-mode-boundary { grid-template-columns: 1fr; } .mode-separation-lock { min-height: 76px; } }
 @media (max-width: 560px) { .spot-summary-grid,.methodology-lanes,.scenario-controls { grid-template-columns: 1fr; } }
 @media (max-width: 560px) { .spot-analysis-grid { grid-template-columns: repeat(2,1fr); } .trading-latino-head,.trading-doctrine-head { align-items: flex-start; } .trading-latino-filters,.trading-doctrine-grid { grid-template-columns: 1fr; } .trading-latino-filters article,.trading-doctrine-grid article { min-height: 0; } }
+
+.sl-hunter-lab { display: grid; gap: 10px; }
+.sl-hunter-command { display: flex; justify-content: space-between; align-items: center; gap: 18px; padding: 18px; border-color: rgba(223,192,122,.3); background: radial-gradient(circle at 90% 20%,rgba(223,192,122,.09),transparent 35%),linear-gradient(145deg,#151d25,#090f15); }
+.sl-hunter-command h2 { margin: 3px 0 5px; color: #f4f6f7; }
+.sl-hunter-command span { color: var(--muted); font-size: 11px; }
+.sl-hunter-lock { display: grid; justify-items: end; gap: 3px; }
+.sl-hunter-lock b { color: #e45b70; font: 800 22px var(--font-num); }
+.sl-hunter-lock span { color: #e45b70; font-size: 8px; }
+.sl-capability-grid { display: grid; grid-template-columns: repeat(7,minmax(0,1fr)); gap: 7px; padding: 12px; }
+.sl-capability-grid article { display: grid; gap: 8px; min-height: 78px; padding: 10px; border: 1px solid rgba(255,255,255,.07); border-radius: 6px; background: rgba(255,255,255,.025); }
+.sl-capability-grid b { font-size: 8px; color: var(--positive); }
+.sl-capability-grid strong { color: #e9edef; font-size: 10px; text-transform: uppercase; overflow-wrap: anywhere; }
+.sl-capability-grid .missing { border-color: rgba(217,76,98,.22); background: rgba(217,76,98,.035); }
+.sl-capability-grid .missing b { color: #e45b70; }
+.sl-hunter-controls { display: grid; grid-template-columns: repeat(4,minmax(120px,1fr)) auto; gap: 8px; padding: 12px; align-items: end; }
+.sl-hunter-controls label { display: grid; gap: 5px; color: var(--muted); font-size: 9px; text-transform: uppercase; }
+.sl-hunter-controls input,.sl-hunter-controls select { min-width: 0; padding: 9px; border: 1px solid rgba(223,192,122,.2); border-radius: 5px; background: #0e171f; color: #eef2f4; font: 600 11px var(--font-num); }
+.sl-hunter-controls button { padding: 10px 14px; border: 1px solid rgba(223,192,122,.55); border-radius: 5px; background: rgba(223,192,122,.12); color: var(--brand-2); font-weight: 800; cursor: pointer; }
+.sl-state-machine { display: grid; grid-template-columns: repeat(5,1fr); gap: 5px; }
+.sl-state-machine article { position: relative; display: grid; gap: 4px; min-height: 74px; padding: 10px; border: 1px solid rgba(255,255,255,.06); border-radius: 5px; background: #0d151c; opacity: .5; }
+.sl-state-machine article.reached { opacity: 1; border-color: rgba(223,192,122,.32); background: linear-gradient(145deg,rgba(223,192,122,.09),#0d151c); }
+.sl-state-machine article.locked { border-color: rgba(217,76,98,.22); }
+.sl-state-machine span { color: var(--brand-2); font: 700 10px var(--font-num); }
+.sl-state-machine strong { color: #f0f3f4; font-size: 11px; text-transform: uppercase; }
+.sl-state-machine small { color: var(--muted); font-size: 8px; }
+.sl-state-machine .locked small { color: #e45b70; }
+.sl-hunter-grid { display: grid; grid-template-columns: 1.45fr .8fr; gap: 10px; }
+.sl-metric-grid,.sl-plan-values { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 7px; padding: 12px; }
+.sl-metric-grid div,.sl-plan-values div { display: grid; gap: 5px; padding: 10px; border: 1px solid rgba(255,255,255,.07); border-radius: 5px; background: rgba(255,255,255,.025); }
+.sl-metric-grid span,.sl-metric-grid small,.sl-plan-values span { color: var(--muted); font-size: 8px; text-transform: uppercase; }
+.sl-metric-grid strong,.sl-plan-values strong { color: #eef2f4; font: 700 12px var(--font-num); overflow-wrap: anywhere; }
+.sl-claim-boundary { margin: 0 12px 12px; padding: 10px; border-left: 2px solid var(--brand-2); background: rgba(223,192,122,.04); color: #b8c0c5; font-size: 10px; }
+.sl-risk-plan > small { display: block; padding: 0 12px 12px; color: #e45b70; font-size: 9px; }
+.sl-history { display: grid; padding: 8px 12px 12px; }
+.sl-history button { display: grid; grid-template-columns: 50px 1fr 1.2fr 1fr; gap: 8px; padding: 9px; border: 0; border-bottom: 1px solid rgba(255,255,255,.06); background: transparent; color: #dfe4e7; text-align: left; cursor: pointer; }
+.sl-history button:hover { background: rgba(223,192,122,.04); }
+.sl-history span,.sl-history small { color: var(--muted); font: 500 9px var(--font-num); }
+.sl-history b { color: var(--brand-2); font-size: 9px; text-transform: uppercase; }
+@media (max-width: 1050px) { .sl-capability-grid { grid-template-columns: repeat(4,1fr); } .sl-hunter-controls { grid-template-columns: repeat(2,1fr); } .sl-hunter-controls button { grid-column: span 2; } .sl-hunter-grid { grid-template-columns: 1fr; } }
+@media (max-width: 620px) { .sl-hunter-command { align-items: flex-start; flex-direction: column; } .sl-hunter-lock { justify-items: start; } .sl-capability-grid,.sl-state-machine,.sl-hunter-controls,.sl-metric-grid,.sl-plan-values { grid-template-columns: 1fr; } .sl-hunter-controls button { grid-column: auto; } .sl-state-machine { overflow-x: auto; grid-template-columns: repeat(5,150px); } .sl-history button { grid-template-columns: 42px 1fr; } }

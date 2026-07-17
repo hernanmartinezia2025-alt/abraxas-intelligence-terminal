@@ -4,6 +4,7 @@ import BacktestComparisonPanel from "../features/backtests/BacktestComparisonPan
 import BacktestEquityChart from "../features/charts/BacktestEquityChart.jsx";
 import PageSubtabs from "../components/PageSubtabs.jsx";
 import PaperTradingPanel from "../features/paper/PaperTradingPanel.jsx";
+import SLHunterPanel from "../features/bots/SLHunterPanel.jsx";
 
 const BOT_STAGES = [
   ["Saved Bots", "online", "Bots persistidos en SQLite con versiones auditables."],
@@ -493,6 +494,7 @@ export default function BotsPage({ selectedSymbol = "BTCUSDT" }) {
           ["runs", "Backtest Runs", "ROI + trades + auditoría"],
           ["compare", "Compare", "versiones A/B"],
           ["paper", "Paper Trading", "cuenta + ordenes + posiciones"],
+          ["sl-hunter", "SL Hunter", "liquidity sweep lab"],
         ]}
         activeTab={activeTab}
         onChange={setActiveTab}
@@ -960,6 +962,7 @@ export default function BotsPage({ selectedSymbol = "BTCUSDT" }) {
       )}
 
       {activeTab === "paper" && <PaperTradingPanel botId={selectedBotId} defaultSymbol={detailMatchesSelection ? detail.bot.base_symbol : selectedSymbol} />}
+      {activeTab === "sl-hunter" && <SLHunterPanel defaultSymbol={selectedSymbol} />}
     </section>
   );
 }

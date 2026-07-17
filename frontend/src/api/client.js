@@ -51,6 +51,20 @@ export function getOrderBook(symbol = "BTCUSDT", limit = 20) {
   return request(`/api/order-book?${params}`);
 }
 
+export function getSLHunterReadiness() {
+  return request("/api/sl-hunter/readiness");
+}
+
+export function evaluateSLHunter(payload) {
+  return request("/api/sl-hunter/evaluate", { method: "POST", body: JSON.stringify(payload) });
+}
+
+export function getSLHunterEvaluations({ limit = 20, symbol = "" } = {}) {
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (symbol) params.set("symbol", symbol);
+  return request(`/api/sl-hunter/evaluations?${params}`);
+}
+
 export function getStatistics({
   symbol = "BTCUSDT",
   interval = "15m",

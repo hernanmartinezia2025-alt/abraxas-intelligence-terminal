@@ -253,6 +253,59 @@ CREATE TABLE IF NOT EXISTS liquidity_sweep_evaluations (
 CREATE INDEX IF NOT EXISTS idx_liquidity_sweeps_symbol_time
 ON liquidity_sweep_evaluations(symbol, timeframe, candle_timestamp);
 
+CREATE TABLE IF NOT EXISTS market_aggregate_trades (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    symbol TEXT NOT NULL,
+    aggregate_trade_id INTEGER NOT NULL,
+    first_trade_id INTEGER NOT NULL,
+    last_trade_id INTEGER NOT NULL,
+    event_time INTEGER NOT NULL,
+    price REAL NOT NULL,
+    quantity REAL NOT NULL,
+    quote_quantity REAL NOT NULL,
+    buyer_is_maker INTEGER NOT NULL CHECK(buyer_is_maker IN (0, 1)),
+    aggressor_side TEXT NOT NULL CHECK(aggressor_side IN ('buy', 'sell')),
+    source TEXT NOT NULL,
+    fetched_at TEXT NOT NULL,
+    UNIQUE(symbol, aggregate_trade_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_market_agg_trades_symbol_time
+ON market_aggregate_trades(symbol, event_time);
+
+CREATE TABLE IF NOT EXISTS order_book_snapshots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    symbol TEXT NOT NULL,
+    source TEXT NOT NULL,
+    last_update_id INTEGER,
+    best_bid REAL,
+    best_ask REAL,
+    spread REAL,
+    spread_percent REAL,
+    mid_price REAL,
+    level_count INTEGER NOT NULL,
+    fetched_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_order_book_snapshots_symbol_time
+ON order_book_snapshots(symbol, fetched_at);
+
+CREATE TABLE IF NOT EXISTS order_book_levels (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    snapshot_id INTEGER NOT NULL,
+    symbol TEXT NOT NULL,
+    side TEXT NOT NULL CHECK(side IN ('bid', 'ask')),
+    level_index INTEGER NOT NULL,
+    price REAL NOT NULL,
+    quantity REAL NOT NULL,
+    notional REAL NOT NULL,
+    FOREIGN KEY(snapshot_id) REFERENCES order_book_snapshots(id) ON DELETE CASCADE,
+    UNIQUE(snapshot_id, side, level_index)
+);
+
+CREATE INDEX IF NOT EXISTS idx_order_book_levels_snapshot_side
+ON order_book_levels(snapshot_id, side, level_index);
+
 CREATE TABLE IF NOT EXISTS paper_order_proposals (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     signal_evaluation_id INTEGER NOT NULL UNIQUE,

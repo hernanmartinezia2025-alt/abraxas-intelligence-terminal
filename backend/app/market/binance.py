@@ -10,6 +10,7 @@ from backend.app.core.config import REQUEST_TIMEOUT
 TICKER_URL = "https://api.binance.com/api/v3/ticker/24hr"
 KLINES_URL = "https://api.binance.com/api/v3/klines"
 DEPTH_URL = "https://api.binance.com/api/v3/depth"
+AGG_TRADES_URL = "https://api.binance.com/api/v3/aggTrades"
 
 
 def fetch_24h_tickers(symbols: Iterable[str]) -> list[dict]:
@@ -100,3 +101,46 @@ def fetch_order_book(symbol: str, limit: int = 20) -> dict:
         "bids": bids,
         "asks": asks,
     }
+
+
+def fetch_aggregate_trades(
+    symbol: str,
+    start_time: int | None = None,
+    end_time: int | None = None,
+    limit: int = 1000,
+) -> list[dict]:
+    normalized_symbol = symbol.upper().strip()
+    params: dict[str, int | str] = {
+        "symbol": normalized_symbol,
+        "limit": max(1, min(int(limit), 1000)),
+    }
+    if start_time is not None:
+        params["startTime"] = int(start_time)
+    if end_time is not None:
+        params["endTime"] = int(end_time)
+    response = requests.get(AGG_TRADES_URL, params=params, timeout=REQUEST_TIMEOUT)
+    response.raise_for_status()
+    rows = []
+    fetched_at = datetime.now(timezone.utc).isoformat()
+    for item in response.json():
+        price = float(item["p"])
+        quantity = float(item["q"])
+        buyer_is_maker = bool(item["m"])
+        rows.append(
+            {
+                "symbol": normalized_symbol,
+                "aggregate_trade_id": int(item["a"]),
+                "first_trade_id": int(item["f"]),
+                "last_trade_id": int(item["l"]),
+                "event_time": int(item["T"]),
+                "price": price,
+                "quantity": quantity,
+                "quote_quantity": price * quantity,
+                "buyer_is_maker": buyer_is_maker,
+                "aggressor_side": "sell" if buyer_is_maker else "buy",
+                "best_price_match": bool(item.get("M", True)),
+                "source": "binance_agg_trades",
+                "fetched_at": fetched_at,
+            }
+        )
+    return rows

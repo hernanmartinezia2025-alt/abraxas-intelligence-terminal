@@ -52,7 +52,7 @@ def spot_projection(
 @router.get("/analysis")
 def spot_analysis(
     symbol: str = Query(default="BTCUSDT", min_length=3, max_length=30),
-    timeframe: str = Query(default="1d", pattern="^(15m|1h|4h|1d)$"),
+    timeframe: str = Query(default="1d", pattern="^(1d|1w)$"),
     limit: int = Query(default=300, ge=60, le=1000),
 ) -> dict:
     try:

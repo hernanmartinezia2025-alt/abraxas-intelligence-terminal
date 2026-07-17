@@ -7,6 +7,7 @@ from pathlib import Path
 
 from backend.app.storage import sqlite as storage_sqlite
 from backend.app.analytics.spot_analysis import analyze_spot_candles
+from backend.app.strategies.market_modes import build_market_mode_policy
 from backend.app.storage.sqlite import connect, initialize_database
 from backend.app.storage.spot_portfolio import execute_spot_transaction, portfolio_snapshot, project_contributions
 
@@ -41,6 +42,23 @@ class SpotPortfolioTests(unittest.TestCase):
         projection = project_contributions(1000, 100, 2, 0)
         self.assertEqual(projection["final_value"], 3400)
         self.assertEqual(projection["mode"], "user_assumption_scenario")
+
+    def test_spot_and_futures_are_hard_separated(self) -> None:
+        policy = build_market_mode_policy(
+            "1d",
+            {
+                "limits": {"max_position_pct": 10, "max_daily_loss_pct": 3, "max_drawdown_pct": 12},
+                "kill_switch": {"active": True},
+            },
+        )
+        self.assertEqual(policy["contract"], "market_mode_separation_v1")
+        self.assertTrue(policy["spot"]["timeframe_allowed"])
+        self.assertEqual(policy["spot"]["leverage"], 1)
+        self.assertEqual(policy["futures"]["status"], "locked")
+        self.assertFalse(policy["futures"]["execution_supported"])
+        self.assertEqual(policy["futures"]["stop_loss"], "mandatory")
+        self.assertEqual(policy["futures"]["leverage"]["hard_max"], 10)
+        self.assertEqual(policy["mode_conversion"], "forbidden")
 
     def test_daily_analysis_exposes_evidence_without_asserting_elliott_count(self) -> None:
         candles = [
@@ -77,6 +95,8 @@ class SpotPortfolioTests(unittest.TestCase):
         self.assertEqual(doctrine["principles"]["probability_discipline"]["sample_size"], 0)
         self.assertEqual(doctrine["principles"]["contrarian_psychology"]["status"], "watch_accumulation_after_confirmation")
         self.assertTrue(doctrine["principles"]["capital_survival"]["kill_switch_active"])
+        self.assertEqual(analysis["market_mode_policy"]["active_mode"], "spot_portfolio_simulation")
+        self.assertEqual(analysis["market_mode_policy"]["futures"]["status"], "locked")
 
 
 if __name__ == "__main__":

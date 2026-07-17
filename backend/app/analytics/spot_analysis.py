@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from math import sqrt
 
+from backend.app.strategies.market_modes import build_market_mode_policy
+
 
 def mean(values: list[float]) -> float | None:
     return sum(values) / len(values) if values else None
@@ -370,6 +372,7 @@ def analyze_spot_candles(
         },
         "trading_latino_5f": trading_latino,
         "trading_latino_doctrine": trading_latino_operating_doctrine(trading_latino, sentiment, risk_profile),
+        "market_mode_policy": build_market_mode_policy(timeframe, risk_profile),
         "guardrails": [
             "No method in this payload executes an order.",
             "Support and resistance are rolling-window observations, not guaranteed levels.",

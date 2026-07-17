@@ -70,12 +70,32 @@ function TradingLatinoDoctrine({ doctrine }) {
   </section>;
 }
 
+function MarketModeBoundary({ policy }) {
+  if (!policy) return null;
+  return <section className="market-mode-boundary">
+    <article className="spot-mode-card">
+      <div><span>SPOT · PATRIMONIO</span><b>SIMULACIÓN</b></div>
+      <strong>Acumular con paciencia</strong>
+      <p>1D / 1W · long-only · 1x · DCA manual limitado por asignación.</p>
+      <small>No usar SL automático no elimina drawdown, fallo del activo, custodia ni costo de oportunidad.</small>
+    </article>
+    <div className="mode-separation-lock"><span>≠</span><b>NO CONVERTIR MODOS</b><small>Una pérdida de futuros nunca se transforma en holding spot.</small></div>
+    <article className="futures-mode-card">
+      <div><span>FUTUROS · FLUJO</span><b>LOCKED</b></div>
+      <strong>Infraestructura incompleta</strong>
+      <p>1H / 4H · SL obligatorio · 3–5x planeado · máximo duro 10x.</p>
+      <small>{policy.futures.unlock_requirements.length} controles pendientes antes de habilitar paper-margin.</small>
+    </article>
+  </section>;
+}
+
 export default function SpotPortfolioPage({ selectedSymbol = "BTCUSDT" }) {
   const [snapshot, setSnapshot] = useState(null);
   const [ticket, setTicket] = useState({ symbol: selectedSymbol, side: "buy", quantity: "0.001", notes: "" });
   const [scenario, setScenario] = useState({ monthly_contribution: 250, years: 4, annual_return_pct: 0 });
   const [projection, setProjection] = useState(null);
   const [analysis, setAnalysis] = useState(null);
+  const [analysisTimeframe, setAnalysisTimeframe] = useState("1d");
   const [message, setMessage] = useState("");
 
   async function load() { try { setSnapshot(await getSpotPortfolio()); setMessage(""); } catch (error) { setMessage(error.message); } }
@@ -83,8 +103,8 @@ export default function SpotPortfolioPage({ selectedSymbol = "BTCUSDT" }) {
   useEffect(() => { setTicket((current) => ({ ...current, symbol: selectedSymbol })); }, [selectedSymbol]);
   useEffect(() => {
     setAnalysis(null);
-    getSpotAnalysis(selectedSymbol, "1d", 300).then(setAnalysis).catch((error) => setMessage(error.message));
-  }, [selectedSymbol]);
+    getSpotAnalysis(selectedSymbol, analysisTimeframe, 300).then(setAnalysis).catch((error) => setMessage(error.message));
+  }, [selectedSymbol, analysisTimeframe]);
   useEffect(() => {
     if (!snapshot) return;
     getSpotProjection({ initial_value: snapshot.equity, ...scenario }).then(setProjection).catch((error) => setMessage(error.message));
@@ -110,6 +130,8 @@ export default function SpotPortfolioPage({ selectedSymbol = "BTCUSDT" }) {
       <article><span>Invertido</span><strong>{money(snapshot.market_value)}</strong><small>{allocation.length} activos</small></article>
       <article><span>PnL no realizado</span><strong className={snapshot.unrealized_pnl >= 0 ? "positive" : "negative"}>{money(snapshot.unrealized_pnl)}</strong><small>{percent(snapshot.return_pct)}</small></article>
     </div>
+
+    <MarketModeBoundary policy={analysis?.market_mode_policy} />
 
     <div className="spot-workbench">
       <section className="exchange-panel spot-ticket">
@@ -143,7 +165,7 @@ export default function SpotPortfolioPage({ selectedSymbol = "BTCUSDT" }) {
     </section>
 
     <section className="exchange-panel spot-analysis-panel">
-      <div className="exchange-panel-head compact"><div><p className="eyebrow">Daily evidence engine</p><h2>{selectedSymbol} · estructura de largo plazo</h2></div><span>{analysis ? `${analysis.candles_used} CANDLES` : "CARGANDO"}</span></div>
+      <div className="exchange-panel-head compact"><div><p className="eyebrow">Long-term evidence engine</p><h2>{selectedSymbol} · estructura de largo plazo</h2></div><div className="spot-timeframe-switch"><button className={analysisTimeframe === "1d" ? "active" : ""} onClick={() => setAnalysisTimeframe("1d")}>1D</button><button className={analysisTimeframe === "1w" ? "active" : ""} onClick={() => setAnalysisTimeframe("1w")}>1W</button><span>{analysis ? `${analysis.candles_used} CANDLES` : "CARGANDO"}</span></div></div>
       {analysis ? <>
         <div className="spot-analysis-grid">
           <article><span>Tendencia</span><strong>{analysis.chartism.trend.replaceAll("_", " ")}</strong><small>Cierre {money(analysis.latest_close)}</small></article>

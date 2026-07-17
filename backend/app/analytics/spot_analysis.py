@@ -186,6 +186,92 @@ def trading_latino_five_filters(candles: list[dict]) -> dict:
     }
 
 
+def trading_latino_operating_doctrine(
+    strategy: dict,
+    sentiment: dict | None = None,
+    risk_profile: dict | None = None,
+) -> dict:
+    """Translate the operating philosophy into observable, non-executing policy."""
+    volume_filter = strategy["filters"]["volume_profile"]
+    time_filter = strategy["filters"]["time"]
+    sentiment_value = int(sentiment["value"]) if sentiment and sentiment.get("value") is not None else None
+    sentiment_regime = str(sentiment.get("regime")) if sentiment else "unavailable"
+
+    if sentiment_value is None:
+        contrarian_posture = "sentiment_unavailable"
+        contrarian_action = "Block sentiment interpretation until a persisted reading exists."
+    elif sentiment_value <= 24:
+        contrarian_posture = "watch_accumulation_after_confirmation"
+        contrarian_action = "Extreme fear enables a long watch, never an automatic buy."
+    elif sentiment_value >= 75:
+        contrarian_posture = "protect_gains_do_not_chase"
+        contrarian_action = "Extreme greed favors protecting capital and rejecting late entries."
+    else:
+        contrarian_posture = "no_contrarian_extreme"
+        contrarian_action = "Sentiment has no extreme edge; technical structure remains primary."
+
+    limits = (risk_profile or {}).get("limits") or {}
+    kill_switch = (risk_profile or {}).get("kill_switch") or {}
+    kill_switch_active = bool(kill_switch.get("active", True))
+    if strategy["decision"] == "buy_candidate" and sentiment_value is not None and sentiment_value <= 24:
+        posture = "candidate_requires_risk_plan"
+    elif sentiment_value is not None and sentiment_value >= 75:
+        posture = "protect_capital"
+    else:
+        posture = "observe"
+
+    return {
+        "contract": "trading_latino_doctrine_v1",
+        "posture": posture,
+        "order_allowed": False,
+        "principles": {
+            "liquidity_footprint": {
+                "status": "observable_proxy",
+                "poc": volume_filter.get("poc"),
+                "method": volume_filter.get("method"),
+                "claim_boundary": "Volume concentration is observable; ABRAXAS cannot identify or prove whale intent from OHLCV candles.",
+            },
+            "probability_discipline": {
+                "status": "edge_unverified",
+                "confluence_score": strategy["filters_passed"],
+                "confluence_total": strategy["filters_total"],
+                "sample_size": 0,
+                "claim_boundary": "The filter score is confluence, not win probability. Backtest evidence is required before estimating an edge.",
+            },
+            "contrarian_psychology": {
+                "status": contrarian_posture,
+                "fear_greed_value": sentiment_value,
+                "fear_greed_regime": sentiment_regime,
+                "source": sentiment.get("source") if sentiment else None,
+                "action": contrarian_action,
+            },
+            "time_invalidation": {
+                "status": time_filter["status"],
+                "setup_age_bars": time_filter["setup_age_bars"],
+                "price_progress_pct": time_filter["price_progress_pct"],
+                "invalidated": time_filter["status"] == "expired_no_progress",
+            },
+            "capital_survival": {
+                "status": "risk_gate_locked" if kill_switch_active else "risk_gate_available",
+                "kill_switch_active": kill_switch_active,
+                "kill_switch_reason": kill_switch.get("reason", "Risk profile unavailable; fail closed."),
+                "max_position_pct": limits.get("max_position_pct"),
+                "max_daily_loss_pct": limits.get("max_daily_loss_pct"),
+                "max_drawdown_pct": limits.get("max_drawdown_pct"),
+                "stop_loss": "required_before_paper_execution",
+                "break_even": "not_automated_for_spot_portfolio",
+                "partial_take_profit": "not_automated_for_spot_portfolio",
+            },
+        },
+        "missing_controls": [
+            "Persisted backtest sample for this exact five-filter contract.",
+            "Trade-level volume profile for true VPVR/POC evidence.",
+            "Spot-portfolio break-even and partial-take-profit automation.",
+        ],
+        "guardrail": "Doctrine informs observation and risk posture only; it never authorizes or places an order.",
+    }
+
+
 def find_pivots(candles: list[dict], window: int = 3) -> list[dict]:
     pivots = []
     for index in range(window, len(candles) - window):
@@ -200,7 +286,13 @@ def find_pivots(candles: list[dict], window: int = 3) -> list[dict]:
     return pivots[-12:]
 
 
-def analyze_spot_candles(symbol: str, timeframe: str, candles: list[dict]) -> dict:
+def analyze_spot_candles(
+    symbol: str,
+    timeframe: str,
+    candles: list[dict],
+    sentiment: dict | None = None,
+    risk_profile: dict | None = None,
+) -> dict:
     if len(candles) < 60:
         raise ValueError("At least 60 closed candles are required for spot portfolio analysis")
     ordered = sorted(candles, key=lambda item: int(item["timestamp"]))
@@ -248,6 +340,7 @@ def analyze_spot_candles(symbol: str, timeframe: str, candles: list[dict]) -> di
         wyckoff = "trading_range_unclassified"
         evidence = "Price is inside a range without enough evidence to classify accumulation or distribution."
 
+    trading_latino = trading_latino_five_filters(ordered)
     return {
         "symbol": symbol,
         "timeframe": timeframe,
@@ -275,7 +368,8 @@ def analyze_spot_candles(symbol: str, timeframe: str, candles: list[dict]) -> di
             "pivots": find_pivots(ordered),
             "warning": "Pivots are evidence for manual alternatives; ABRAXAS does not assert an automatic Elliott wave count.",
         },
-        "trading_latino_5f": trading_latino_five_filters(ordered),
+        "trading_latino_5f": trading_latino,
+        "trading_latino_doctrine": trading_latino_operating_doctrine(trading_latino, sentiment, risk_profile),
         "guardrails": [
             "No method in this payload executes an order.",
             "Support and resistance are rolling-window observations, not guaranteed levels.",

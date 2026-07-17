@@ -47,7 +47,16 @@ class SpotPortfolioTests(unittest.TestCase):
             {"timestamp": index, "open": 100 + index, "high": 102 + index, "low": 98 + index, "close": 101 + index, "volume": 1000 + index}
             for index in range(220)
         ]
-        analysis = analyze_spot_candles("BTCUSDT", "1d", candles)
+        analysis = analyze_spot_candles(
+            "BTCUSDT",
+            "1d",
+            candles,
+            sentiment={"value": 20, "regime": "FUD_EXTREME", "source": "test fixture"},
+            risk_profile={
+                "limits": {"max_position_pct": 10, "max_daily_loss_pct": 3, "max_drawdown_pct": 12},
+                "kill_switch": {"active": True, "reason": "test lock"},
+            },
+        )
         self.assertEqual(analysis["chartism"]["trend"], "strong_uptrend")
         self.assertEqual(analysis["elliott"]["status"], "manual_count_required")
         self.assertEqual(analysis["wyckoff"]["status"], "heuristic_hypothesis")
@@ -60,6 +69,14 @@ class SpotPortfolioTests(unittest.TestCase):
         self.assertEqual(strategy["filters"]["adx_strength"]["method"], "wilder_adx_14")
         self.assertIn("Approximate POC", strategy["filters"]["volume_profile"]["warning"])
         self.assertIn("never places an order", strategy["guardrail"])
+        doctrine = analysis["trading_latino_doctrine"]
+        self.assertEqual(doctrine["contract"], "trading_latino_doctrine_v1")
+        self.assertFalse(doctrine["order_allowed"])
+        self.assertEqual(doctrine["principles"]["liquidity_footprint"]["status"], "observable_proxy")
+        self.assertEqual(doctrine["principles"]["probability_discipline"]["status"], "edge_unverified")
+        self.assertEqual(doctrine["principles"]["probability_discipline"]["sample_size"], 0)
+        self.assertEqual(doctrine["principles"]["contrarian_psychology"]["status"], "watch_accumulation_after_confirmation")
+        self.assertTrue(doctrine["principles"]["capital_survival"]["kill_switch_active"])
 
 
 if __name__ == "__main__":

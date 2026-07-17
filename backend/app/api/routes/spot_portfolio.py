@@ -5,6 +5,8 @@ from pydantic import BaseModel, Field
 
 from backend.app.analytics.spot_analysis import analyze_spot_candles
 from backend.app.services.candle_service import get_candles
+from backend.app.services.radar_service import get_radar
+from backend.app.storage.risk import get_risk_profile
 from backend.app.storage.spot_portfolio import execute_spot_transaction, portfolio_snapshot, project_contributions
 
 router = APIRouter(prefix="/api/spot-portfolio", tags=["spot-portfolio"])
@@ -55,7 +57,13 @@ def spot_analysis(
 ) -> dict:
     try:
         payload = get_candles(symbol=symbol.upper(), interval=timeframe, limit=limit)
-        result = analyze_spot_candles(symbol.upper(), timeframe, payload["candles"])
+        result = analyze_spot_candles(
+            symbol.upper(),
+            timeframe,
+            payload["candles"],
+            sentiment=get_radar().get("sentiment"),
+            risk_profile=get_risk_profile(audit_limit=0),
+        )
         result["data_source"] = payload.get("source")
         result["served_from"] = payload.get("served_from")
         return result

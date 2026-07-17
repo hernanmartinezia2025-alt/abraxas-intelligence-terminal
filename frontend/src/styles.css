@@ -4013,12 +4013,25 @@ button, a, input, select, textarea {
 .trading-latino-guardrail { display: grid; gap: 4px; padding: 10px 13px; border-top: 1px solid rgba(255,255,255,.06); background: rgba(223,192,122,.035); }
 .trading-latino-guardrail span { color: #d9dee1; font-size: 10px; }
 .trading-latino-guardrail small { color: #a6afb5; font-size: 9px; }
+.trading-doctrine-panel { margin: 0 12px 12px; overflow: hidden; border: 1px solid rgba(223,192,122,.24); border-radius: 7px; background: linear-gradient(150deg,rgba(28,27,24,.96),rgba(10,17,23,.98)); }
+.trading-doctrine-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 13px; border-bottom: 1px solid rgba(223,192,122,.14); }
+.trading-doctrine-head h3 { margin: 3px 0 0; color: #f3f5f6; font-size: 15px; }
+.trading-doctrine-head > div:last-child { display: grid; justify-items: end; gap: 3px; }
+.trading-doctrine-head > div:last-child strong { color: var(--brand-2); font: 700 11px var(--font-num); text-transform: uppercase; }
+.trading-doctrine-head > div:last-child span { color: #e45b70; font-size: 8px; }
+.trading-doctrine-grid { display: grid; grid-template-columns: repeat(5,minmax(0,1fr)); gap: 7px; padding: 10px; }
+.trading-doctrine-grid article { display: grid; align-content: start; gap: 7px; min-height: 96px; padding: 10px; border: 1px solid rgba(255,255,255,.07); border-radius: 6px; background: rgba(255,255,255,.025); }
+.trading-doctrine-grid span,.trading-doctrine-grid small { color: var(--muted); font-size: 9px; text-transform: uppercase; }
+.trading-doctrine-grid strong { color: #eef1f2; font-size: 12px; text-transform: uppercase; overflow-wrap: anywhere; }
+.trading-doctrine-gaps { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; padding: 9px 13px; border-top: 1px solid rgba(255,255,255,.05); }
+.trading-doctrine-gaps b { color: var(--brand-2); font-size: 9px; text-transform: uppercase; }
+.trading-doctrine-gaps span { padding: 4px 7px; border: 1px solid rgba(217,76,98,.2); border-radius: 999px; color: #b8c0c5; font-size: 8px; text-transform: uppercase; }
 .methodology-lanes { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; padding: 10px; }
 .methodology-lanes article { display: grid; gap: 6px; padding: 12px; border: 1px solid rgba(255,255,255,.08); border-radius: 6px; background: rgba(255,255,255,.025); }
 .methodology-lanes span { color: var(--brand-2); font-size: 10px; text-transform: uppercase; }
 .methodology-lanes strong { color: #fff; }
 .methodology-lanes p { color: var(--muted); font-size: 11px; line-height: 1.5; margin: 0; }
-@media (max-width: 1100px) { .spot-analysis-grid { grid-template-columns: repeat(3,1fr); } .trading-latino-filters { grid-template-columns: repeat(3,1fr); } }
+@media (max-width: 1100px) { .spot-analysis-grid { grid-template-columns: repeat(3,1fr); } .trading-latino-filters,.trading-doctrine-grid { grid-template-columns: repeat(3,1fr); } }
 @media (max-width: 900px) { .spot-summary-grid { grid-template-columns: repeat(2,1fr); } .spot-workbench { grid-template-columns: 1fr; } .methodology-lanes { grid-template-columns: repeat(2,1fr); } }
 @media (max-width: 560px) { .spot-summary-grid,.methodology-lanes,.scenario-controls { grid-template-columns: 1fr; } }
-@media (max-width: 560px) { .spot-analysis-grid { grid-template-columns: repeat(2,1fr); } .trading-latino-head { align-items: flex-start; } .trading-latino-filters { grid-template-columns: 1fr; } .trading-latino-filters article { min-height: 0; } }
+@media (max-width: 560px) { .spot-analysis-grid { grid-template-columns: repeat(2,1fr); } .trading-latino-head,.trading-doctrine-head { align-items: flex-start; } .trading-latino-filters,.trading-doctrine-grid { grid-template-columns: 1fr; } .trading-latino-filters article,.trading-doctrine-grid article { min-height: 0; } }

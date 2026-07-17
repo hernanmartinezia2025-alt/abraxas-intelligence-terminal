@@ -39,6 +39,37 @@ function TradingLatinoPanel({ strategy }) {
   </section>;
 }
 
+function TradingLatinoDoctrine({ doctrine }) {
+  if (!doctrine) return null;
+  const principles = doctrine.principles;
+  const contrarianLabels = {
+    watch_accumulation_after_confirmation: "Vigilar acumulación",
+    protect_gains_do_not_chase: "Proteger ganancias",
+    no_contrarian_extreme: "Sin extremo emocional",
+    sentiment_unavailable: "Sentimiento sin datos",
+  };
+  const postureLabels = {
+    observe: "Observar",
+    protect_capital: "Proteger capital",
+    candidate_requires_risk_plan: "Candidato · falta plan de riesgo",
+  };
+  const cards = [
+    { label: "Huella institucional", value: "POC proxy", detail: `${money(principles.liquidity_footprint.poc)} · concentración, no identidad` },
+    { label: "Probabilidades", value: "Edge sin validar", detail: `${principles.probability_discipline.confluence_score}/${principles.probability_discipline.confluence_total} es confluencia, no win rate` },
+    { label: "Contra la manada", value: contrarianLabels[principles.contrarian_psychology.status] || principles.contrarian_psychology.status, detail: `Fear & Greed ${principles.contrarian_psychology.fear_greed_value ?? "--"} · ${principles.contrarian_psychology.fear_greed_regime}` },
+    { label: "El tiempo invalida", value: principles.time_invalidation.invalidated ? "Setup vencido" : principles.time_invalidation.status.replaceAll("_", " "), detail: `${principles.time_invalidation.setup_age_bars} velas · progreso ${metric(principles.time_invalidation.price_progress_pct)}%` },
+    { label: "Supervivencia", value: principles.capital_survival.kill_switch_active ? "Kill switch ON" : "Risk gate disponible", detail: `posición máx. ${metric(principles.capital_survival.max_position_pct)}% · DD máx. ${metric(principles.capital_survival.max_drawdown_pct)}%` },
+  ];
+  return <section className="trading-doctrine-panel">
+    <div className="trading-doctrine-head">
+      <div><p className="eyebrow">Doctrina operativa · datos + límites</p><h3>Paciencia, probabilidad y supervivencia</h3></div>
+      <div><strong>{postureLabels[doctrine.posture] || doctrine.posture.replaceAll("_", " ")}</strong><span>NO ORDER</span></div>
+    </div>
+    <div className="trading-doctrine-grid">{cards.map((card) => <article key={card.label}><span>{card.label}</span><strong>{card.value}</strong><small>{card.detail}</small></article>)}</div>
+    <div className="trading-doctrine-gaps"><b>Controles pendientes reales</b><span>Backtest 5F persistido</span><span>VPVR trade-level</span><span>Break-even y parciales spot</span></div>
+  </section>;
+}
+
 export default function SpotPortfolioPage({ selectedSymbol = "BTCUSDT" }) {
   const [snapshot, setSnapshot] = useState(null);
   const [ticket, setTicket] = useState({ symbol: selectedSymbol, side: "buy", quantity: "0.001", notes: "" });
@@ -124,6 +155,7 @@ export default function SpotPortfolioPage({ selectedSymbol = "BTCUSDT" }) {
         </div>
         <div className="spot-analysis-reading"><span>Hipótesis Wyckoff</span><p>{analysis.wyckoff.evidence}</p><small>{analysis.elliott.warning}</small></div>
         <TradingLatinoPanel strategy={analysis.trading_latino_5f} />
+        <TradingLatinoDoctrine doctrine={analysis.trading_latino_doctrine} />
       </> : <div className="chart-state">Preparando candles diarios reales para el análisis.</div>}
     </section>
 

@@ -51,6 +51,15 @@ class SpotPortfolioTests(unittest.TestCase):
         self.assertEqual(analysis["chartism"]["trend"], "strong_uptrend")
         self.assertEqual(analysis["elliott"]["status"], "manual_count_required")
         self.assertEqual(analysis["wyckoff"]["status"], "heuristic_hypothesis")
+        strategy = analysis["trading_latino_5f"]
+        self.assertEqual(strategy["contract"], "trading_latino_5f_v1")
+        self.assertEqual(strategy["mode"], "spot_long_only_observation")
+        self.assertEqual(strategy["filters_total"], 5)
+        self.assertEqual(set(strategy["filters"]), {"directionality", "adx_strength", "ema_value_area", "volume_profile", "time"})
+        self.assertIn(strategy["decision"], {"blocked", "buy_candidate"})
+        self.assertEqual(strategy["filters"]["adx_strength"]["method"], "wilder_adx_14")
+        self.assertIn("Approximate POC", strategy["filters"]["volume_profile"]["warning"])
+        self.assertIn("never places an order", strategy["guardrail"])
 
 
 if __name__ == "__main__":

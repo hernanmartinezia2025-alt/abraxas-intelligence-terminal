@@ -12,6 +12,33 @@ function ProjectionChart({ points = [] }) {
   return <svg className="spot-projection-chart" viewBox="0 0 100 100" preserveAspectRatio="none" role="img" aria-label="Escenario de crecimiento de cartera"><polyline className="contributed" points={contributed} /><polyline className="projected" points={line} /></svg>;
 }
 
+const metric = (value, digits = 2) => value === null || value === undefined ? "--" : Number(value).toFixed(digits);
+
+function TradingLatinoPanel({ strategy }) {
+  if (!strategy) return null;
+  const filters = strategy.filters;
+  const rows = [
+    { key: "directionality", label: "1 · Direccionalidad", value: filters.directionality.direction.replaceAll("_", " "), detail: `SQZMOM ${metric(filters.directionality.value, 4)} · previo ${metric(filters.directionality.previous, 4)}` },
+    { key: "adx_strength", label: "2 · Fuerza ADX", value: filters.adx_strength.slope.replaceAll("_", " "), detail: `ADX14 ${metric(filters.adx_strength.value)} · previo ${metric(filters.adx_strength.previous)}` },
+    { key: "ema_value_area", label: "3 · Área EMA", value: `${metric(filters.ema_value_area.distance_ema55_pct)}% de EMA55`, detail: `EMA10 ${money(filters.ema_value_area.ema10)} · EMA55 ${money(filters.ema_value_area.ema55)}` },
+    { key: "volume_profile", label: "4 · POC de volumen", value: money(filters.volume_profile.poc), detail: "aproximación candle-volume" },
+    { key: "time", label: "5 · Tiempo", value: filters.time.status.replaceAll("_", " "), detail: `${filters.time.setup_age_bars} velas · progreso ${metric(filters.time.price_progress_pct)}%` },
+  ];
+  return <section className={`trading-latino-panel ${strategy.decision === "buy_candidate" ? "candidate" : "blocked"}`}>
+    <div className="trading-latino-head">
+      <div><p className="eyebrow">Trading Latino · contrato auditable</p><h3>Setup long spot · cinco filtros</h3></div>
+      <div className="trading-latino-score"><strong>{strategy.filters_passed}/5</strong><span>{strategy.decision.replaceAll("_", " ")}</span></div>
+    </div>
+    <div className="trading-latino-filters">
+      {rows.map((row) => <article className={filters[row.key].passed ? "passed" : "failed"} key={row.key}>
+        <div><span>{row.label}</span><b>{filters[row.key].passed ? "PASA" : "BLOQUEA"}</b></div>
+        <strong>{row.value}</strong><small>{row.detail}</small>
+      </article>)}
+    </div>
+    <div className="trading-latino-guardrail"><span>{strategy.guardrail}</span><small>{filters.volume_profile.warning}</small></div>
+  </section>;
+}
+
 export default function SpotPortfolioPage({ selectedSymbol = "BTCUSDT" }) {
   const [snapshot, setSnapshot] = useState(null);
   const [ticket, setTicket] = useState({ symbol: selectedSymbol, side: "buy", quantity: "0.001", notes: "" });
@@ -96,6 +123,7 @@ export default function SpotPortfolioPage({ selectedSymbol = "BTCUSDT" }) {
           <article><span>Elliott</span><strong>{analysis.elliott.pivots.length} pivotes</strong><small>conteo manual requerido</small></article>
         </div>
         <div className="spot-analysis-reading"><span>Hipótesis Wyckoff</span><p>{analysis.wyckoff.evidence}</p><small>{analysis.elliott.warning}</small></div>
+        <TradingLatinoPanel strategy={analysis.trading_latino_5f} />
       </> : <div className="chart-state">Preparando candles diarios reales para el análisis.</div>}
     </section>
 
@@ -103,7 +131,7 @@ export default function SpotPortfolioPage({ selectedSymbol = "BTCUSDT" }) {
       <article><span>Chartismo</span><strong>Próximo</strong><p>Estructura, soportes, resistencias e invalidación sobre candles reales.</p></article>
       <article><span>Wyckoff</span><strong>Laboratorio</strong><p>Esfuerzo/resultado y rangos como evidencia; fases siempre etiquetadas como hipótesis.</p></article>
       <article><span>Elliott</span><strong>Asistido</strong><p>Conteo manual con alternativas; no se presentará un conteo automático como certeza.</p></article>
-      <article><span>Plantilla Merino</span><strong>Inspirada</strong><p>Acumulación de largo plazo y capital por horizontes; reglas documentadas, editables y auditables.</p></article>
+      <article><span>Trading Latino 5F</span><strong>Operativo</strong><p>Squeeze, ADX, EMA55, POC aproximado y tiempo; candidato observable, nunca orden automática.</p></article>
     </section>
   </section>;
 }

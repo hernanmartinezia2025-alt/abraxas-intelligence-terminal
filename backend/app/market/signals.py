@@ -13,9 +13,9 @@ def classify_risk(fear_greed_value: int, change_24h: float) -> str:
 
 def build_reading(symbol: str, risk_level: str) -> str:
     readings = {
-        "HIGH_EUPHORIA_RISK": f"{symbol}: suba con codicia alta. Riesgo de entrada tardia del retail. No perseguir vela.",
-        "HIGH_FEAR_RISK": f"{symbol}: caida con miedo alto. Puede haber panico real o zona de oportunidad. Mirar volumen.",
-        "HIGH_VOLATILITY": f"{symbol}: movimiento fuerte. El mercado esta activo, pero no necesariamente claro.",
-        "NORMAL": f"{symbol}: mercado sin senal extrema. Observar, no inventar epica.",
+        "HIGH_EUPHORIA_RISK": f"{symbol}: impulso alcista con euforia. Accion: no perseguir; esperar retroceso y confirmar volumen.",
+        "HIGH_FEAR_RISK": f"{symbol}: presion vendedora con miedo extremo. Accion: vigilar acumulacion; no comprar sin estabilizacion.",
+        "HIGH_VOLATILITY": f"{symbol}: rango de movimiento elevado. Accion: reducir tamano y exigir confirmacion antes de operar.",
+        "NORMAL": f"{symbol}: sin extremo estadistico en el snapshot. Accion: observar rango, liquidez y confirmacion.",
     }
     return readings.get(risk_level, readings["NORMAL"])

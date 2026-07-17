@@ -49,7 +49,7 @@ def update_market(symbols: list[str] | None = None) -> list[dict]:
     return rows
 
 
-def get_latest(limit: int = 160) -> list[dict]:
+def get_latest(limit: int = 2000) -> list[dict]:
     initialize_database()
     with connect() as connection:
         rows = connection.execute(

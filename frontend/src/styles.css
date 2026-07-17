@@ -730,6 +730,9 @@ h2 {
 .asset-sparkline.positive polyline { stroke: #47d9aa; }
 .asset-sparkline.negative polyline { stroke: #ff8b98; }
 .asset-sparkline.empty { color: rgba(244,247,251,.35); font-size: 10px; }
+.asset-action-strip { display: flex; justify-content: space-between; align-items: center; gap: 6px; padding: 6px 7px; border: 1px solid rgba(223,192,122,.18); border-radius: 5px; background: rgba(5,10,15,.38); }
+.asset-action-strip span { color: rgba(244,247,251,.48); font-size: 9px; text-transform: uppercase; letter-spacing: .05em; }
+.asset-action-strip strong { color: var(--brand-2); font: 700 9px var(--font-num); letter-spacing: .04em; text-align: right; }
 .asset-head {
   display: flex;
   justify-content: space-between;
@@ -2939,6 +2942,9 @@ h2 {
 .exchange-panel-head.compact {
   min-height: 62px;
 }
+.market-intelligence-brief .exchange-panel-head button { border: 1px solid rgba(223,192,122,.42); border-radius: 6px; background: rgba(223,192,122,.10); color: #f1dfad; padding: 8px 11px; font: 700 10px var(--font-num); cursor: pointer; transition: background .16s ease, border-color .16s ease; }
+.market-intelligence-brief .exchange-panel-head button:hover:not(:disabled) { background: rgba(223,192,122,.2); border-color: rgba(223,192,122,.75); }
+.market-intelligence-brief .exchange-panel-head button:disabled { opacity: .55; cursor: wait; }
 .exchange-panel-head .eyebrow {
   color: var(--brand-2);
 }

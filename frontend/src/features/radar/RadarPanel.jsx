@@ -40,7 +40,7 @@ function compactRisk(level) {
 function Sparkline({ rows, symbol, tone }) {
   const points = rows
     .filter((row) => row.symbol === symbol)
-    .slice(0, 24)
+    .slice(0, 72)
     .reverse()
     .map((row) => Number(row.price || 0))
     .filter((price) => Number.isFinite(price));
@@ -54,6 +54,14 @@ function Sparkline({ rows, symbol, tone }) {
       <polyline points={polyline} vectorEffect="non-scaling-stroke" />
     </svg>
   );
+}
+
+function actionFor(row) {
+  const risk = String(row.risk_level || "NORMAL");
+  if (risk === "HIGH_EUPHORIA_RISK") return "ESPERAR RETROCESO";
+  if (risk === "HIGH_FEAR_RISK") return "VIGILAR ESTABILIZACIÓN";
+  if (risk === "HIGH_VOLATILITY") return "REDUCIR TAMAÑO";
+  return Number(row.change_24h || 0) >= 0 ? "OBSERVAR CONTINUIDAD" : "OBSERVAR SOPORTE";
 }
 
 function SentimentGauge({ value = 0 }) {
@@ -146,6 +154,7 @@ export default function RadarPanel({ rows, sentiment, onOpenTrade }) {
                 <span>Volumen 24h</span>
                 <b>${formatCompact(row.volume_24h)}</b>
               </div>
+              <div className="asset-action-strip"><span>Lectura operativa</span><strong>{actionFor(row)}</strong></div>
               <p>{row.abraxas_reading}</p>
               <span className="asset-card-action">Abrir en Trade →</span>
             </button>

@@ -5,12 +5,22 @@ import unittest
 from pathlib import Path
 
 from backend.app.services.data_center_service import get_dataset_preview
+from backend.app.services.microstructure_collector import (
+    DepthSequenceGap,
+    LocalOrderBook,
+    normalize_agg_trade_event,
+    normalize_depth_event,
+)
 from backend.app.storage import sqlite as storage_sqlite
 from backend.app.storage.microstructure import (
     get_microstructure_status,
     list_aggregate_trades,
     save_aggregate_trades,
+    save_order_book_deltas,
     save_order_book_snapshot,
+    start_collector_run,
+    latest_collector_run,
+    reconcile_interrupted_collectors,
 )
 
 
@@ -71,6 +81,63 @@ class MicrostructureStorageTests(unittest.TestCase):
         preview = get_dataset_preview("order_book_levels", limit=5)
         self.assertTrue(preview["dataset"]["exists"])
         self.assertEqual(len(preview["rows"]), 2)
+
+    def test_local_book_applies_sequence_and_detects_gap(self) -> None:
+        book = LocalOrderBook.from_snapshot(
+            {
+                "symbol": "BTCUSDT",
+                "last_update_id": 100,
+                "bids": [{"price": 100, "quantity": 2}],
+                "asks": [{"price": 101, "quantity": 3}],
+            }
+        )
+        applied = book.apply(
+            {
+                "first_update_id": 101,
+                "final_update_id": 102,
+                "bid_changes": [["100", "0"], ["99.5", "4"]],
+                "ask_changes": [["101", "1"]],
+            }
+        )
+        self.assertTrue(applied)
+        self.assertNotIn(100.0, book.bids)
+        self.assertEqual(book.bids[99.5], 4.0)
+        self.assertEqual(book.last_update_id, 102)
+        with self.assertRaises(DepthSequenceGap):
+            book.apply(
+                {
+                    "first_update_id": 104,
+                    "final_update_id": 105,
+                    "bid_changes": [],
+                    "ask_changes": [],
+                }
+            )
+
+    def test_stream_events_are_normalized_and_deltas_are_idempotent(self) -> None:
+        trade = normalize_agg_trade_event(
+            {"s": "BTCUSDT", "a": 12, "f": 20, "l": 21, "T": 1_700_000_000_000,
+             "p": "100.5", "q": "2", "m": False, "M": True}
+        )
+        self.assertEqual(trade["aggressor_side"], "buy")
+        self.assertEqual(trade["quote_quantity"], 201.0)
+        delta = normalize_depth_event(
+            {"s": "BTCUSDT", "E": 1_700_000_000_001, "U": 101, "u": 102,
+             "b": [["100", "2"]], "a": [["101", "0"]]}
+        )
+        self.assertEqual(save_order_book_deltas([delta]), 1)
+        self.assertEqual(save_order_book_deltas([delta]), 0)
+        status = get_microstructure_status("BTCUSDT")
+        self.assertEqual(status["order_book_deltas"]["row_count"], 1)
+        preview = get_dataset_preview("order_book_deltas", limit=5)
+        self.assertEqual(len(preview["rows"]), 1)
+
+    def test_restart_marks_running_collector_as_interrupted(self) -> None:
+        run_id = start_collector_run(["BTCUSDT"], {"snapshot_interval_seconds": 10})
+        self.assertEqual(run_id, 1)
+        self.assertEqual(reconcile_interrupted_collectors(), 1)
+        run = latest_collector_run()
+        self.assertEqual(run["status"], "interrupted")
+        self.assertIsNotNone(run["stopped_at"])
 
 
 if __name__ == "__main__":

@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from backend.app.api.routes import bots, candles, data_center, exchanges, features, health, liquidity_sweep, live_map, market_universe, microstructure, order_book, paper, radar, regime, risk, spot_portfolio, statistics
 from backend.app.storage.sqlite import initialize_database
+from backend.app.services.microstructure_collector import collector, reconcile_collector_state
 
 app = FastAPI(title="ABRAXAS Intelligence Terminal API", version="1.0.0")
 
@@ -39,3 +40,9 @@ app.include_router(exchanges.router)
 @app.on_event("startup")
 def startup() -> None:
     initialize_database()
+    reconcile_collector_state()
+
+
+@app.on_event("shutdown")
+async def shutdown() -> None:
+    await collector.stop(reason="backend_shutdown")

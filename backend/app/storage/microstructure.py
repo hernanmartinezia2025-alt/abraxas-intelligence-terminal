@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import json
+from datetime import datetime, timezone
+
 from backend.app.storage.sqlite import connect, initialize_database
 
 
@@ -115,10 +118,129 @@ def get_microstructure_status(symbol: str) -> dict:
             """,
             (normalized,),
         ).fetchone()
+        delta_row = connection.execute(
+            """
+            SELECT COUNT(*) AS row_count, MIN(event_time) AS first_time, MAX(event_time) AS last_time
+            FROM order_book_deltas WHERE symbol = ?
+            """,
+            (normalized,),
+        ).fetchone()
     return {
         "symbol": normalized,
         "aggregate_trades": dict(trade_row),
         "order_book_snapshots": dict(snapshot_row),
-        "continuous_stream": False,
-        "historical_l2_ready": int(snapshot_row["row_count"] or 0) >= 100,
+        "order_book_deltas": dict(delta_row),
+        "continuous_stream": int(delta_row["row_count"] or 0) > 0,
+        "historical_l2_ready": int(delta_row["row_count"] or 0) >= 1000,
     }
+
+
+def save_order_book_deltas(deltas: list[dict]) -> int:
+    initialize_database()
+    if not deltas:
+        return 0
+    with connect() as connection:
+        before = connection.total_changes
+        connection.executemany(
+            """
+            INSERT INTO order_book_deltas (
+                symbol, event_time, first_update_id, final_update_id,
+                bid_changes_json, ask_changes_json, level_change_count,
+                source, received_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(symbol, final_update_id) DO NOTHING
+            """,
+            [
+                (
+                    item["symbol"], item["event_time"], item["first_update_id"],
+                    item["final_update_id"], json.dumps(item["bid_changes"], ensure_ascii=True),
+                    json.dumps(item["ask_changes"], ensure_ascii=True),
+                    len(item["bid_changes"]) + len(item["ask_changes"]),
+                    item.get("source", "binance_depth_stream"), item["received_at"],
+                )
+                for item in deltas
+            ],
+        )
+        return connection.total_changes - before
+
+
+def prune_microstructure(symbol: str, trade_before_ms: int, delta_before_ms: int) -> dict:
+    initialize_database()
+    with connect() as connection:
+        trade_cursor = connection.execute(
+            "DELETE FROM market_aggregate_trades WHERE symbol = ? AND event_time < ?",
+            (symbol.upper(), int(trade_before_ms)),
+        )
+        delta_cursor = connection.execute(
+            "DELETE FROM order_book_deltas WHERE symbol = ? AND event_time < ?",
+            (symbol.upper(), int(delta_before_ms)),
+        )
+    return {"trades_deleted": trade_cursor.rowcount, "deltas_deleted": delta_cursor.rowcount}
+
+
+def start_collector_run(symbols: list[str], config: dict) -> int:
+    initialize_database()
+    now = datetime.now(timezone.utc).isoformat()
+    with connect() as connection:
+        cursor = connection.execute(
+            """
+            INSERT INTO microstructure_collector_runs (
+                symbols_json, status, config_json, started_at, updated_at
+            ) VALUES (?, 'starting', ?, ?, ?)
+            """,
+            (json.dumps(symbols), json.dumps(config, ensure_ascii=True), now, now),
+        )
+        return int(cursor.lastrowid)
+
+
+def update_collector_run(run_id: int, state: dict, status: str | None = None, stopped: bool = False) -> None:
+    initialize_database()
+    now = datetime.now(timezone.utc).isoformat()
+    effective_status = status or state.get("status") or "running"
+    with connect() as connection:
+        connection.execute(
+            """
+            UPDATE microstructure_collector_runs SET
+                status = ?, messages_received = ?, trades_saved = ?, deltas_saved = ?,
+                snapshots_saved = ?, reconnect_count = ?, sequence_gap_count = ?,
+                last_event_at = ?, last_error = ?, stopped_at = ?, updated_at = ?
+            WHERE id = ?
+            """,
+            (
+                effective_status, int(state.get("messages_received", 0)),
+                int(state.get("trades_saved", 0)), int(state.get("deltas_saved", 0)),
+                int(state.get("snapshots_saved", 0)), int(state.get("reconnect_count", 0)),
+                int(state.get("sequence_gap_count", 0)), state.get("last_event_at"),
+                state.get("last_error"), now if stopped else None, now, run_id,
+            ),
+        )
+
+
+def reconcile_interrupted_collectors() -> int:
+    initialize_database()
+    now = datetime.now(timezone.utc).isoformat()
+    with connect() as connection:
+        cursor = connection.execute(
+            """
+            UPDATE microstructure_collector_runs
+            SET status = 'interrupted', stopped_at = ?, updated_at = ?,
+                last_error = COALESCE(last_error, 'Backend restarted while collector was active.')
+            WHERE status IN ('starting', 'running', 'stopping')
+            """,
+            (now, now),
+        )
+        return cursor.rowcount
+
+
+def latest_collector_run() -> dict | None:
+    initialize_database()
+    with connect() as connection:
+        row = connection.execute(
+            "SELECT * FROM microstructure_collector_runs ORDER BY id DESC LIMIT 1"
+        ).fetchone()
+    if not row:
+        return None
+    payload = dict(row)
+    payload["symbols"] = json.loads(payload.pop("symbols_json"))
+    payload["config"] = json.loads(payload.pop("config_json"))
+    return payload

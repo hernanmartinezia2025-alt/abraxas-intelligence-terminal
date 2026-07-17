@@ -45,12 +45,22 @@ def capture_microstructure_window(
 
 
 def microstructure_status(symbol: str) -> dict:
+    status = get_microstructure_status(symbol)
+    stream_active = bool(status.get("continuous_stream"))
     return {
         "contract": "microstructure_storage_v1",
-        **get_microstructure_status(symbol),
+        **status,
         "boundaries": {
-            "aggregate_trades": "REST windows, not a continuous WebSocket stream.",
-            "order_book": "Persisted point-in-time snapshots, not continuous L2 deltas.",
+            "aggregate_trades": (
+                "Persisted REST windows plus public WebSocket aggTrades."
+                if stream_active
+                else "Persisted REST windows; start the collector for continuous WebSocket flow."
+            ),
+            "order_book": (
+                "Sequenced public L2 deltas plus periodic reconstructed-book snapshots."
+                if stream_active
+                else "Point-in-time snapshots only; continuous L2 collection is inactive."
+            ),
             "liquidations": "Unavailable.",
         },
     }

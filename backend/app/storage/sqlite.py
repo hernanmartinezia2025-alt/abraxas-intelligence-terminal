@@ -306,6 +306,44 @@ CREATE TABLE IF NOT EXISTS order_book_levels (
 CREATE INDEX IF NOT EXISTS idx_order_book_levels_snapshot_side
 ON order_book_levels(snapshot_id, side, level_index);
 
+CREATE TABLE IF NOT EXISTS order_book_deltas (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    symbol TEXT NOT NULL,
+    event_time INTEGER NOT NULL,
+    first_update_id INTEGER NOT NULL,
+    final_update_id INTEGER NOT NULL,
+    bid_changes_json TEXT NOT NULL,
+    ask_changes_json TEXT NOT NULL,
+    level_change_count INTEGER NOT NULL,
+    source TEXT NOT NULL,
+    received_at TEXT NOT NULL,
+    UNIQUE(symbol, final_update_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_order_book_deltas_symbol_time
+ON order_book_deltas(symbol, event_time);
+
+CREATE TABLE IF NOT EXISTS microstructure_collector_runs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    symbols_json TEXT NOT NULL,
+    status TEXT NOT NULL CHECK(status IN ('starting', 'running', 'stopping', 'stopped', 'failed', 'interrupted')),
+    messages_received INTEGER NOT NULL DEFAULT 0,
+    trades_saved INTEGER NOT NULL DEFAULT 0,
+    deltas_saved INTEGER NOT NULL DEFAULT 0,
+    snapshots_saved INTEGER NOT NULL DEFAULT 0,
+    reconnect_count INTEGER NOT NULL DEFAULT 0,
+    sequence_gap_count INTEGER NOT NULL DEFAULT 0,
+    last_event_at TEXT,
+    last_error TEXT,
+    config_json TEXT NOT NULL,
+    started_at TEXT NOT NULL,
+    stopped_at TEXT,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_microstructure_collector_runs_status_time
+ON microstructure_collector_runs(status, started_at);
+
 CREATE TABLE IF NOT EXISTS paper_order_proposals (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     signal_evaluation_id INTEGER NOT NULL UNIQUE,

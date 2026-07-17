@@ -1,4 +1,6 @@
-const API_BASE = import.meta.env.VITE_ABRAXAS_API_BASE || `http://${window.location.hostname || "127.0.0.1"}:8000`;
+// Keep browser traffic same-origin in local development. Vite proxies /api to
+// FastAPI, while deployments can still provide an explicit API base URL.
+const API_BASE = import.meta.env.VITE_ABRAXAS_API_BASE || "";
 
 async function request(path, options = {}) {
   const response = await fetch(`${API_BASE}${path}`, {

@@ -88,6 +88,7 @@ SOURCE_CATALOG = [
             "simulated_ledger",
             "exchange_source_health",
             "execution_intents",
+            "liquidity_sweep_evaluations",
         ],
         "purpose": "Base local para cache, auditoria y datasets analiticos.",
     },
@@ -205,6 +206,15 @@ DATASET_CATALOG = [
         "powerbi_ready": True,
         "bot_ready": True,
         "description": "Evaluaciones auditables regla por regla sobre features reales; no crean ordenes ni intents.",
+    },
+    {
+        "dataset_id": "liquidity_sweep_evaluations",
+        "table": "liquidity_sweep_evaluations",
+        "label": "Liquidity Sweep Evaluations",
+        "category": "bot_forge",
+        "powerbi_ready": True,
+        "bot_ready": False,
+        "description": "Observaciones auditables de barridos por vela cerrada, agotamiento y snapshot L2; ejecucion bloqueada.",
     },
     {
         "dataset_id": "paper_order_proposals",

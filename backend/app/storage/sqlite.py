@@ -237,6 +237,22 @@ CREATE TABLE IF NOT EXISTS strategy_signal_evaluations (
 CREATE INDEX IF NOT EXISTS idx_strategy_signals_bot_time
 ON strategy_signal_evaluations(bot_id, evaluated_at);
 
+CREATE TABLE IF NOT EXISTS liquidity_sweep_evaluations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    evaluation_key TEXT NOT NULL UNIQUE,
+    symbol TEXT NOT NULL,
+    timeframe TEXT NOT NULL,
+    candle_timestamp INTEGER NOT NULL,
+    state TEXT NOT NULL,
+    direction TEXT NOT NULL,
+    order_allowed INTEGER NOT NULL CHECK(order_allowed IN (0, 1)),
+    result_json TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_liquidity_sweeps_symbol_time
+ON liquidity_sweep_evaluations(symbol, timeframe, candle_timestamp);
+
 CREATE TABLE IF NOT EXISTS paper_order_proposals (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     signal_evaluation_id INTEGER NOT NULL UNIQUE,

@@ -344,6 +344,36 @@ CREATE TABLE IF NOT EXISTS microstructure_collector_runs (
 CREATE INDEX IF NOT EXISTS idx_microstructure_collector_runs_status_time
 ON microstructure_collector_runs(status, started_at);
 
+CREATE TABLE IF NOT EXISTS chart_indicator_presets (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    symbol TEXT NOT NULL,
+    timeframe TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active', 'archived')),
+    active_version INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE(name, symbol, timeframe)
+);
+
+CREATE INDEX IF NOT EXISTS idx_chart_indicator_presets_symbol_timeframe
+ON chart_indicator_presets(symbol, timeframe, status);
+
+CREATE TABLE IF NOT EXISTS chart_indicator_preset_versions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    preset_id INTEGER NOT NULL,
+    version_number INTEGER NOT NULL,
+    indicators_json TEXT NOT NULL,
+    config_hash TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY(preset_id) REFERENCES chart_indicator_presets(id),
+    UNIQUE(preset_id, version_number),
+    UNIQUE(preset_id, config_hash)
+);
+
+CREATE INDEX IF NOT EXISTS idx_chart_indicator_preset_versions_preset
+ON chart_indicator_preset_versions(preset_id, version_number);
+
 CREATE TABLE IF NOT EXISTS paper_order_proposals (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     signal_evaluation_id INTEGER NOT NULL UNIQUE,

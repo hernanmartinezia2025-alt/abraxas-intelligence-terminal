@@ -29,6 +29,7 @@ class OrderIntent:
     strategy_hash: str | None
     signal_evaluation_id: int | None
     proposal_id: int | None
+    trigger_reason: str | None
     created_at: str
 
     @classmethod
@@ -54,6 +55,7 @@ class OrderIntent:
             strategy_hash=payload.get("strategy_hash"),
             signal_evaluation_id=payload.get("signal_evaluation_id"),
             proposal_id=payload.get("proposal_id"),
+            trigger_reason=payload.get("trigger_reason"),
             created_at=utc_now_iso(),
         )
 

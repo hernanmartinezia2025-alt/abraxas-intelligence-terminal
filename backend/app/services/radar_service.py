@@ -9,6 +9,7 @@ from backend.app.market.sentiment_analysis import build_sentiment_analysis
 from backend.app.market.horizon_pressure import build_horizon_pressure
 from backend.app.market.signals import build_reading, classify_risk
 from backend.app.storage.sqlite import connect, initialize_database
+from backend.app.storage.paper import evaluate_open_protections
 
 
 def update_market(symbols: list[str] | None = None) -> list[dict]:
@@ -46,6 +47,7 @@ def update_market(symbols: list[str] | None = None) -> list[dict]:
             """,
             rows,
         )
+    evaluate_open_protections([row["symbol"] for row in rows])
     return rows
 
 

@@ -221,8 +221,10 @@ def account_snapshot() -> dict:
                     try:
                         risk = json.loads(version["strategy_json"]).get("risk", {})
                         average = float(allocation["average_price"])
-                        allocation["stop_loss_price"] = round(average * (1 - abs(float(risk.get("stop_loss_pct", 0))) / 100), 8)
-                        allocation["take_profit_price"] = round(average * (1 + abs(float(risk.get("take_profit_pct", 0))) / 100), 8)
+                        if allocation.get("stop_loss_price") is None:
+                            allocation["stop_loss_price"] = round(average * (1 - abs(float(risk.get("stop_loss_pct", 0))) / 100), 8)
+                        if allocation.get("take_profit_price") is None:
+                            allocation["take_profit_price"] = round(average * (1 + abs(float(risk.get("take_profit_pct", 0))) / 100), 8)
                     except (TypeError, ValueError, json.JSONDecodeError):
                         pass
         proposals = [dict(row) for row in connection.execute(
@@ -475,9 +477,40 @@ def _execute_market_intent_serialized(intent: OrderIntent) -> dict:
         new_cash = float(account["cash_balance"]) + cash_delta
         connection.execute("UPDATE simulated_accounts SET cash_balance = ?, realized_pnl = realized_pnl + ?, updated_at = ? WHERE id = ?", (new_cash, realized_delta, now, ACCOUNT_ID))
         fill_id = connection.execute("INSERT INTO simulated_fills (order_id, account_id, symbol, side, quantity, price, fee, filled_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", (order_id, ACCOUNT_ID, symbol, side, quantity, price, fee, now)).lastrowid
-        connection.execute("INSERT INTO simulated_ledger (account_id, event_type, reference_id, symbol, cash_delta, realized_pnl_delta, cash_balance, payload_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", (ACCOUNT_ID, "market_fill", fill_id, symbol, cash_delta, realized_delta, new_cash, json.dumps({"order_id": order_id, "side": side, "quantity": quantity, "price": price, "fee": fee}), now))
+        connection.execute("INSERT INTO simulated_ledger (account_id, event_type, reference_id, symbol, cash_delta, realized_pnl_delta, cash_balance, payload_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", (ACCOUNT_ID, "market_fill", fill_id, symbol, cash_delta, realized_delta, new_cash, json.dumps({"order_id": order_id, "side": side, "quantity": quantity, "price": price, "fee": fee, "trigger_reason": intent.trigger_reason}), now))
         update_execution_intent(intent.id, "filled", f"simulated_fill:{fill_id}", decision["validation_id"], connection=connection)
     return {"intent_id": intent.id, "order_id": order_id, "fill_id": fill_id, "status": status, "risk": decision, "execution_performed": True, "account": account_snapshot()}
+
+
+def evaluate_open_protections(symbols: list[str] | None = None) -> dict:
+    """Evaluate persisted paper protections against the latest local marks."""
+    initialize_database()
+    triggered = []
+    with connect() as connection:
+        rows = connection.execute(
+            """SELECT a.*, p.stop_loss_price, p.take_profit_price, p.trailing_distance_pct, p.highest_price
+               FROM simulated_position_allocations a JOIN paper_position_protections p ON p.allocation_id = a.id
+               WHERE a.account_id = ? AND a.quantity > 0""", (ACCOUNT_ID,)
+        ).fetchall()
+        for row in rows:
+            allocation = dict(row)
+            if symbols and allocation["symbol"] not in symbols:
+                continue
+            mark_row = connection.execute("SELECT price FROM market_snapshots WHERE symbol = ? ORDER BY timestamp DESC, id DESC LIMIT 1", (allocation["symbol"],)).fetchone()
+            if not mark_row:
+                continue
+            mark = float(mark_row["price"])
+            stop = float(allocation["stop_loss_price"]) if allocation["stop_loss_price"] is not None else None
+            take = float(allocation["take_profit_price"]) if allocation["take_profit_price"] is not None else None
+            reason = "take_profit" if take is not None and mark >= take else "trailing_stop" if allocation["trailing_distance_pct"] and stop is not None and allocation["highest_price"] and mark <= stop and stop > float(allocation["average_price"]) else "stop_loss" if stop is not None and mark <= stop else None
+            if not reason:
+                continue
+            triggered.append(place_market_order({
+                "symbol": allocation["symbol"], "side": "sell", "quantity": allocation["quantity"],
+                "bot_id": allocation["bot_id"], "bot_version_id": allocation["bot_version_id"],
+                "strategy_hash": allocation["strategy_hash"], "trigger_reason": reason,
+            }))
+    return {"evaluated": len(rows), "triggered": len(triggered), "results": triggered}
 
 
 def reset_account(initial_balance: float, reason: str) -> dict:

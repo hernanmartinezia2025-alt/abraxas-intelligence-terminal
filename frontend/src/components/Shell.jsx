@@ -4,6 +4,7 @@ import GlobalAssetSelector from "./GlobalAssetSelector.jsx";
 const NAV_ITEMS = [
   ["markets", "Markets", "overview", "◈"],
   ["trade", "Trade", "spot desk", "⌁"],
+  ["portfolio", "Portfolio", "spot long term", "◐"],
   ["map", "Map", "live world", "◎"],
   ["research", "Research", "strategy", "∿"],
   ["data", "Data", "sources", "▦"],

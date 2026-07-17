@@ -300,6 +300,14 @@ DATASET_CATALOG = [
             ("simulated_ledger", "Ledger de caja y eventos de la cuenta paper."),
         ]
     ],
+    *[
+        {"dataset_id": table, "table": table, "label": table.replace("_", " ").title(), "category": "spot_portfolio", "powerbi_ready": True, "bot_ready": False, "description": description}
+        for table, description in [
+            ("spot_portfolios", "Cuentas simuladas de acumulacion spot a largo plazo."),
+            ("spot_holdings", "Tenencias spot, costo promedio y PnL realizado."),
+            ("spot_transactions", "Compras y ventas spot simuladas con precio y timestamp auditables."),
+        ]
+    ],
     {
         "dataset_id": "exchange_source_health",
         "table": "exchange_source_health",

@@ -3963,3 +3963,34 @@ button, a, input, select, textarea {
   :root, html, body { scroll-behavior: auto; }
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
+
+.spot-portfolio-page { display: grid; gap: 12px; }
+.spot-summary-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.spot-summary-grid article { display: grid; gap: 6px; padding: 14px; border: 1px solid rgba(223,192,122,.18); border-radius: 8px; background: linear-gradient(145deg,#17212b,#10171f); }
+.spot-summary-grid span,.spot-summary-grid small { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .06em; }
+.spot-summary-grid strong { color: #fff; font: 700 22px var(--font-num); }
+.spot-workbench { display: grid; grid-template-columns: minmax(280px,.8fr) minmax(400px,1.4fr); gap: 10px; }
+.spot-ticket form,.scenario-controls { display: grid; gap: 9px; padding: 14px; }
+.spot-ticket label,.scenario-controls label { display: grid; gap: 5px; color: var(--muted); font-size: 10px; text-transform: uppercase; }
+.spot-ticket input,.spot-ticket select,.scenario-controls input { border: 1px solid rgba(223,192,122,.22); border-radius: 5px; background: #101820; color: #eef3f6; padding: 9px; font: 600 12px var(--font-num); }
+.spot-ticket button { border: 1px solid rgba(223,192,122,.55); border-radius: 5px; background: #dfc079; color: #101820; padding: 10px; font-weight: 800; cursor: pointer; }
+.spot-ticket form small,.spot-scenario > small { color: var(--muted); font-size: 10px; }
+.scenario-controls { grid-template-columns: repeat(3,1fr); }
+.spot-projection-chart { width: 100%; height: 190px; padding: 0 14px; overflow: visible; }
+.spot-projection-chart polyline { fill: none; vector-effect: non-scaling-stroke; }
+.spot-projection-chart .contributed { stroke: rgba(223,192,122,.45); stroke-width: 1.2; stroke-dasharray: 3 2; }
+.spot-projection-chart .projected { stroke: #36d1a1; stroke-width: 2; }
+.scenario-result { display: flex; gap: 18px; padding: 8px 14px 12px; color: var(--muted); font-size: 11px; }
+.scenario-result b { color: #fff; margin-left: 5px; font-family: var(--font-num); }
+.spot-scenario > small { display: block; padding: 0 14px 14px; }
+.spot-holdings-table { padding: 8px 14px 14px; overflow-x: auto; }
+.spot-holdings-table > div { min-width: 760px; display: grid; grid-template-columns: 1fr 1.15fr 1fr 1fr .7fr 1.4fr; gap: 10px; padding: 9px 4px; border-bottom: 1px solid rgba(255,255,255,.07); align-items: center; }
+.spot-holdings-table .table-head { color: var(--muted); font-size: 9px; text-transform: uppercase; }
+.spot-holdings-table span,.spot-holdings-table b { font: 600 11px var(--font-num); }
+.methodology-lanes { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; padding: 10px; }
+.methodology-lanes article { display: grid; gap: 6px; padding: 12px; border: 1px solid rgba(255,255,255,.08); border-radius: 6px; background: rgba(255,255,255,.025); }
+.methodology-lanes span { color: var(--brand-2); font-size: 10px; text-transform: uppercase; }
+.methodology-lanes strong { color: #fff; }
+.methodology-lanes p { color: var(--muted); font-size: 11px; line-height: 1.5; margin: 0; }
+@media (max-width: 900px) { .spot-summary-grid { grid-template-columns: repeat(2,1fr); } .spot-workbench { grid-template-columns: 1fr; } .methodology-lanes { grid-template-columns: repeat(2,1fr); } }
+@media (max-width: 560px) { .spot-summary-grid,.methodology-lanes,.scenario-controls { grid-template-columns: 1fr; } }

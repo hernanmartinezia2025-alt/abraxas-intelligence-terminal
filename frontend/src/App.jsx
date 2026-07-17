@@ -5,6 +5,7 @@ import { latestRows } from "./utils/assets.js";
 
 const MarketsPage = lazy(() => import("./pages/MarketsPage.jsx"));
 const TradePage = lazy(() => import("./pages/TradePage.jsx"));
+const SpotPortfolioPage = lazy(() => import("./pages/SpotPortfolioPage.jsx"));
 const LiveMapPage = lazy(() => import("./pages/LiveMapPage.jsx"));
 const ResearchPage = lazy(() => import("./pages/ResearchPage.jsx"));
 const DataPage = lazy(() => import("./pages/DataPage.jsx"));
@@ -14,6 +15,7 @@ const RiskPage = lazy(() => import("./pages/RiskPage.jsx"));
 const PAGE_META = {
   markets: ["Market overview", "Markets"],
   trade: ["Spot desk", "Trade"],
+  portfolio: ["Long-term spot", "Portfolio"],
   map: ["World vectors", "Live Map"],
   research: ["Research desk", "Research"],
   data: ["Data layer", "Data"],
@@ -123,6 +125,7 @@ export default function App() {
       <Suspense fallback={<section className="page-loading-state"><span>ABRAXAS</span><strong>Cargando modulo operativo...</strong></section>}>
         {activePage === "markets" && <MarketsPage rows={rows} sentiment={radar.sentiment} selectedSymbol={selectedSymbol} onSelectSymbol={setSelectedSymbol} />}
         {activePage === "trade" && <TradePage rows={rows} selectedSymbol={selectedSymbol} onSelectSymbol={setSelectedSymbol} />}
+        {activePage === "portfolio" && <SpotPortfolioPage selectedSymbol={selectedSymbol} />}
         {activePage === "map" && <LiveMapPage />}
         {activePage === "research" && <ResearchPage selectedSymbol={selectedSymbol} />}
         {activePage === "data" && <DataPage selectedSymbol={selectedSymbol} />}

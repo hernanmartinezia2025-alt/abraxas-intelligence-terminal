@@ -276,6 +276,18 @@ export function getPaperAccount() {
   return request("/api/paper");
 }
 
+export function getSpotPortfolio() {
+  return request("/api/spot-portfolio");
+}
+
+export function createSpotTransaction(payload) {
+  return request("/api/spot-portfolio/transactions", { method: "POST", body: JSON.stringify(payload) });
+}
+
+export function getSpotProjection(params) {
+  return request(`/api/spot-portfolio/projection?${new URLSearchParams(params)}`);
+}
+
 export function placePaperOrder(payload) {
   return request("/api/paper/orders", { method: "POST", body: JSON.stringify(payload) });
 }

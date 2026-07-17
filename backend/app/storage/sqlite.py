@@ -415,6 +415,48 @@ CREATE TABLE IF NOT EXISTS simulated_accounts (
     updated_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS spot_portfolios (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    base_currency TEXT NOT NULL DEFAULT 'USDT',
+    initial_cash REAL NOT NULL,
+    cash_balance REAL NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS spot_holdings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    portfolio_id INTEGER NOT NULL,
+    symbol TEXT NOT NULL,
+    quantity REAL NOT NULL DEFAULT 0,
+    average_cost REAL NOT NULL DEFAULT 0,
+    realized_pnl REAL NOT NULL DEFAULT 0,
+    updated_at TEXT NOT NULL,
+    UNIQUE(portfolio_id, symbol),
+    FOREIGN KEY(portfolio_id) REFERENCES spot_portfolios(id)
+);
+
+CREATE TABLE IF NOT EXISTS spot_transactions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    portfolio_id INTEGER NOT NULL,
+    symbol TEXT NOT NULL,
+    side TEXT NOT NULL CHECK(side IN ('buy', 'sell')),
+    quantity REAL NOT NULL,
+    price REAL NOT NULL,
+    notional REAL NOT NULL,
+    fee REAL NOT NULL,
+    realized_pnl REAL NOT NULL DEFAULT 0,
+    price_timestamp TEXT NOT NULL,
+    source TEXT NOT NULL,
+    notes TEXT,
+    executed_at TEXT NOT NULL,
+    FOREIGN KEY(portfolio_id) REFERENCES spot_portfolios(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_spot_transactions_portfolio_time
+ON spot_transactions(portfolio_id, executed_at);
+
 CREATE TABLE IF NOT EXISTS simulated_orders (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     account_id INTEGER NOT NULL,

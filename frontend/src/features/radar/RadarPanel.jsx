@@ -1,5 +1,6 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { latestRows } from "../../utils/assets.js";
+import { getCandles } from "../../api/client.js";
 
 function formatPrice(value) {
   return Number(value || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -37,20 +38,22 @@ function compactRisk(level) {
   return "NORMAL";
 }
 
-function Sparkline({ rows, symbol, tone }) {
-  const points = rows
-    .filter((row) => row.symbol === symbol)
-    .slice(0, 72)
-    .reverse()
-    .map((row) => Number(row.price || 0))
-    .filter((price) => Number.isFinite(price));
-  if (points.length < 2) return <div className="asset-sparkline empty">sin historial</div>;
+function Sparkline({ symbol, tone }) {
+  const [points, setPoints] = useState([]);
+  useEffect(() => {
+    let alive = true;
+    getCandles(symbol, "15m", 48).then((payload) => {
+      if (alive) setPoints((payload.candles || []).map((candle) => Number(candle.close)).filter(Number.isFinite));
+    }).catch(() => alive && setPoints([]));
+    return () => { alive = false; };
+  }, [symbol]);
+  if (points.length < 2) return <div className="asset-sparkline empty">sin historial de candles</div>;
   const min = Math.min(...points);
   const max = Math.max(...points);
   const range = max - min || 1;
   const polyline = points.map((price, index) => `${(index / (points.length - 1)) * 100},${25 - ((price - min) / range) * 22}`).join(" ");
   return (
-    <svg className={`asset-sparkline ${tone}`} viewBox="0 0 100 28" preserveAspectRatio="none" role="img" aria-label={`${symbol} historial de snapshots`}>
+    <svg className={`asset-sparkline ${tone}`} viewBox="0 0 100 28" preserveAspectRatio="none" role="img" aria-label={`${symbol} últimos candles de 15 minutos`}>
       <polyline points={polyline} vectorEffect="non-scaling-stroke" />
     </svg>
   );
@@ -149,7 +152,7 @@ export default function RadarPanel({ rows, sentiment, onOpenTrade }) {
                 <b className={tone}>{formatPercent(change)}</b>
                 <small>{compactRisk(row.risk_level)}</small>
               </div>
-              <Sparkline rows={rows} symbol={row.symbol} tone={tone} />
+              <Sparkline symbol={row.symbol} tone={tone} />
               <div className="volume-line">
                 <span>Volumen 24h</span>
                 <b>${formatCompact(row.volume_24h)}</b>

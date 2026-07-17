@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { CandlestickSeries, ColorType, createChart, HistogramSeries, LineSeries } from "lightweight-charts";
+import { CandlestickSeries, ColorType, createChart, createSeriesMarkers, HistogramSeries, LineSeries } from "lightweight-charts";
 import { getCandles, getPaperAccount, updatePaperProtection } from "../../api/client.js";
 
 function normalizeCandles(candles) {
@@ -19,6 +19,7 @@ export default function MarketChart({ symbol = "BTCUSDT", interval = "15m", expa
   const candleSeriesRef = useRef(null);
   const volumeSeriesRef = useRef(null);
   const overlaysRef = useRef({});
+  const markersRef = useRef(null);
   const [candles, setCandles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -147,6 +148,7 @@ export default function MarketChart({ symbol = "BTCUSDT", interval = "15m", expa
     chartRef.current = chart;
     candleSeriesRef.current = candleSeries;
     volumeSeriesRef.current = volumeSeries;
+    markersRef.current = createSeriesMarkers(candleSeries);
 
     return () => {
       chart.remove();
@@ -154,6 +156,8 @@ export default function MarketChart({ symbol = "BTCUSDT", interval = "15m", expa
       candleSeriesRef.current = null;
       volumeSeriesRef.current = null;
       overlaysRef.current = {};
+      markersRef.current?.detach();
+      markersRef.current = null;
     };
   }, []);
 
@@ -178,7 +182,7 @@ export default function MarketChart({ symbol = "BTCUSDT", interval = "15m", expa
       const exit = fill.side === "sell";
       return { time: Math.floor(new Date(fill.filled_at).getTime() / 1000), position: exit ? "aboveBar" : "belowBar", color: exit ? "#ff6376" : "#25d39b", shape: exit ? "arrowDown" : "arrowUp", text: exit ? (trigger || "EXIT") : "ENTRY" };
     }).filter((marker) => Number.isFinite(marker.time));
-    candleSeriesRef.current.setMarkers(markers.sort((a, b) => a.time - b.time));
+    markersRef.current?.setMarkers(markers.sort((a, b) => a.time - b.time));
     overlaysRef.current.sma20?.setData(indicators.sma20 ? sma(20) : []);
     overlaysRef.current.ema50?.setData(indicators.ema50 ? sma(50, true) : []);
     const position = (paper?.positions || []).find((item) => item.symbol === symbol);

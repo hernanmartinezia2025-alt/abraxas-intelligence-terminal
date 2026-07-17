@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { createSpotTransaction, getSpotPortfolio, getSpotProjection } from "../api/client.js";
+import { createSpotTransaction, getSpotAnalysis, getSpotPortfolio, getSpotProjection } from "../api/client.js";
 
 const money = (value) => Number(value || 0).toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 });
 const percent = (value) => `${Number(value || 0) >= 0 ? "+" : ""}${Number(value || 0).toFixed(2)}%`;
@@ -17,11 +17,16 @@ export default function SpotPortfolioPage({ selectedSymbol = "BTCUSDT" }) {
   const [ticket, setTicket] = useState({ symbol: selectedSymbol, side: "buy", quantity: "0.001", notes: "" });
   const [scenario, setScenario] = useState({ monthly_contribution: 250, years: 4, annual_return_pct: 0 });
   const [projection, setProjection] = useState(null);
+  const [analysis, setAnalysis] = useState(null);
   const [message, setMessage] = useState("");
 
   async function load() { try { setSnapshot(await getSpotPortfolio()); setMessage(""); } catch (error) { setMessage(error.message); } }
   useEffect(() => { load(); }, []);
   useEffect(() => { setTicket((current) => ({ ...current, symbol: selectedSymbol })); }, [selectedSymbol]);
+  useEffect(() => {
+    setAnalysis(null);
+    getSpotAnalysis(selectedSymbol, "1d", 300).then(setAnalysis).catch((error) => setMessage(error.message));
+  }, [selectedSymbol]);
   useEffect(() => {
     if (!snapshot) return;
     getSpotProjection({ initial_value: snapshot.equity, ...scenario }).then(setProjection).catch((error) => setMessage(error.message));
@@ -77,6 +82,21 @@ export default function SpotPortfolioPage({ selectedSymbol = "BTCUSDT" }) {
     <section className="exchange-panel spot-holdings">
       <div className="exchange-panel-head compact"><div><p className="eyebrow">Holdings</p><h2>Cartera spot simulada</h2></div><span>SQLITE / AUDITABLE</span></div>
       {allocation.length ? <div className="spot-holdings-table"><div className="table-head"><span>Activo</span><span>Cantidad</span><span>Costo medio</span><span>Precio</span><span>Peso</span><span>PnL</span></div>{allocation.map((holding) => <div key={holding.symbol}><strong>{holding.symbol}</strong><span>{Number(holding.quantity).toFixed(8)}</span><span>{money(holding.average_cost)}</span><span>{money(holding.market_price)}</span><span>{holding.weight_pct.toFixed(2)}%</span><b className={holding.unrealized_pnl >= 0 ? "positive" : "negative"}>{money(holding.unrealized_pnl)} · {percent(holding.return_pct)}</b></div>)}</div> : <div className="chart-state">Sin compras spot simuladas todavía.</div>}
+    </section>
+
+    <section className="exchange-panel spot-analysis-panel">
+      <div className="exchange-panel-head compact"><div><p className="eyebrow">Daily evidence engine</p><h2>{selectedSymbol} · estructura de largo plazo</h2></div><span>{analysis ? `${analysis.candles_used} CANDLES` : "CARGANDO"}</span></div>
+      {analysis ? <>
+        <div className="spot-analysis-grid">
+          <article><span>Tendencia</span><strong>{analysis.chartism.trend.replaceAll("_", " ")}</strong><small>Cierre {money(analysis.latest_close)}</small></article>
+          <article><span>Soporte 90</span><strong>{money(analysis.chartism.support_90)}</strong><small>mínimo observado</small></article>
+          <article><span>Resistencia 90</span><strong>{money(analysis.chartism.resistance_90)}</strong><small>máximo observado</small></article>
+          <article><span>Posición del rango</span><strong>{analysis.chartism.range_position_pct.toFixed(1)}%</strong><small>0 soporte · 100 resistencia</small></article>
+          <article><span>Wyckoff</span><strong>{analysis.wyckoff.hypothesis.replaceAll("_", " ")}</strong><small>volumen relativo {analysis.wyckoff.relative_volume_20 ? analysis.wyckoff.relative_volume_20.toFixed(2) : "--"}x</small></article>
+          <article><span>Elliott</span><strong>{analysis.elliott.pivots.length} pivotes</strong><small>conteo manual requerido</small></article>
+        </div>
+        <div className="spot-analysis-reading"><span>Hipótesis Wyckoff</span><p>{analysis.wyckoff.evidence}</p><small>{analysis.elliott.warning}</small></div>
+      </> : <div className="chart-state">Preparando candles diarios reales para el análisis.</div>}
     </section>
 
     <section className="exchange-panel methodology-lanes">

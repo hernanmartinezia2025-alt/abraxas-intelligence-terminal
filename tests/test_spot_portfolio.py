@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from backend.app.storage import sqlite as storage_sqlite
+from backend.app.analytics.spot_analysis import analyze_spot_candles
 from backend.app.storage.sqlite import connect, initialize_database
 from backend.app.storage.spot_portfolio import execute_spot_transaction, portfolio_snapshot, project_contributions
 
@@ -40,6 +41,16 @@ class SpotPortfolioTests(unittest.TestCase):
         projection = project_contributions(1000, 100, 2, 0)
         self.assertEqual(projection["final_value"], 3400)
         self.assertEqual(projection["mode"], "user_assumption_scenario")
+
+    def test_daily_analysis_exposes_evidence_without_asserting_elliott_count(self) -> None:
+        candles = [
+            {"timestamp": index, "open": 100 + index, "high": 102 + index, "low": 98 + index, "close": 101 + index, "volume": 1000 + index}
+            for index in range(220)
+        ]
+        analysis = analyze_spot_candles("BTCUSDT", "1d", candles)
+        self.assertEqual(analysis["chartism"]["trend"], "strong_uptrend")
+        self.assertEqual(analysis["elliott"]["status"], "manual_count_required")
+        self.assertEqual(analysis["wyckoff"]["status"], "heuristic_hypothesis")
 
 
 if __name__ == "__main__":

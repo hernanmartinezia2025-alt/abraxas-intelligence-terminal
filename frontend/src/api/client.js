@@ -288,6 +288,10 @@ export function getSpotProjection(params) {
   return request(`/api/spot-portfolio/projection?${new URLSearchParams(params)}`);
 }
 
+export function getSpotAnalysis(symbol = "BTCUSDT", timeframe = "1d", limit = 300) {
+  return request(`/api/spot-portfolio/analysis?${new URLSearchParams({ symbol, timeframe, limit: String(limit) })}`);
+}
+
 export function placePaperOrder(payload) {
   return request("/api/paper/orders", { method: "POST", body: JSON.stringify(payload) });
 }

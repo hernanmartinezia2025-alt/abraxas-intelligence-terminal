@@ -164,6 +164,72 @@ def save_order_book_deltas(deltas: list[dict]) -> int:
         return connection.total_changes - before
 
 
+def get_order_book_replay_anchor(symbol: str, target_time_iso: str) -> dict | None:
+    initialize_database()
+    normalized = symbol.upper()
+    with connect() as connection:
+        snapshot = connection.execute(
+            """
+            SELECT id, symbol, source, last_update_id, fetched_at
+            FROM order_book_snapshots
+            WHERE symbol = ? AND source = 'binance_depth_stream_local_book'
+              AND last_update_id IS NOT NULL AND fetched_at <= ?
+            ORDER BY fetched_at DESC, id DESC
+            LIMIT 1
+            """,
+            (normalized, target_time_iso),
+        ).fetchone()
+        if not snapshot:
+            return None
+        levels = connection.execute(
+            """
+            SELECT side, level_index, price, quantity, notional
+            FROM order_book_levels
+            WHERE snapshot_id = ?
+            ORDER BY side, level_index
+            """,
+            (snapshot["id"],),
+        ).fetchall()
+    payload = dict(snapshot)
+    payload["bids"] = [dict(row) for row in levels if row["side"] == "bid"]
+    payload["asks"] = [dict(row) for row in levels if row["side"] == "ask"]
+    return payload
+
+
+def list_order_book_deltas_for_replay(
+    symbol: str,
+    after_update_id: int,
+    target_time_ms: int,
+    limit: int = 50_001,
+) -> list[dict]:
+    initialize_database()
+    with connect() as connection:
+        rows = connection.execute(
+            """
+            SELECT event_time, first_update_id, final_update_id, bid_changes_json,
+                   ask_changes_json, source, received_at
+            FROM order_book_deltas
+            WHERE symbol = ? AND final_update_id > ? AND event_time <= ?
+            ORDER BY final_update_id
+            LIMIT ?
+            """,
+            (symbol.upper(), int(after_update_id), int(target_time_ms), int(limit)),
+        ).fetchall()
+    return [
+        {
+            "symbol": symbol.upper(),
+            "event_time": row["event_time"],
+            "first_update_id": row["first_update_id"],
+            "final_update_id": row["final_update_id"],
+            "bid_changes": json.loads(row["bid_changes_json"]),
+            "ask_changes": json.loads(row["ask_changes_json"]),
+            "source": row["source"],
+            "received_at": row["received_at"],
+        }
+        for row in rows
+    ]
+
+
 def prune_microstructure(symbol: str, trade_before_ms: int, delta_before_ms: int) -> dict:
     initialize_database()
     with connect() as connection:

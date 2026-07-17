@@ -1,9 +1,14 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 from backend.app.market.binance import fetch_aggregate_trades
+from backend.app.market.local_order_book import DepthSequenceGap, LocalOrderBook
 from backend.app.services.order_book_service import get_order_book
 from backend.app.storage.microstructure import (
     get_microstructure_status,
+    get_order_book_replay_anchor,
+    list_order_book_deltas_for_replay,
     list_aggregate_trades,
     save_aggregate_trades,
     save_order_book_snapshot,
@@ -74,4 +79,79 @@ def microstructure_trades(symbol: str, start_time: int, end_time: int, limit: in
         "end_time": end_time,
         "count": len(trades),
         "trades": trades,
+    }
+
+
+def replay_order_book(
+    symbol: str,
+    target_time: int,
+    levels: int = 100,
+    max_deltas: int = 50_000,
+) -> dict:
+    normalized = symbol.upper().strip()
+    target_time = int(target_time)
+    status = get_microstructure_status(normalized)
+    first_delta = status["order_book_deltas"].get("first_time")
+    last_delta = status["order_book_deltas"].get("last_time")
+    if first_delta is None or last_delta is None:
+        raise ValueError("No persisted L2 delta coverage exists for this symbol.")
+    if target_time < int(first_delta) or target_time > int(last_delta):
+        raise ValueError(
+            f"target_time must be inside persisted L2 coverage {first_delta}-{last_delta}."
+        )
+
+    target_iso = datetime.fromtimestamp(target_time / 1000, tz=timezone.utc).isoformat()
+    anchor = get_order_book_replay_anchor(normalized, target_iso)
+    if not anchor:
+        raise ValueError("No reconstructed-book anchor exists at or before target_time.")
+    deltas = list_order_book_deltas_for_replay(
+        normalized,
+        int(anchor["last_update_id"]),
+        target_time,
+        limit=max_deltas + 1,
+    )
+    if len(deltas) > max_deltas:
+        raise ValueError(
+            f"Replay requires more than max_deltas={max_deltas}; choose a nearer target or anchor."
+        )
+
+    book = LocalOrderBook.from_snapshot(anchor)
+    applied = 0
+    stale = 0
+    try:
+        for delta in deltas:
+            if book.apply(delta):
+                applied += 1
+            else:
+                stale += 1
+    except DepthSequenceGap as exc:
+        raise ValueError(f"Replay is incomplete because a persisted L2 sequence gap was found: {exc}") from exc
+
+    reconstructed = book.snapshot_payload(limit=levels, fetched_at=target_iso)
+    reconstructed["source"] = "sqlite_sequenced_l2_replay"
+    return {
+        "contract": "order_book_replay_v1",
+        "symbol": normalized,
+        "target_time": target_time,
+        "coverage": {"first_event_time": first_delta, "last_event_time": last_delta},
+        "anchor": {
+            "snapshot_id": anchor["id"],
+            "fetched_at": anchor["fetched_at"],
+            "last_update_id": anchor["last_update_id"],
+            "stored_levels": len(anchor["bids"]) + len(anchor["asks"]),
+        },
+        "replay": {
+            "sequence_complete": True,
+            "deltas_read": len(deltas),
+            "deltas_applied": applied,
+            "stale_deltas_skipped": stale,
+            "final_update_id": book.last_update_id,
+            "max_deltas": max_deltas,
+        },
+        "book": reconstructed,
+        "claim_boundary": (
+            "Sequence-complete reconstruction within the persisted anchor depth. "
+            "It is not a full exchange book and does not expose hidden or cancelled stop orders."
+        ),
+        "execution_created": False,
     }

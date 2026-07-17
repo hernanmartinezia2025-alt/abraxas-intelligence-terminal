@@ -7,6 +7,7 @@ import {
   getSLHunterReadiness,
   startMicrostructureCollector,
   stopMicrostructureCollector,
+  replayMicrostructureOrderBook,
 } from "../../api/client.js";
 
 const STATE_ORDER = ["scanning", "sweep_unconfirmed", "flow_pending", "exhaustion_pending", "observation_candidate", "executing"];
@@ -34,6 +35,7 @@ export default function SLHunterPanel({ defaultSymbol = "BTCUSDT" }) {
   const [microstructure, setMicrostructure] = useState(null);
   const [collector, setCollector] = useState(null);
   const [collectorLoading, setCollectorLoading] = useState(false);
+  const [replay, setReplay] = useState(null);
   const [evaluation, setEvaluation] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -93,6 +95,23 @@ export default function SLHunterPanel({ defaultSymbol = "BTCUSDT" }) {
       setMicrostructure(await getMicrostructureStatus(form.symbol));
     } catch (collectorError) {
       setError(collectorError.message);
+    } finally {
+      setCollectorLoading(false);
+    }
+  }
+
+  async function handleReplay() {
+    const targetTime = microstructure?.order_book_deltas?.last_time;
+    if (!targetTime) {
+      setError("Todavia no existe cobertura L2 persistida para reconstruir.");
+      return;
+    }
+    setCollectorLoading(true);
+    setError("");
+    try {
+      setReplay(await replayMicrostructureOrderBook({ symbol: form.symbol, targetTime, levels: 100 }));
+    } catch (replayError) {
+      setError(replayError.message);
     } finally {
       setCollectorLoading(false);
     }
@@ -167,10 +186,19 @@ export default function SLHunterPanel({ defaultSymbol = "BTCUSDT" }) {
         </div>
         <div className="sl-collector-actions">
           <p>{collector?.last_error || "Captura publica auditable. No crea ordenes, posiciones ni fills."}</p>
-          {collector?.status === "running" || collector?.status === "starting"
-            ? <button type="button" disabled={collectorLoading} onClick={() => handleCollector("stop")}>Detener captura</button>
-            : <button type="button" disabled={collectorLoading} onClick={() => handleCollector("start")}>Capturar {form.symbol}</button>}
+          <div>
+            <button type="button" disabled={collectorLoading || !microstructure?.order_book_deltas?.last_time} onClick={handleReplay}>Replay ultimo L2</button>
+            {collector?.status === "running" || collector?.status === "starting"
+              ? <button type="button" disabled={collectorLoading} onClick={() => handleCollector("stop")}>Detener captura</button>
+              : <button type="button" disabled={collectorLoading} onClick={() => handleCollector("start")}>Capturar {form.symbol}</button>}
+          </div>
         </div>
+        {replay && <div className="sl-replay-summary">
+          <span>Replay #{replay.anchor?.snapshot_id}</span>
+          <strong>{number(replay.replay?.deltas_applied, 0)} deltas</strong>
+          <b>${number(replay.book?.best_bid)} / ${number(replay.book?.best_ask)}</b>
+          <small>update {replay.replay?.final_update_id} · secuencia completa</small>
+        </div>}
       </section>
 
       <section className="exchange-panel">

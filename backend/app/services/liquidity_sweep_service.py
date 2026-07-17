@@ -23,9 +23,9 @@ def readiness() -> dict:
         "status": "observation_only",
         "allowed_timeframes": sorted(ALLOWED_TIMEFRAMES),
         "order_allowed": False,
-        "available": ["closed_ohlcv", "closed_candle_volume", "squeeze_adx", "current_l2_snapshot", "closed_candle_aggregate_trade_flow", "persisted_l2_snapshots", "continuous_websocket_trade_flow", "continuous_l2_deltas", "audited_collector_lifecycle"],
-        "missing": ["historical_l2_replay", "liquidation_clusters"],
-        "unlock_rule": "Execution remains blocked until missing order-flow data, risk validation and paper evidence exist.",
+        "available": ["closed_ohlcv", "closed_candle_volume", "squeeze_adx", "current_l2_snapshot", "closed_candle_aggregate_trade_flow", "persisted_l2_snapshots", "continuous_websocket_trade_flow", "continuous_l2_deltas", "audited_collector_lifecycle", "historical_l2_replay"],
+        "missing": ["liquidation_clusters"],
+        "unlock_rule": "Execution remains blocked until liquidation evidence, risk validation and paper evidence exist.",
     }
 
 

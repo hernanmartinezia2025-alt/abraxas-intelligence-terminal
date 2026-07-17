@@ -4076,8 +4076,12 @@ button, a, input, select, textarea {
 .sl-collector-grid strong { color: #eef2f4; font: 800 14px var(--font-num); }
 .sl-collector-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 9px; }
 .sl-collector-actions p { margin: 0; color: var(--muted); font-size: 9px; overflow-wrap: anywhere; }
+.sl-collector-actions > div { display: flex; gap: 7px; flex: 0 0 auto; }
 .sl-collector-actions button { flex: 0 0 auto; padding: 8px 12px; border: 1px solid rgba(50,211,164,.42); border-radius: 5px; background: rgba(50,211,164,.09); color: var(--positive); font-size: 9px; font-weight: 800; cursor: pointer; }
 .sl-collector-actions button:disabled { opacity: .5; cursor: wait; }
+.sl-replay-summary { display: grid; grid-template-columns: auto auto 1fr auto; gap: 10px; align-items: center; margin-top: 9px; padding: 9px; border: 1px solid rgba(223,192,122,.18); border-radius: 5px; background: rgba(223,192,122,.035); }
+.sl-replay-summary span,.sl-replay-summary small { color: var(--muted); font-size: 8px; text-transform: uppercase; }
+.sl-replay-summary strong,.sl-replay-summary b { color: var(--brand-2); font: 800 11px var(--font-num); }
 .sl-hunter-controls { display: grid; grid-template-columns: repeat(4,minmax(120px,1fr)) auto; gap: 8px; padding: 12px; align-items: end; }
 .sl-hunter-controls label { display: grid; gap: 5px; color: var(--muted); font-size: 9px; text-transform: uppercase; }
 .sl-hunter-controls input,.sl-hunter-controls select { min-width: 0; padding: 9px; border: 1px solid rgba(223,192,122,.2); border-radius: 5px; background: #0e171f; color: #eef2f4; font: 600 11px var(--font-num); }
@@ -4103,4 +4107,4 @@ button, a, input, select, textarea {
 .sl-history span,.sl-history small { color: var(--muted); font: 500 9px var(--font-num); }
 .sl-history b { color: var(--brand-2); font-size: 9px; text-transform: uppercase; }
 @media (max-width: 1050px) { .sl-capability-grid { grid-template-columns: repeat(4,1fr); } .sl-collector-grid { grid-template-columns: repeat(3,1fr); } .sl-hunter-controls { grid-template-columns: repeat(2,1fr); } .sl-hunter-controls button { grid-column: span 2; } .sl-hunter-grid { grid-template-columns: 1fr; } }
-@media (max-width: 620px) { .sl-hunter-command { align-items: flex-start; flex-direction: column; } .sl-hunter-lock { justify-items: start; } .sl-capability-grid,.sl-collector-grid,.sl-state-machine,.sl-hunter-controls,.sl-metric-grid,.sl-plan-values { grid-template-columns: 1fr; } .sl-collector-actions { align-items: stretch; flex-direction: column; } .sl-collector-actions button { width: 100%; } .sl-hunter-controls button { grid-column: auto; } .sl-state-machine { overflow-x: auto; grid-template-columns: repeat(6,150px); } .sl-history button { grid-template-columns: 42px 1fr; } }
+@media (max-width: 620px) { .sl-hunter-command { align-items: flex-start; flex-direction: column; } .sl-hunter-lock { justify-items: start; } .sl-capability-grid,.sl-collector-grid,.sl-replay-summary,.sl-state-machine,.sl-hunter-controls,.sl-metric-grid,.sl-plan-values { grid-template-columns: 1fr; } .sl-collector-actions { align-items: stretch; flex-direction: column; } .sl-collector-actions > div { flex-direction: column; } .sl-collector-actions button { width: 100%; } .sl-hunter-controls button { grid-column: auto; } .sl-state-machine { overflow-x: auto; grid-template-columns: repeat(6,150px); } .sl-history button { grid-template-columns: 42px 1fr; } }

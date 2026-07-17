@@ -82,6 +82,15 @@ export function stopMicrostructureCollector() {
   return request("/api/microstructure/collector/stop", { method: "POST" });
 }
 
+export function replayMicrostructureOrderBook({ symbol = "BTCUSDT", targetTime, levels = 100 }) {
+  const params = new URLSearchParams({
+    symbol,
+    target_time: String(targetTime),
+    levels: String(levels),
+  });
+  return request(`/api/microstructure/replay?${params}`);
+}
+
 export function captureMicrostructure(payload) {
   return request("/api/microstructure/capture", { method: "POST", body: JSON.stringify(payload) });
 }

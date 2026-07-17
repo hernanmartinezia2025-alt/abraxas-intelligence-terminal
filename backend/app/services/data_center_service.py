@@ -255,7 +255,7 @@ DATASET_CATALOG = [
         "category": "market_microstructure",
         "powerbi_ready": True,
         "bot_ready": True,
-        "description": "Eventos L2 publicos de Binance validados por update ID para reconstruccion y futuro replay local.",
+        "description": "Eventos L2 publicos de Binance validados por update ID para reconstruccion y replay local acotado.",
     },
     {
         "dataset_id": "microstructure_collector_runs",

@@ -7,6 +7,7 @@ from backend.app.services.microstructure_service import (
     capture_microstructure_window,
     microstructure_status,
     microstructure_trades,
+    replay_order_book,
 )
 from backend.app.services.microstructure_collector import collector
 
@@ -55,6 +56,19 @@ def trades(
     limit: int = Query(default=1000, ge=1, le=5000),
 ) -> dict:
     return microstructure_trades(symbol, start_time, end_time, limit)
+
+
+@router.get("/replay")
+def replay(
+    symbol: str = Query(default="BTCUSDT", min_length=3, max_length=24),
+    target_time: int = Query(gt=0),
+    levels: int = Query(default=100, ge=5, le=500),
+    max_deltas: int = Query(default=50_000, ge=100, le=200_000),
+) -> dict:
+    try:
+        return replay_order_book(symbol, target_time, levels, max_deltas)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
 @router.post("/collector/start")

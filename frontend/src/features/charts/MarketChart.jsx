@@ -170,6 +170,15 @@ export default function MarketChart({ symbol = "BTCUSDT", interval = "15m", expa
         color: candle.close >= candle.open ? "rgba(37, 211, 155, 0.36)" : "rgba(255, 99, 118, 0.34)",
       }))
     );
+    const ledgerByReference = new Map((paper?.ledger || []).map((item) => [String(item.reference_id), item]));
+    const markers = (paper?.fills || []).filter((fill) => fill.symbol === symbol).map((fill) => {
+      const ledger = ledgerByReference.get(String(fill.id));
+      let trigger = "";
+      try { trigger = ledger?.payload_json ? JSON.parse(ledger.payload_json).trigger_reason || "" : ""; } catch { trigger = ""; }
+      const exit = fill.side === "sell";
+      return { time: Math.floor(new Date(fill.filled_at).getTime() / 1000), position: exit ? "aboveBar" : "belowBar", color: exit ? "#ff6376" : "#25d39b", shape: exit ? "arrowDown" : "arrowUp", text: exit ? (trigger || "EXIT") : "ENTRY" };
+    }).filter((marker) => Number.isFinite(marker.time));
+    candleSeriesRef.current.setMarkers(markers.sort((a, b) => a.time - b.time));
     overlaysRef.current.sma20?.setData(indicators.sma20 ? sma(20) : []);
     overlaysRef.current.ema50?.setData(indicators.ema50 ? sma(50, true) : []);
     const position = (paper?.positions || []).find((item) => item.symbol === symbol);

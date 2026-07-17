@@ -46,6 +46,25 @@ export function getCandles(symbol = "BTCUSDT", interval = "15m", limit = 200) {
   return request(`/api/candles?${params}`);
 }
 
+export function computeChartIndicators(payload) {
+  return request("/api/chart-indicators/compute", { method: "POST", body: JSON.stringify(payload) });
+}
+
+export function getChartIndicatorPresets({ symbol = "", timeframe = "", includeArchived = false } = {}) {
+  const params = new URLSearchParams({ include_archived: String(includeArchived) });
+  if (symbol) params.set("symbol", symbol);
+  if (timeframe) params.set("timeframe", timeframe);
+  return request(`/api/chart-indicators/presets?${params}`);
+}
+
+export function saveChartIndicatorPreset(payload) {
+  return request("/api/chart-indicators/presets", { method: "POST", body: JSON.stringify(payload) });
+}
+
+export function archiveChartIndicatorPreset(presetId) {
+  return request(`/api/chart-indicators/presets/${presetId}`, { method: "DELETE" });
+}
+
 export function getOrderBook(symbol = "BTCUSDT", limit = 20) {
   const params = new URLSearchParams({ symbol, limit: String(limit) });
   return request(`/api/order-book?${params}`);

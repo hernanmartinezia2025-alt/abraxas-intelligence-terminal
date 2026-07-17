@@ -14,6 +14,7 @@ import {
   getStatisticsRuns,
   getRiskProfile,
   getPaperAccount,
+  getChartIndicatorPresets,
 } from "../../api/client.js";
 
 const UI_ROUTE_SURFACES = [
@@ -21,6 +22,7 @@ const UI_ROUTE_SURFACES = [
   ["/api/markets", "markets", "Markets"],
   ["/api/candles", "trade", "Trade"],
   ["/api/order-book", "trade", "Trade"],
+  ["/api/chart-indicators", "trade", "Trade / Indicators"],
   ["/api/statistics", "research", "Research"],
   ["/api/regime", "research", "Research"],
   ["/api/features", "research", "Research"],
@@ -161,6 +163,14 @@ export default function BackendSurface({ selectedSymbol = "BTCUSDT" }) {
         description: "Profundidad real Binance Spot para la mesa Trade.",
         call: () => getOrderBook(selectedSymbol, 20),
         rows: ["bids"],
+      },
+      {
+        label: "Chart Indicator Presets",
+        method: "GET",
+        path: "/api/chart-indicators/presets",
+        description: "Workspaces versionados de SMA, EMA y Bollinger calculados por backend.",
+        call: () => getChartIndicatorPresets({ symbol: selectedSymbol, timeframe: "15m" }),
+        rows: ["presets"],
       },
       {
         label: "Risk Engine",

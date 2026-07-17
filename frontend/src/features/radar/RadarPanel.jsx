@@ -42,7 +42,7 @@ function Sparkline({ symbol, tone }) {
   const [points, setPoints] = useState([]);
   useEffect(() => {
     let alive = true;
-    getCandles(symbol, "15m", 48).then((payload) => {
+    getCandles(symbol, "15m", 60).then((payload) => {
       if (alive) setPoints((payload.candles || []).map((candle) => Number(candle.close)).filter(Number.isFinite));
     }).catch(() => alive && setPoints([]));
     return () => { alive = false; };

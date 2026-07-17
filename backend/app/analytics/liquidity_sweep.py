@@ -281,14 +281,25 @@ def build_liquidity_sweep_evaluation(
             "current_l2_snapshot": {"status": "available" if order_book else "degraded", "source": "Binance Depth"},
             "closed_candle_aggregate_trade_flow": {
                 "status": "available" if trade_flow.get("available") else "degraded",
-                "source": "Binance aggregate trades REST",
+                "source": "Binance aggregate trades persisted from REST/WebSocket",
             },
             "persisted_l2_snapshots": {
                 "status": "available" if (microstructure_status or {}).get("order_book_snapshots", {}).get("row_count", 0) else "collecting",
                 "snapshot_count": (microstructure_status or {}).get("order_book_snapshots", {}).get("row_count", 0),
             },
-            "realtime_trade_flow": {"status": "missing", "reason": "REST windows are persisted, but no continuous WebSocket trade stream exists yet."},
-            "historical_l2": {"status": "collecting" if (microstructure_status or {}).get("order_book_snapshots", {}).get("row_count", 0) else "missing", "reason": "Snapshots are accumulating; continuous L2 deltas and replay are not implemented."},
+            "realtime_trade_flow": {
+                "status": "available" if (microstructure_status or {}).get("continuous_stream") else "inactive",
+                "reason": "Public WebSocket aggTrades persist while the audited collector is running.",
+            },
+            "continuous_l2_deltas": {
+                "status": "available" if (microstructure_status or {}).get("continuous_stream") else "inactive",
+                "delta_count": (microstructure_status or {}).get("order_book_deltas", {}).get("row_count", 0),
+                "reason": "Binance update IDs are sequence-validated before persistence.",
+            },
+            "historical_l2": {
+                "status": "available" if (microstructure_status or {}).get("historical_l2_ready") else "collecting",
+                "reason": "Deltas are accumulating; deterministic point-in-time replay is the next gate.",
+            },
             "liquidation_clusters": {"status": "missing", "reason": "No liquidation feed is integrated."},
         },
         "evidence": {

@@ -1,5 +1,13 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { evaluateSLHunter, getMicrostructureStatus, getSLHunterEvaluations, getSLHunterReadiness } from "../../api/client.js";
+import {
+  evaluateSLHunter,
+  getMicrostructureCollectorStatus,
+  getMicrostructureStatus,
+  getSLHunterEvaluations,
+  getSLHunterReadiness,
+  startMicrostructureCollector,
+  stopMicrostructureCollector,
+} from "../../api/client.js";
 
 const STATE_ORDER = ["scanning", "sweep_unconfirmed", "flow_pending", "exhaustion_pending", "observation_candidate", "executing"];
 
@@ -24,6 +32,8 @@ export default function SLHunterPanel({ defaultSymbol = "BTCUSDT" }) {
   const [readiness, setReadiness] = useState(null);
   const [history, setHistory] = useState([]);
   const [microstructure, setMicrostructure] = useState(null);
+  const [collector, setCollector] = useState(null);
+  const [collectorLoading, setCollectorLoading] = useState(false);
   const [evaluation, setEvaluation] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -38,6 +48,7 @@ export default function SLHunterPanel({ defaultSymbol = "BTCUSDT" }) {
       ]);
       setReadiness(ready);
       setMicrostructure(micro);
+      setCollector(micro.collector || null);
       setHistory(runs.evaluations || []);
       if (!evaluation && runs.evaluations?.[0]) setEvaluation(runs.evaluations[0]);
     } catch (loadError) {
@@ -45,11 +56,47 @@ export default function SLHunterPanel({ defaultSymbol = "BTCUSDT" }) {
     }
   }
 
-  useEffect(() => { loadContext(); }, []);
+  useEffect(() => { loadContext(); }, [form.symbol]);
 
   useEffect(() => {
     setForm((current) => ({ ...current, symbol: defaultSymbol }));
   }, [defaultSymbol]);
+
+  useEffect(() => {
+    if (!collector || !["starting", "running", "stopping"].includes(collector.status)) return undefined;
+    const timer = window.setInterval(async () => {
+      try {
+        const next = await getMicrostructureCollectorStatus();
+        setCollector(next);
+        if (next.status === "running") setMicrostructure(await getMicrostructureStatus(form.symbol));
+      } catch (pollError) {
+        setError(pollError.message);
+      }
+    }, 3000);
+    return () => window.clearInterval(timer);
+  }, [collector?.status, form.symbol]);
+
+  async function handleCollector(action) {
+    setCollectorLoading(true);
+    setError("");
+    try {
+      const next = action === "start"
+        ? await startMicrostructureCollector({
+          symbols: [form.symbol],
+          snapshot_interval_seconds: 10,
+          trade_retention_days: 7,
+          delta_retention_hours: 24,
+          book_levels: 100,
+        })
+        : await stopMicrostructureCollector();
+      setCollector(next);
+      setMicrostructure(await getMicrostructureStatus(form.symbol));
+    } catch (collectorError) {
+      setError(collectorError.message);
+    } finally {
+      setCollectorLoading(false);
+    }
+  }
 
   async function handleEvaluate(event) {
     event.preventDefault();
@@ -102,6 +149,27 @@ export default function SLHunterPanel({ defaultSymbol = "BTCUSDT" }) {
         <div className="sl-capability-grid">
           {(readiness?.available || []).map((item) => <article className="available" key={item}><b>REAL</b><strong>{item.replaceAll("_", " ")}</strong></article>)}
           {(readiness?.missing || []).map((item) => <article className="missing" key={item}><b>MISSING</b><strong>{item.replaceAll("_", " ")}</strong></article>)}
+        </div>
+      </section>
+
+      <section className="exchange-panel sl-collector-panel">
+        <div className="exchange-panel-head compact">
+          <div><p className="eyebrow">Continuous Capture</p><h2>Binance WebSocket + libro L2 local</h2></div>
+          <span className={`sl-collector-status ${collector?.status || "stopped"}`}>{collector?.status || "stopped"}</span>
+        </div>
+        <div className="sl-collector-grid">
+          <div><span>Mensajes</span><strong>{number(collector?.messages_received, 0)}</strong></div>
+          <div><span>Trades guardados</span><strong>{number(collector?.trades_saved, 0)}</strong></div>
+          <div><span>Deltas L2</span><strong>{number(collector?.deltas_saved, 0)}</strong></div>
+          <div><span>Books reconstruidos</span><strong>{number(collector?.snapshots_saved, 0)}</strong></div>
+          <div><span>Reconexiones</span><strong>{number(collector?.reconnect_count, 0)}</strong></div>
+          <div><span>Huecos secuencia</span><strong>{number(collector?.sequence_gap_count, 0)}</strong></div>
+        </div>
+        <div className="sl-collector-actions">
+          <p>{collector?.last_error || "Captura publica auditable. No crea ordenes, posiciones ni fills."}</p>
+          {collector?.status === "running" || collector?.status === "starting"
+            ? <button type="button" disabled={collectorLoading} onClick={() => handleCollector("stop")}>Detener captura</button>
+            : <button type="button" disabled={collectorLoading} onClick={() => handleCollector("start")}>Capturar {form.symbol}</button>}
         </div>
       </section>
 

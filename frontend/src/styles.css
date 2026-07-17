@@ -4066,6 +4066,18 @@ button, a, input, select, textarea {
 .sl-capability-grid strong { color: #e9edef; font-size: 10px; text-transform: uppercase; overflow-wrap: anywhere; }
 .sl-capability-grid .missing { border-color: rgba(217,76,98,.22); background: rgba(217,76,98,.035); }
 .sl-capability-grid .missing b { color: #e45b70; }
+.sl-collector-panel { padding: 12px; border-color: rgba(50,211,164,.2); background: linear-gradient(145deg,rgba(16,29,38,.96),rgba(8,14,20,.98)); }
+.sl-collector-status { padding: 5px 8px; border: 1px solid rgba(255,255,255,.12); border-radius: 999px; color: var(--muted); font: 800 9px var(--font-num); text-transform: uppercase; }
+.sl-collector-status.running,.sl-collector-status.starting { border-color: rgba(50,211,164,.42); color: var(--positive); box-shadow: 0 0 18px rgba(50,211,164,.08); }
+.sl-collector-status.stopping { border-color: rgba(223,192,122,.42); color: var(--brand-2); }
+.sl-collector-grid { display: grid; grid-template-columns: repeat(6,minmax(0,1fr)); gap: 7px; margin-top: 10px; }
+.sl-collector-grid div { display: grid; gap: 5px; min-width: 0; padding: 9px; border: 1px solid rgba(255,255,255,.07); border-radius: 5px; background: rgba(255,255,255,.025); }
+.sl-collector-grid span { color: var(--muted); font-size: 8px; text-transform: uppercase; }
+.sl-collector-grid strong { color: #eef2f4; font: 800 14px var(--font-num); }
+.sl-collector-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 9px; }
+.sl-collector-actions p { margin: 0; color: var(--muted); font-size: 9px; overflow-wrap: anywhere; }
+.sl-collector-actions button { flex: 0 0 auto; padding: 8px 12px; border: 1px solid rgba(50,211,164,.42); border-radius: 5px; background: rgba(50,211,164,.09); color: var(--positive); font-size: 9px; font-weight: 800; cursor: pointer; }
+.sl-collector-actions button:disabled { opacity: .5; cursor: wait; }
 .sl-hunter-controls { display: grid; grid-template-columns: repeat(4,minmax(120px,1fr)) auto; gap: 8px; padding: 12px; align-items: end; }
 .sl-hunter-controls label { display: grid; gap: 5px; color: var(--muted); font-size: 9px; text-transform: uppercase; }
 .sl-hunter-controls input,.sl-hunter-controls select { min-width: 0; padding: 9px; border: 1px solid rgba(223,192,122,.2); border-radius: 5px; background: #0e171f; color: #eef2f4; font: 600 11px var(--font-num); }
@@ -4090,5 +4102,5 @@ button, a, input, select, textarea {
 .sl-history button:hover { background: rgba(223,192,122,.04); }
 .sl-history span,.sl-history small { color: var(--muted); font: 500 9px var(--font-num); }
 .sl-history b { color: var(--brand-2); font-size: 9px; text-transform: uppercase; }
-@media (max-width: 1050px) { .sl-capability-grid { grid-template-columns: repeat(4,1fr); } .sl-hunter-controls { grid-template-columns: repeat(2,1fr); } .sl-hunter-controls button { grid-column: span 2; } .sl-hunter-grid { grid-template-columns: 1fr; } }
-@media (max-width: 620px) { .sl-hunter-command { align-items: flex-start; flex-direction: column; } .sl-hunter-lock { justify-items: start; } .sl-capability-grid,.sl-state-machine,.sl-hunter-controls,.sl-metric-grid,.sl-plan-values { grid-template-columns: 1fr; } .sl-hunter-controls button { grid-column: auto; } .sl-state-machine { overflow-x: auto; grid-template-columns: repeat(6,150px); } .sl-history button { grid-template-columns: 42px 1fr; } }
+@media (max-width: 1050px) { .sl-capability-grid { grid-template-columns: repeat(4,1fr); } .sl-collector-grid { grid-template-columns: repeat(3,1fr); } .sl-hunter-controls { grid-template-columns: repeat(2,1fr); } .sl-hunter-controls button { grid-column: span 2; } .sl-hunter-grid { grid-template-columns: 1fr; } }
+@media (max-width: 620px) { .sl-hunter-command { align-items: flex-start; flex-direction: column; } .sl-hunter-lock { justify-items: start; } .sl-capability-grid,.sl-collector-grid,.sl-state-machine,.sl-hunter-controls,.sl-metric-grid,.sl-plan-values { grid-template-columns: 1fr; } .sl-collector-actions { align-items: stretch; flex-direction: column; } .sl-collector-actions button { width: 100%; } .sl-hunter-controls button { grid-column: auto; } .sl-state-machine { overflow-x: auto; grid-template-columns: repeat(6,150px); } .sl-history button { grid-template-columns: 42px 1fr; } }

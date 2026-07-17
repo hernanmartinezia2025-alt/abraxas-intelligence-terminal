@@ -70,6 +70,18 @@ export function getMicrostructureStatus(symbol = "BTCUSDT") {
   return request(`/api/microstructure/status?${params}`);
 }
 
+export function getMicrostructureCollectorStatus() {
+  return request("/api/microstructure/collector/status");
+}
+
+export function startMicrostructureCollector(payload) {
+  return request("/api/microstructure/collector/start", { method: "POST", body: JSON.stringify(payload) });
+}
+
+export function stopMicrostructureCollector() {
+  return request("/api/microstructure/collector/stop", { method: "POST" });
+}
+
 export function captureMicrostructure(payload) {
   return request("/api/microstructure/capture", { method: "POST", body: JSON.stringify(payload) });
 }

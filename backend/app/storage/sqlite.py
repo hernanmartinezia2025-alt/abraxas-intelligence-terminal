@@ -698,6 +698,58 @@ ON spot_dca_plans(status, next_run_at);
 CREATE INDEX IF NOT EXISTS idx_spot_dca_executions_plan_time
 ON spot_dca_executions(plan_id, created_at);
 
+CREATE TABLE IF NOT EXISTS spot_allocation_policies (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    portfolio_id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    status TEXT NOT NULL CHECK(status IN ('active', 'archived')),
+    active_version INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE(portfolio_id, name),
+    FOREIGN KEY(portfolio_id) REFERENCES spot_portfolios(id)
+);
+
+CREATE TABLE IF NOT EXISTS spot_allocation_policy_versions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    policy_id INTEGER NOT NULL,
+    version_number INTEGER NOT NULL,
+    targets_json TEXT NOT NULL,
+    min_trade_notional REAL NOT NULL,
+    config_hash TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    UNIQUE(policy_id, version_number),
+    UNIQUE(policy_id, config_hash),
+    FOREIGN KEY(policy_id) REFERENCES spot_allocation_policies(id)
+);
+
+CREATE TABLE IF NOT EXISTS spot_rebalance_runs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    portfolio_id INTEGER NOT NULL,
+    policy_id INTEGER NOT NULL,
+    policy_version_id INTEGER NOT NULL,
+    status TEXT NOT NULL CHECK(status IN ('draft', 'applying', 'applied', 'partial')),
+    portfolio_state_hash TEXT NOT NULL,
+    equity_at_plan REAL NOT NULL,
+    cash_at_plan REAL NOT NULL,
+    source_timestamp TEXT,
+    plan_json TEXT NOT NULL,
+    metrics_json TEXT NOT NULL,
+    execution_json TEXT,
+    created_at TEXT NOT NULL,
+    applied_at TEXT,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY(portfolio_id) REFERENCES spot_portfolios(id),
+    FOREIGN KEY(policy_id) REFERENCES spot_allocation_policies(id),
+    FOREIGN KEY(policy_version_id) REFERENCES spot_allocation_policy_versions(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_spot_allocation_policies_portfolio
+ON spot_allocation_policies(portfolio_id, status, updated_at);
+
+CREATE INDEX IF NOT EXISTS idx_spot_rebalance_runs_policy_time
+ON spot_rebalance_runs(policy_id, created_at);
+
 CREATE TABLE IF NOT EXISTS simulated_orders (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     account_id INTEGER NOT NULL,

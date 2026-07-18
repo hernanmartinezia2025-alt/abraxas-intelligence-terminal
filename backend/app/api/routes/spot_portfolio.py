@@ -7,6 +7,13 @@ from backend.app.analytics.spot_analysis import analyze_spot_candles
 from backend.app.services.candle_service import get_candles
 from backend.app.services.radar_service import get_radar
 from backend.app.storage.risk import get_risk_profile
+from backend.app.storage.spot_allocation import (
+    apply_rebalance_run,
+    archive_allocation_policy,
+    create_rebalance_run,
+    list_allocation_policies,
+    save_allocation_policy,
+)
 from backend.app.storage.spot_dca import (
     create_dca_plan,
     execute_due_dca_plan,
@@ -57,6 +64,17 @@ class DcaPlanRequest(BaseModel):
 
 class DcaPlanStatusRequest(BaseModel):
     status: str = Field(pattern="^(active|paused|archived)$")
+
+
+class AllocationTargetRequest(BaseModel):
+    symbol: str = Field(min_length=3, max_length=30)
+    target_pct: float = Field(gt=0, le=100)
+
+
+class AllocationPolicyRequest(BaseModel):
+    name: str = Field(min_length=3, max_length=100)
+    targets: list[AllocationTargetRequest] = Field(min_length=1, max_length=50)
+    min_trade_notional: float = Field(default=25, ge=1, le=1_000_000)
 
 
 def values(model: BaseModel) -> dict:
@@ -145,6 +163,45 @@ def spot_update_dca_plan_status(plan_id: int, payload: DcaPlanStatusRequest) -> 
 def spot_execute_dca_plan(plan_id: int) -> dict:
     try:
         return execute_due_dca_plan(plan_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.get("/allocation-policies")
+def spot_allocation_policies(limit: int = Query(default=100, ge=1, le=500)) -> dict:
+    return list_allocation_policies(limit=limit)
+
+
+@router.post("/allocation-policies")
+def spot_save_allocation_policy(payload: AllocationPolicyRequest) -> dict:
+    try:
+        body = values(payload)
+        body["targets"] = [values(target) if isinstance(target, BaseModel) else target for target in payload.targets]
+        return save_allocation_policy(**body)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.delete("/allocation-policies/{policy_id}")
+def spot_archive_allocation_policy(policy_id: int) -> dict:
+    try:
+        return archive_allocation_policy(policy_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/allocation-policies/{policy_id}/rebalance-runs")
+def spot_create_rebalance_run(policy_id: int) -> dict:
+    try:
+        return create_rebalance_run(policy_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/rebalance-runs/{run_id}/apply")
+def spot_apply_rebalance_run(run_id: int) -> dict:
+    try:
+        return apply_rebalance_run(run_id)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 

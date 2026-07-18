@@ -104,6 +104,9 @@ SOURCE_CATALOG = [
             "spot_equity_snapshots",
             "spot_dca_plans",
             "spot_dca_executions",
+            "spot_allocation_policies",
+            "spot_allocation_policy_versions",
+            "spot_rebalance_runs",
         ],
         "purpose": "Base local para cache, auditoria y datasets analiticos.",
     },
@@ -399,6 +402,9 @@ DATASET_CATALOG = [
             ("spot_equity_snapshots", "Curva patrimonial persistida con fuente, motivo y fingerprint idempotente."),
             ("spot_dca_plans", "Planes de acumulacion spot con frecuencia, presupuesto y limite de asignacion."),
             ("spot_dca_executions", "Intentos DCA ejecutados o rechazados con referencia idempotente y evidencia."),
+            ("spot_allocation_policies", "Politicas de asignacion objetivo activas o archivadas por cartera."),
+            ("spot_allocation_policy_versions", "Versiones inmutables de pesos objetivo, cash residual y umbral minimo."),
+            ("spot_rebalance_runs", "Planes y aplicaciones de rebalanceo simuladas con marks, metricas y ejecucion auditables."),
         ]
     ],
     {

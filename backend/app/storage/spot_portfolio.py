@@ -267,7 +267,7 @@ def execute_spot_transaction(payload: dict, portfolio_id: int = DEFAULT_PORTFOLI
     now = now_iso()
     origin = str(payload.get("origin") or "manual").strip().lower()
     origin_reference = str(payload.get("origin_reference") or "").strip() or None
-    if origin not in {"manual", "dca_plan"}:
+    if origin not in {"manual", "dca_plan", "rebalance_run"}:
         raise ValueError("Unsupported spot transaction origin")
     if origin_reference and len(origin_reference) > 200:
         raise ValueError("Spot transaction origin reference is too long")

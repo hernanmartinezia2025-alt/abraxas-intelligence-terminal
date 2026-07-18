@@ -359,6 +359,22 @@ export function createSpotTransaction(payload) {
   return request("/api/spot-portfolio/transactions", { method: "POST", body: JSON.stringify(payload) });
 }
 
+export function quoteSpotTransaction(payload) {
+  return request("/api/spot-portfolio/transactions/quote", { method: "POST", body: JSON.stringify(payload) });
+}
+
+export function createSpotCashFlow(payload) {
+  return request("/api/spot-portfolio/cash-flows", { method: "POST", body: JSON.stringify(payload) });
+}
+
+export function recordSpotValuation() {
+  return request("/api/spot-portfolio/valuation", { method: "POST" });
+}
+
+export function resetSpotPortfolio(payload) {
+  return request("/api/spot-portfolio/reset", { method: "POST", body: JSON.stringify(payload) });
+}
+
 export function getSpotProjection(params) {
   return request(`/api/spot-portfolio/projection?${new URLSearchParams(params)}`);
 }

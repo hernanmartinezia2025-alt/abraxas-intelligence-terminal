@@ -1,5 +1,14 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { createSpotTransaction, getSpotAnalysis, getSpotPortfolio, getSpotProjection } from "../api/client.js";
+import {
+  createSpotCashFlow,
+  createSpotTransaction,
+  getSpotAnalysis,
+  getSpotPortfolio,
+  getSpotProjection,
+  quoteSpotTransaction,
+  recordSpotValuation,
+  resetSpotPortfolio,
+} from "../api/client.js";
 
 const money = (value) => Number(value || 0).toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 });
 const percent = (value) => `${Number(value || 0) >= 0 ? "+" : ""}${Number(value || 0).toFixed(2)}%`;
@@ -10,6 +19,23 @@ function ProjectionChart({ points = [] }) {
   const line = points.map((point, index) => `${(index / (points.length - 1)) * 100},${96 - point.value / max * 88}`).join(" ");
   const contributed = points.map((point, index) => `${(index / (points.length - 1)) * 100},${96 - point.contributed / max * 88}`).join(" ");
   return <svg className="spot-projection-chart" viewBox="0 0 100 100" preserveAspectRatio="none" role="img" aria-label="Escenario de crecimiento de cartera"><polyline className="contributed" points={contributed} /><polyline className="projected" points={line} /></svg>;
+}
+
+function EquityHistoryChart({ points = [] }) {
+  if (!points.length) return <div className="chart-state">La curva comenzará con la primera operación o valuación registrada.</div>;
+  const values = points.map((point) => Number(point.equity));
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = Math.max(max - min, Math.max(Math.abs(max), 1) * 0.002);
+  const line = points.length === 1 ? "0,50 100,50" : points.map((point, index) => {
+    const x = points.length === 1 ? 50 : (index / (points.length - 1)) * 100;
+    const y = 92 - ((Number(point.equity) - min) / range) * 78;
+    return `${x},${y}`;
+  }).join(" ");
+  return <div className="spot-equity-visual">
+    <svg viewBox="0 0 100 100" preserveAspectRatio="none" role="img" aria-label="Curva patrimonial persistida"><polyline points={line} /></svg>
+    <div><span>{money(values[0])} inicial</span><strong>{money(values.at(-1))}</strong><span>{points.length} valuaciones</span></div>
+  </div>;
 }
 
 const metric = (value, digits = 2) => value === null || value === undefined ? "--" : Number(value).toFixed(digits);
@@ -90,8 +116,13 @@ function MarketModeBoundary({ policy }) {
 }
 
 export default function SpotPortfolioPage({ selectedSymbol = "BTCUSDT" }) {
+  const [activeTab, setActiveTab] = useState("overview");
   const [snapshot, setSnapshot] = useState(null);
   const [ticket, setTicket] = useState({ symbol: selectedSymbol, side: "buy", quantity: "0.001", notes: "" });
+  const [quote, setQuote] = useState(null);
+  const [quoteError, setQuoteError] = useState("");
+  const [cashFlow, setCashFlow] = useState({ flow_type: "deposit", amount: "250", notes: "aporte DCA" });
+  const [resetForm, setResetForm] = useState({ initial_cash: "10000", reason: "nuevo ciclo patrimonial" });
   const [scenario, setScenario] = useState({ monthly_contribution: 250, years: 4, annual_return_pct: 0 });
   const [projection, setProjection] = useState(null);
   const [analysis, setAnalysis] = useState(null);
@@ -109,6 +140,14 @@ export default function SpotPortfolioPage({ selectedSymbol = "BTCUSDT" }) {
     if (!snapshot) return;
     getSpotProjection({ initial_value: snapshot.equity, ...scenario }).then(setProjection).catch((error) => setMessage(error.message));
   }, [snapshot?.equity, scenario.monthly_contribution, scenario.years, scenario.annual_return_pct]);
+  useEffect(() => {
+    const quantity = Number(ticket.quantity);
+    if (!ticket.symbol || !Number.isFinite(quantity) || quantity <= 0) { setQuote(null); setQuoteError(""); return undefined; }
+    const timer = window.setTimeout(() => {
+      quoteSpotTransaction({ ...ticket, quantity }).then((result) => { setQuote(result); setQuoteError(""); }).catch((error) => { setQuote(null); setQuoteError(error.message); });
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [ticket.symbol, ticket.side, ticket.quantity, snapshot?.portfolio?.cash_balance]);
 
   async function submit(event) {
     event.preventDefault();
@@ -120,6 +159,35 @@ export default function SpotPortfolioPage({ selectedSymbol = "BTCUSDT" }) {
     } catch (error) { setMessage(error.message); }
   }
 
+  async function submitCashFlow(event) {
+    event.preventDefault();
+    setMessage("Registrando movimiento de caja...");
+    try {
+      const result = await createSpotCashFlow({ ...cashFlow, amount: Number(cashFlow.amount) });
+      setSnapshot(result.snapshot);
+      setMessage(`Movimiento de caja #${result.cash_flow_id} persistido.`);
+    } catch (error) { setMessage(error.message); }
+  }
+
+  async function refreshValuation() {
+    setMessage("Contrastando marks persistidos...");
+    try {
+      const result = await recordSpotValuation();
+      setSnapshot(result.snapshot);
+      setMessage(result.recorded ? "Nueva valuación agregada a la curva." : "Sin cambios de cartera o marks; no se duplicó la valuación.");
+    } catch (error) { setMessage(error.message); }
+  }
+
+  async function resetCycle(event) {
+    event.preventDefault();
+    setMessage("Iniciando nuevo ciclo patrimonial...");
+    try {
+      const result = await resetSpotPortfolio({ initial_cash: Number(resetForm.initial_cash), reason: resetForm.reason });
+      setSnapshot(result.snapshot);
+      setMessage(`Ciclo ${result.cycle_number} iniciado; el historial anterior permanece en el ledger.`);
+    } catch (error) { setMessage(error.message); }
+  }
+
   const allocation = useMemo(() => snapshot?.holdings || [], [snapshot]);
   if (!snapshot) return <section className="page-loading-state"><strong>Cargando cartera spot...</strong><small>{message}</small></section>;
 
@@ -128,9 +196,17 @@ export default function SpotPortfolioPage({ selectedSymbol = "BTCUSDT" }) {
       <article><span>Patrimonio</span><strong>{money(snapshot.equity)}</strong><small>cash + valor de mercado</small></article>
       <article><span>Disponible</span><strong>{money(snapshot.portfolio.cash_balance)}</strong><small>USDT simulado</small></article>
       <article><span>Invertido</span><strong>{money(snapshot.market_value)}</strong><small>{allocation.length} activos</small></article>
+      <article><span>PnL total</span><strong className={snapshot.total_pnl >= 0 ? "positive" : "negative"}>{money(snapshot.total_pnl)}</strong><small>{percent(snapshot.total_return_pct)}</small></article>
       <article><span>PnL no realizado</span><strong className={snapshot.unrealized_pnl >= 0 ? "positive" : "negative"}>{money(snapshot.unrealized_pnl)}</strong><small>{percent(snapshot.return_pct)}</small></article>
+      <article><span>Ciclo activo</span><strong>#{snapshot.portfolio.active_cycle}</strong><small>{money(snapshot.net_contributions)} aportado</small></article>
     </div>
 
+    <nav className="spot-section-tabs" aria-label="Secciones de cartera">
+      {[["overview", "Cartera", "posición + curva"], ["analysis", "Inteligencia", "1D / 1W"], ["ledger", "Auditoría", "caja + eventos"]].map(([key, label, detail]) => <button key={key} className={activeTab === key ? "active" : ""} onClick={() => setActiveTab(key)}><strong>{label}</strong><small>{detail}</small></button>)}
+    </nav>
+    {message && <div className="spot-status-line">{message}</div>}
+
+    {activeTab === "overview" && <>
     <MarketModeBoundary policy={analysis?.market_mode_policy} />
 
     <div className="spot-workbench">
@@ -141,8 +217,12 @@ export default function SpotPortfolioPage({ selectedSymbol = "BTCUSDT" }) {
           <label>Operación<select value={ticket.side} onChange={(event) => setTicket({ ...ticket, side: event.target.value })}><option value="buy">Comprar</option><option value="sell">Vender</option></select></label>
           <label>Cantidad<input type="number" min="0" step="any" value={ticket.quantity} onChange={(event) => setTicket({ ...ticket, quantity: event.target.value })} /></label>
           <label>Nota<input value={ticket.notes} onChange={(event) => setTicket({ ...ticket, notes: event.target.value })} placeholder="tesis o motivo" /></label>
-          <button type="submit">Registrar operación spot</button>
-          <small>{message || "Precio desde market_snapshots; fee 0.10%; ejecución real bloqueada."}</small>
+          <div className={`spot-quote ${quote?.allowed ? "allowed" : "blocked"}`}>
+            <span>PREVIEW · SIN EJECUCIÓN</span>
+            {quote ? <><strong>{money(quote.notional)} + {money(quote.fee)} fee</strong><small>Mark {money(quote.price)} · caja posterior {money(quote.cash_balance_after)}</small>{!quote.allowed && <b>{quote.rejection_reason}</b>}</> : <small>{quoteError || "Esperando una cantidad válida."}</small>}
+          </div>
+          <button type="submit" disabled={!quote?.allowed}>Registrar operación spot</button>
+          <small>Precio desde market_snapshots; fee 0.10%; ejecución real bloqueada.</small>
         </form>
       </section>
 
@@ -159,11 +239,19 @@ export default function SpotPortfolioPage({ selectedSymbol = "BTCUSDT" }) {
       </section>
     </div>
 
+    <section className="exchange-panel spot-equity-panel">
+      <div className="exchange-panel-head compact"><div><p className="eyebrow">Persisted equity</p><h2>Curva patrimonial real del simulador</h2></div><button onClick={refreshValuation}>Registrar valuación</button></div>
+      <EquityHistoryChart points={snapshot.equity_history} />
+      <small>Solo agrega un punto cuando cambia la cartera o cambia el mark persistido; no duplica lecturas idénticas.</small>
+    </section>
+
     <section className="exchange-panel spot-holdings">
       <div className="exchange-panel-head compact"><div><p className="eyebrow">Holdings</p><h2>Cartera spot simulada</h2></div><span>SQLITE / AUDITABLE</span></div>
       {allocation.length ? <div className="spot-holdings-table"><div className="table-head"><span>Activo</span><span>Cantidad</span><span>Costo medio</span><span>Precio</span><span>Peso</span><span>PnL</span></div>{allocation.map((holding) => <div key={holding.symbol}><strong>{holding.symbol}</strong><span>{Number(holding.quantity).toFixed(8)}</span><span>{money(holding.average_cost)}</span><span>{money(holding.market_price)}</span><span>{holding.weight_pct.toFixed(2)}%</span><b className={holding.unrealized_pnl >= 0 ? "positive" : "negative"}>{money(holding.unrealized_pnl)} · {percent(holding.return_pct)}</b></div>)}</div> : <div className="chart-state">Sin compras spot simuladas todavía.</div>}
     </section>
+    </>}
 
+    {activeTab === "analysis" && <>
     <section className="exchange-panel spot-analysis-panel">
       <div className="exchange-panel-head compact"><div><p className="eyebrow">Long-term evidence engine</p><h2>{selectedSymbol} · estructura de largo plazo</h2></div><div className="spot-timeframe-switch"><button className={analysisTimeframe === "1d" ? "active" : ""} onClick={() => setAnalysisTimeframe("1d")}>1D</button><button className={analysisTimeframe === "1w" ? "active" : ""} onClick={() => setAnalysisTimeframe("1w")}>1W</button><span>{analysis ? `${analysis.candles_used} CANDLES` : "CARGANDO"}</span></div></div>
       {analysis ? <>
@@ -187,5 +275,42 @@ export default function SpotPortfolioPage({ selectedSymbol = "BTCUSDT" }) {
       <article><span>Elliott</span><strong>Asistido</strong><p>Conteo manual con alternativas; no se presentará un conteo automático como certeza.</p></article>
       <article><span>Trading Latino 5F</span><strong>Operativo</strong><p>Squeeze, ADX, EMA55, POC aproximado y tiempo; candidato observable, nunca orden automática.</p></article>
     </section>
+    </>}
+
+    {activeTab === "ledger" && <>
+      <div className="spot-account-controls">
+        <section className="exchange-panel spot-cash-flow">
+          <div className="exchange-panel-head compact"><div><p className="eyebrow">Capital flows</p><h2>Aporte / retiro simulado</h2></div><span>SEPARADO DEL PnL</span></div>
+          <form onSubmit={submitCashFlow}>
+            <label>Tipo<select value={cashFlow.flow_type} onChange={(event) => setCashFlow({ ...cashFlow, flow_type: event.target.value })}><option value="deposit">Aporte</option><option value="withdrawal">Retiro</option></select></label>
+            <label>Monto<input type="number" min="0.01" step="any" value={cashFlow.amount} onChange={(event) => setCashFlow({ ...cashFlow, amount: event.target.value })} /></label>
+            <label>Nota<input value={cashFlow.notes} onChange={(event) => setCashFlow({ ...cashFlow, notes: event.target.value })} /></label>
+            <button type="submit">Registrar movimiento</button>
+          </form>
+        </section>
+        <section className="exchange-panel spot-reset-cycle">
+          <div className="exchange-panel-head compact"><div><p className="eyebrow">Cycle control</p><h2>Nuevo ciclo patrimonial</h2></div><span>HISTORIAL PRESERVADO</span></div>
+          <form onSubmit={resetCycle}>
+            <label>Capital inicial<input type="number" min="100" step="any" value={resetForm.initial_cash} onChange={(event) => setResetForm({ ...resetForm, initial_cash: event.target.value })} /></label>
+            <label>Motivo<input value={resetForm.reason} minLength="3" onChange={(event) => setResetForm({ ...resetForm, reason: event.target.value })} /></label>
+            <button type="submit">Cerrar ciclo e iniciar otro</button>
+            <small>Pone holdings en cero y abre un ciclo nuevo. No borra ledger ni operaciones históricas.</small>
+          </form>
+        </section>
+      </div>
+
+      <section className="exchange-panel spot-ledger-panel">
+        <div className="exchange-panel-head compact"><div><p className="eyebrow">Append-only ledger</p><h2>Eventos patrimoniales</h2></div><span>{snapshot.ledger.length} EVENTOS</span></div>
+        {snapshot.ledger.length ? <div className="spot-ledger-list">{snapshot.ledger.map((entry) => <article key={entry.id}><div><strong>{entry.event_type.replaceAll("_", " ")}</strong><small>Ciclo {entry.cycle_number} · #{entry.reference_id || "—"}</small></div><div><span>{entry.symbol || "CASH"}</span><b className={entry.cash_delta >= 0 ? "positive" : "negative"}>{money(entry.cash_delta)}</b></div><time>{new Date(entry.created_at).toLocaleString()}</time></article>)}</div> : <div className="chart-state">Sin eventos patrimoniales todavía.</div>}
+      </section>
+
+      <section className="exchange-panel spot-transaction-history">
+        <div className="exchange-panel-head compact"><div><p className="eyebrow">Current cycle</p><h2>Operaciones y aportes</h2></div><span>CICLO {snapshot.portfolio.active_cycle}</span></div>
+        <div className="spot-history-columns">
+          <div><h3>Transacciones</h3>{snapshot.transactions.length ? snapshot.transactions.map((item) => <p key={item.id}><strong>{item.side.toUpperCase()} {item.symbol}</strong><span>{Number(item.quantity).toFixed(8)} · {money(item.price)}</span></p>) : <small>Sin operaciones en este ciclo.</small>}</div>
+          <div><h3>Movimientos de caja</h3>{snapshot.cash_flows.length ? snapshot.cash_flows.map((item) => <p key={item.id}><strong>{item.flow_type.toUpperCase()}</strong><span>{money(item.cash_delta)} · {item.notes || "sin nota"}</span></p>) : <small>Sin aportes o retiros en este ciclo.</small>}</div>
+        </div>
+      </section>
+    </>}
   </section>;
 }

@@ -15,6 +15,7 @@ import {
   getRiskProfile,
   getPaperAccount,
   getChartIndicatorPresets,
+  getSpotPortfolio,
 } from "../../api/client.js";
 
 const UI_ROUTE_SURFACES = [
@@ -29,6 +30,7 @@ const UI_ROUTE_SURFACES = [
   ["/api/live-map", "map", "Map"],
   ["/api/bots", "bots", "Bots"],
   ["/api/paper", "bots", "Bots / Paper"],
+  ["/api/spot-portfolio", "portfolio", "Portfolio / Spot"],
   ["/api/risk", "risk", "Risk"],
   ["/api/exchanges", "data", "Data"],
   ["/api/data", "data", "Data"],
@@ -187,6 +189,14 @@ export default function BackendSurface({ selectedSymbol = "BTCUSDT" }) {
         description: "Cuenta, posiciones, fills y perfiles ROI por bot bajo Risk Engine.",
         call: () => getPaperAccount(),
         rows: ["orders", "positions", "bot_performance"],
+      },
+      {
+        label: "Spot Portfolio",
+        method: "GET",
+        path: "/api/spot-portfolio",
+        description: "Ciclos, holdings, equity persistida y ledger patrimonial spot simulado.",
+        call: () => getSpotPortfolio(),
+        rows: ["holdings", "equity_history", "ledger"],
       },
     ],
     [selectedSymbol]

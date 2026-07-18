@@ -395,6 +395,26 @@ export function executeSpotDcaPlan(planId) {
   return request(`/api/spot-portfolio/dca-plans/${planId}/execute`, { method: "POST" });
 }
 
+export function getSpotAllocationPolicies() {
+  return request("/api/spot-portfolio/allocation-policies");
+}
+
+export function saveSpotAllocationPolicy(payload) {
+  return request("/api/spot-portfolio/allocation-policies", { method: "POST", body: JSON.stringify(payload) });
+}
+
+export function archiveSpotAllocationPolicy(policyId) {
+  return request(`/api/spot-portfolio/allocation-policies/${policyId}`, { method: "DELETE" });
+}
+
+export function createSpotRebalanceRun(policyId) {
+  return request(`/api/spot-portfolio/allocation-policies/${policyId}/rebalance-runs`, { method: "POST" });
+}
+
+export function applySpotRebalanceRun(runId) {
+  return request(`/api/spot-portfolio/rebalance-runs/${runId}/apply`, { method: "POST" });
+}
+
 export function getSpotProjection(params) {
   return request(`/api/spot-portfolio/projection?${new URLSearchParams(params)}`);
 }

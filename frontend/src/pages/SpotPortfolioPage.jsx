@@ -2,8 +2,12 @@ import React, { useEffect, useMemo, useState } from "react";
 import {
   createSpotCashFlow,
   createSpotDcaPlan,
+  createSpotRebalanceRun,
   createSpotTransaction,
+  applySpotRebalanceRun,
+  archiveSpotAllocationPolicy,
   executeSpotDcaPlan,
+  getSpotAllocationPolicies,
   getSpotAnalysis,
   getSpotPortfolio,
   getSpotProjection,
@@ -11,8 +15,10 @@ import {
   quoteSpotTransaction,
   recordSpotValuation,
   resetSpotPortfolio,
+  saveSpotAllocationPolicy,
   updateSpotDcaPlanStatus,
 } from "../api/client.js";
+import AllocationWorkspace from "../features/portfolio/AllocationWorkspace.jsx";
 
 const money = (value) => Number(value || 0).toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 });
 const percent = (value) => `${Number(value || 0) >= 0 ? "+" : ""}${Number(value || 0).toFixed(2)}%`;
@@ -130,13 +136,15 @@ export default function SpotPortfolioPage({ selectedSymbol = "BTCUSDT" }) {
   const [dca, setDca] = useState({ plans: [], executions: [], due_count: 0 });
   const [dcaForm, setDcaForm] = useState({ name: `${selectedSymbol} acumulación`, symbol: selectedSymbol, budget_amount: "250", frequency: "monthly", interval_count: "1", allocation_limit_pct: "40", next_run_at: new Date(Date.now() + 86_400_000).toISOString().slice(0, 16) });
   const [dcaBusy, setDcaBusy] = useState(false);
+  const [allocationData, setAllocationData] = useState({ policies: [], runs: [] });
+  const [allocationBusy, setAllocationBusy] = useState(false);
   const [scenario, setScenario] = useState({ monthly_contribution: 250, years: 4, annual_return_pct: 0 });
   const [projection, setProjection] = useState(null);
   const [analysis, setAnalysis] = useState(null);
   const [analysisTimeframe, setAnalysisTimeframe] = useState("1d");
   const [message, setMessage] = useState("");
 
-  async function load() { try { const [portfolio, plans] = await Promise.all([getSpotPortfolio(), getSpotDcaPlans()]); setSnapshot(portfolio); setDca(plans); setMessage(""); } catch (error) { setMessage(error.message); } }
+  async function load() { try { const [portfolio, plans, policies] = await Promise.all([getSpotPortfolio(), getSpotDcaPlans(), getSpotAllocationPolicies()]); setSnapshot(portfolio); setDca(plans); setAllocationData(policies); setMessage(""); } catch (error) { setMessage(error.message); } }
   useEffect(() => { load(); }, []);
   useEffect(() => { setTicket((current) => ({ ...current, symbol: selectedSymbol })); setDcaForm((current) => ({ ...current, symbol: selectedSymbol, name: `${selectedSymbol} acumulación` })); }, [selectedSymbol]);
   useEffect(() => {
@@ -233,6 +241,52 @@ export default function SpotPortfolioPage({ selectedSymbol = "BTCUSDT" }) {
     } catch (error) { setMessage(error.message); } finally { setDcaBusy(false); }
   }
 
+  async function refreshAllocation() {
+    const policies = await getSpotAllocationPolicies();
+    setAllocationData(policies);
+    return policies;
+  }
+
+  async function saveAllocationPolicy(payload) {
+    setAllocationBusy(true);
+    setMessage("Versionando política de asignación...");
+    try {
+      const result = await saveSpotAllocationPolicy(payload);
+      await refreshAllocation();
+      setMessage(`Política #${result.policy.id} · versión ${result.policy.active_version} guardada. No se modificó la cartera.`);
+    } catch (error) { setMessage(error.message); } finally { setAllocationBusy(false); }
+  }
+
+  async function archiveAllocationPolicy(policyId) {
+    setAllocationBusy(true);
+    try {
+      await archiveSpotAllocationPolicy(policyId);
+      await refreshAllocation();
+      setMessage(`Política #${policyId} archivada; sus versiones y runs permanecen auditables.`);
+    } catch (error) { setMessage(error.message); } finally { setAllocationBusy(false); }
+  }
+
+  async function planRebalance(policyId) {
+    setAllocationBusy(true);
+    setMessage(`Calculando plan para política #${policyId}...`);
+    try {
+      const result = await createSpotRebalanceRun(policyId);
+      await refreshAllocation();
+      setMessage(`Plan #${result.run.id} persistido con ${result.run.plan.length} órdenes. Todavía no se aplicó.`);
+    } catch (error) { setMessage(error.message); } finally { setAllocationBusy(false); }
+  }
+
+  async function applyRebalance(runId) {
+    setAllocationBusy(true);
+    setMessage(`Aplicando plan #${runId} en el simulador Spot...`);
+    try {
+      const result = await applySpotRebalanceRun(runId);
+      setSnapshot(result.snapshot);
+      await refreshAllocation();
+      setMessage(result.run.status === "applied" ? `Plan #${runId} aplicado y auditado.` : `Plan #${runId} quedó ${result.run.status}; revisa los rechazos.`);
+    } catch (error) { setMessage(error.message); } finally { setAllocationBusy(false); }
+  }
+
   const allocation = useMemo(() => snapshot?.holdings || [], [snapshot]);
   if (!snapshot) return <section className="page-loading-state"><strong>Cargando cartera spot...</strong><small>{message}</small></section>;
 
@@ -247,7 +301,7 @@ export default function SpotPortfolioPage({ selectedSymbol = "BTCUSDT" }) {
     </div>
 
     <nav className="spot-section-tabs" aria-label="Secciones de cartera">
-      {[["overview", "Cartera", "posición + curva"], ["dca", "DCA", `${dca.due_count} vencidos`], ["analysis", "Inteligencia", "1D / 1W"], ["ledger", "Auditoría", "caja + eventos"]].map(([key, label, detail]) => <button key={key} className={activeTab === key ? "active" : ""} onClick={() => setActiveTab(key)}><strong>{label}</strong><small>{detail}</small></button>)}
+      {[["overview", "Cartera", "posición + curva"], ["dca", "DCA", `${dca.due_count} vencidos`], ["allocation", "Asignación", `${allocationData.policies.length} políticas`], ["analysis", "Inteligencia", "1D / 1W"], ["ledger", "Auditoría", "caja + eventos"]].map(([key, label, detail]) => <button key={key} className={activeTab === key ? "active" : ""} onClick={() => setActiveTab(key)}><strong>{label}</strong><small>{detail}</small></button>)}
     </nav>
     {message && <div className="spot-status-line">{message}</div>}
 
@@ -330,6 +384,15 @@ export default function SpotPortfolioPage({ selectedSymbol = "BTCUSDT" }) {
         {dca.executions.length ? <div>{dca.executions.map((execution) => <article key={execution.id}><span>Plan #{execution.plan_id}</span><strong className={execution.status === "executed" ? "positive" : "negative"}>{execution.status.toUpperCase()}</strong><b>{execution.notional ? money(execution.notional) : "SIN COMPRA"}</b><small>{execution.reason || new Date(execution.created_at).toLocaleString()}</small></article>)}</div> : <div className="chart-state">Sin cuotas ejecutadas o rechazadas.</div>}
       </section>
     </>}
+
+    {activeTab === "allocation" && <AllocationWorkspace
+      data={allocationData}
+      busy={allocationBusy}
+      onSave={saveAllocationPolicy}
+      onArchive={archiveAllocationPolicy}
+      onPlan={planRebalance}
+      onApply={applyRebalance}
+    />}
 
     {activeTab === "analysis" && <>
     <section className="exchange-panel spot-analysis-panel">

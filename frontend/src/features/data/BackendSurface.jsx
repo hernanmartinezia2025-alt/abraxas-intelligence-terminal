@@ -17,6 +17,7 @@ import {
   getChartIndicatorPresets,
   getSpotPortfolio,
   getSpotDcaPlans,
+  getSpotAllocationPolicies,
 } from "../../api/client.js";
 
 const UI_ROUTE_SURFACES = [
@@ -206,6 +207,14 @@ export default function BackendSurface({ selectedSymbol = "BTCUSDT" }) {
         description: "Planes, vencimientos e intentos DCA auditables sin scheduler ni live execution.",
         call: () => getSpotDcaPlans(),
         rows: ["plans", "executions"],
+      },
+      {
+        label: "Spot Allocation",
+        method: "GET",
+        path: "/api/spot-portfolio/allocation-policies",
+        description: "Políticas versionadas y runs de rebalanceo en dos fases, sin ejecución live.",
+        call: () => getSpotAllocationPolicies(),
+        rows: ["policies", "runs"],
       },
     ],
     [selectedSymbol]

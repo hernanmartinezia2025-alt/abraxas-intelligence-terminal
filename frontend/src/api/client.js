@@ -375,6 +375,26 @@ export function resetSpotPortfolio(payload) {
   return request("/api/spot-portfolio/reset", { method: "POST", body: JSON.stringify(payload) });
 }
 
+export function getSpotDcaPlans() {
+  return request("/api/spot-portfolio/dca-plans");
+}
+
+export function createSpotDcaPlan(payload) {
+  return request("/api/spot-portfolio/dca-plans", { method: "POST", body: JSON.stringify(payload) });
+}
+
+export function getSpotDcaPreview(planId) {
+  return request(`/api/spot-portfolio/dca-plans/${planId}/preview`);
+}
+
+export function updateSpotDcaPlanStatus(planId, status) {
+  return request(`/api/spot-portfolio/dca-plans/${planId}/status`, { method: "PATCH", body: JSON.stringify({ status }) });
+}
+
+export function executeSpotDcaPlan(planId) {
+  return request(`/api/spot-portfolio/dca-plans/${planId}/execute`, { method: "POST" });
+}
+
 export function getSpotProjection(params) {
   return request(`/api/spot-portfolio/projection?${new URLSearchParams(params)}`);
 }

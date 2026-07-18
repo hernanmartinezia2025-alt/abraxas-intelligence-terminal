@@ -1,13 +1,17 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
   createSpotCashFlow,
+  createSpotDcaPlan,
   createSpotTransaction,
+  executeSpotDcaPlan,
   getSpotAnalysis,
   getSpotPortfolio,
   getSpotProjection,
+  getSpotDcaPlans,
   quoteSpotTransaction,
   recordSpotValuation,
   resetSpotPortfolio,
+  updateSpotDcaPlanStatus,
 } from "../api/client.js";
 
 const money = (value) => Number(value || 0).toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 });
@@ -123,15 +127,18 @@ export default function SpotPortfolioPage({ selectedSymbol = "BTCUSDT" }) {
   const [quoteError, setQuoteError] = useState("");
   const [cashFlow, setCashFlow] = useState({ flow_type: "deposit", amount: "250", notes: "aporte DCA" });
   const [resetForm, setResetForm] = useState({ initial_cash: "10000", reason: "nuevo ciclo patrimonial" });
+  const [dca, setDca] = useState({ plans: [], executions: [], due_count: 0 });
+  const [dcaForm, setDcaForm] = useState({ name: `${selectedSymbol} acumulación`, symbol: selectedSymbol, budget_amount: "250", frequency: "monthly", interval_count: "1", allocation_limit_pct: "40", next_run_at: new Date(Date.now() + 86_400_000).toISOString().slice(0, 16) });
+  const [dcaBusy, setDcaBusy] = useState(false);
   const [scenario, setScenario] = useState({ monthly_contribution: 250, years: 4, annual_return_pct: 0 });
   const [projection, setProjection] = useState(null);
   const [analysis, setAnalysis] = useState(null);
   const [analysisTimeframe, setAnalysisTimeframe] = useState("1d");
   const [message, setMessage] = useState("");
 
-  async function load() { try { setSnapshot(await getSpotPortfolio()); setMessage(""); } catch (error) { setMessage(error.message); } }
+  async function load() { try { const [portfolio, plans] = await Promise.all([getSpotPortfolio(), getSpotDcaPlans()]); setSnapshot(portfolio); setDca(plans); setMessage(""); } catch (error) { setMessage(error.message); } }
   useEffect(() => { load(); }, []);
-  useEffect(() => { setTicket((current) => ({ ...current, symbol: selectedSymbol })); }, [selectedSymbol]);
+  useEffect(() => { setTicket((current) => ({ ...current, symbol: selectedSymbol })); setDcaForm((current) => ({ ...current, symbol: selectedSymbol, name: `${selectedSymbol} acumulación` })); }, [selectedSymbol]);
   useEffect(() => {
     setAnalysis(null);
     getSpotAnalysis(selectedSymbol, analysisTimeframe, 300).then(setAnalysis).catch((error) => setMessage(error.message));
@@ -188,6 +195,44 @@ export default function SpotPortfolioPage({ selectedSymbol = "BTCUSDT" }) {
     } catch (error) { setMessage(error.message); }
   }
 
+  async function submitDcaPlan(event) {
+    event.preventDefault();
+    setDcaBusy(true);
+    setMessage("Persistiendo plan DCA...");
+    try {
+      const payload = {
+        ...dcaForm,
+        budget_amount: Number(dcaForm.budget_amount),
+        interval_count: Number(dcaForm.interval_count),
+        allocation_limit_pct: Number(dcaForm.allocation_limit_pct),
+        next_run_at: new Date(dcaForm.next_run_at).toISOString(),
+      };
+      const result = await createSpotDcaPlan(payload);
+      setDca(await getSpotDcaPlans());
+      setMessage(`Plan DCA #${result.plan.id} creado. No se ejecutó ninguna compra.`);
+    } catch (error) { setMessage(error.message); } finally { setDcaBusy(false); }
+  }
+
+  async function changeDcaStatus(planId, status) {
+    setDcaBusy(true);
+    try {
+      await updateSpotDcaPlanStatus(planId, status);
+      setDca(await getSpotDcaPlans());
+      setMessage(`Plan #${planId}: ${status}.`);
+    } catch (error) { setMessage(error.message); } finally { setDcaBusy(false); }
+  }
+
+  async function runDcaPlan(planId) {
+    setDcaBusy(true);
+    setMessage(`Validando cuota DCA #${planId}...`);
+    try {
+      const result = await executeSpotDcaPlan(planId);
+      setSnapshot(result.snapshot);
+      setDca(await getSpotDcaPlans());
+      setMessage(result.status === "executed" ? `Cuota DCA #${planId} ejecutada en simulación spot.` : `Cuota rechazada: ${result.execution.reason}`);
+    } catch (error) { setMessage(error.message); } finally { setDcaBusy(false); }
+  }
+
   const allocation = useMemo(() => snapshot?.holdings || [], [snapshot]);
   if (!snapshot) return <section className="page-loading-state"><strong>Cargando cartera spot...</strong><small>{message}</small></section>;
 
@@ -202,7 +247,7 @@ export default function SpotPortfolioPage({ selectedSymbol = "BTCUSDT" }) {
     </div>
 
     <nav className="spot-section-tabs" aria-label="Secciones de cartera">
-      {[["overview", "Cartera", "posición + curva"], ["analysis", "Inteligencia", "1D / 1W"], ["ledger", "Auditoría", "caja + eventos"]].map(([key, label, detail]) => <button key={key} className={activeTab === key ? "active" : ""} onClick={() => setActiveTab(key)}><strong>{label}</strong><small>{detail}</small></button>)}
+      {[["overview", "Cartera", "posición + curva"], ["dca", "DCA", `${dca.due_count} vencidos`], ["analysis", "Inteligencia", "1D / 1W"], ["ledger", "Auditoría", "caja + eventos"]].map(([key, label, detail]) => <button key={key} className={activeTab === key ? "active" : ""} onClick={() => setActiveTab(key)}><strong>{label}</strong><small>{detail}</small></button>)}
     </nav>
     {message && <div className="spot-status-line">{message}</div>}
 
@@ -249,6 +294,41 @@ export default function SpotPortfolioPage({ selectedSymbol = "BTCUSDT" }) {
       <div className="exchange-panel-head compact"><div><p className="eyebrow">Holdings</p><h2>Cartera spot simulada</h2></div><span>SQLITE / AUDITABLE</span></div>
       {allocation.length ? <div className="spot-holdings-table"><div className="table-head"><span>Activo</span><span>Cantidad</span><span>Costo medio</span><span>Precio</span><span>Peso</span><span>PnL</span></div>{allocation.map((holding) => <div key={holding.symbol}><strong>{holding.symbol}</strong><span>{Number(holding.quantity).toFixed(8)}</span><span>{money(holding.average_cost)}</span><span>{money(holding.market_price)}</span><span>{holding.weight_pct.toFixed(2)}%</span><b className={holding.unrealized_pnl >= 0 ? "positive" : "negative"}>{money(holding.unrealized_pnl)} · {percent(holding.return_pct)}</b></div>)}</div> : <div className="chart-state">Sin compras spot simuladas todavía.</div>}
     </section>
+    </>}
+
+    {activeTab === "dca" && <>
+      <section className="exchange-panel spot-dca-command">
+        <div><p className="eyebrow">DCA engine · manual due runner</p><h2>Acumulación programada sin scheduler oculto</h2><span>Cada cuota pasa por cash disponible y límite de asignación antes de comprar en la cuenta simulada.</span></div>
+        <div><strong>{dca.due_count}</strong><span>CUOTAS VENCIDAS</span><small>LIVE BLOQUEADO</small></div>
+      </section>
+      <div className="spot-dca-workspace">
+        <section className="exchange-panel spot-dca-builder">
+          <div className="exchange-panel-head compact"><div><p className="eyebrow">Plan contract</p><h2>Nuevo plan DCA</h2></div><span>SQLITE</span></div>
+          <form onSubmit={submitDcaPlan}>
+            <label>Nombre<input required minLength="3" value={dcaForm.name} onChange={(event) => setDcaForm({ ...dcaForm, name: event.target.value })} /></label>
+            <div><label>Activo<input required value={dcaForm.symbol} onChange={(event) => setDcaForm({ ...dcaForm, symbol: event.target.value.toUpperCase() })} /></label><label>Presupuesto USDT<input required type="number" min="1" step="any" value={dcaForm.budget_amount} onChange={(event) => setDcaForm({ ...dcaForm, budget_amount: event.target.value })} /></label></div>
+            <div><label>Frecuencia<select value={dcaForm.frequency} onChange={(event) => setDcaForm({ ...dcaForm, frequency: event.target.value })}><option value="weekly">Semanal</option><option value="monthly">Mensual</option></select></label><label>Cada<input type="number" min="1" max="52" value={dcaForm.interval_count} onChange={(event) => setDcaForm({ ...dcaForm, interval_count: event.target.value })} /></label></div>
+            <div><label>Asignación máxima %<input type="number" min="0.1" max="100" step="0.1" value={dcaForm.allocation_limit_pct} onChange={(event) => setDcaForm({ ...dcaForm, allocation_limit_pct: event.target.value })} /></label><label>Próxima cuota<input required type="datetime-local" value={dcaForm.next_run_at} onChange={(event) => setDcaForm({ ...dcaForm, next_run_at: event.target.value })} /></label></div>
+            <button disabled={dcaBusy} type="submit">Guardar plan · no comprar</button>
+            <small>Guardar un plan nunca ejecuta una orden. Solo “Ejecutar cuota” puede crear una compra spot simulada.</small>
+          </form>
+        </section>
+
+        <section className="exchange-panel spot-dca-plans">
+          <div className="exchange-panel-head compact"><div><p className="eyebrow">Plan registry</p><h2>Planes persistidos</h2></div><span>{dca.plans.length} PLANES</span></div>
+          {dca.plans.length ? <div className="spot-dca-plan-list">{dca.plans.map((plan) => <article className={`${plan.status} ${plan.due ? "due" : ""}`} key={plan.id}>
+            <header><div><span>#{plan.id} · {plan.symbol}</span><strong>{plan.name}</strong></div><b>{plan.due ? "VENCIDO" : plan.status.toUpperCase()}</b></header>
+            <div className="spot-dca-metrics"><span><small>Cuota</small><strong>{money(plan.budget_amount)}</strong></span><span><small>Frecuencia</small><strong>{plan.interval_count}× {plan.frequency}</strong></span><span><small>Límite</small><strong>{Number(plan.allocation_limit_pct).toFixed(1)}%</strong></span></div>
+            <p>Próxima: {new Date(plan.next_run_at).toLocaleString()}</p>
+            <footer>{plan.status === "active" ? <button disabled={dcaBusy || !plan.due} onClick={() => runDcaPlan(plan.id)}>Ejecutar cuota</button> : null}{plan.status === "active" ? <button disabled={dcaBusy} onClick={() => changeDcaStatus(plan.id, "paused")}>Pausar</button> : plan.status === "paused" ? <button disabled={dcaBusy} onClick={() => changeDcaStatus(plan.id, "active")}>Reactivar</button> : null}{plan.status !== "archived" && <button disabled={dcaBusy} onClick={() => changeDcaStatus(plan.id, "archived")}>Archivar</button>}</footer>
+          </article>)}</div> : <div className="chart-state">Todavía no hay planes DCA. El formulario crea el contrato, no una compra.</div>}
+        </section>
+      </div>
+
+      <section className="exchange-panel spot-dca-executions">
+        <div className="exchange-panel-head compact"><div><p className="eyebrow">Execution evidence</p><h2>Cuotas ejecutadas y rechazadas</h2></div><span>{dca.executions.length} INTENTOS</span></div>
+        {dca.executions.length ? <div>{dca.executions.map((execution) => <article key={execution.id}><span>Plan #{execution.plan_id}</span><strong className={execution.status === "executed" ? "positive" : "negative"}>{execution.status.toUpperCase()}</strong><b>{execution.notional ? money(execution.notional) : "SIN COMPRA"}</b><small>{execution.reason || new Date(execution.created_at).toLocaleString()}</small></article>)}</div> : <div className="chart-state">Sin cuotas ejecutadas o rechazadas.</div>}
+      </section>
     </>}
 
     {activeTab === "analysis" && <>

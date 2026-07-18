@@ -16,6 +16,7 @@ import {
   getPaperAccount,
   getChartIndicatorPresets,
   getSpotPortfolio,
+  getSpotDcaPlans,
 } from "../../api/client.js";
 
 const UI_ROUTE_SURFACES = [
@@ -197,6 +198,14 @@ export default function BackendSurface({ selectedSymbol = "BTCUSDT" }) {
         description: "Ciclos, holdings, equity persistida y ledger patrimonial spot simulado.",
         call: () => getSpotPortfolio(),
         rows: ["holdings", "equity_history", "ledger"],
+      },
+      {
+        label: "Spot DCA Plans",
+        method: "GET",
+        path: "/api/spot-portfolio/dca-plans",
+        description: "Planes, vencimientos e intentos DCA auditables sin scheduler ni live execution.",
+        call: () => getSpotDcaPlans(),
+        rows: ["plans", "executions"],
       },
     ],
     [selectedSymbol]

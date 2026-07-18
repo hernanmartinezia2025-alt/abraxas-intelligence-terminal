@@ -15,6 +15,7 @@ from backend.app.storage.spot_allocation import (
     save_allocation_policy,
 )
 from backend.app.storage.spot_portfolio import execute_spot_transaction, portfolio_snapshot
+from backend.app.storage.risk import set_kill_switch, update_risk_limits, validate_order_intent
 from backend.app.storage.sqlite import connect, initialize_database
 
 
@@ -33,6 +34,14 @@ class SpotAllocationTests(unittest.TestCase):
                     VALUES (?, ?, ?, 0, 1000000, 50, 'Neutral', 'NORMAL', 'fixture')""",
                     (now, symbol, price),
                 )
+        update_risk_limits({
+            "max_position_pct": 100,
+            "max_daily_loss_pct": 100,
+            "max_drawdown_pct": 100,
+            "cooldown_minutes": 0,
+            "symbol_whitelist": ["BTCUSDT", "ETHUSDT"],
+        })
+        set_kill_switch(False, "Spot allocation test")
 
     def tearDown(self) -> None:
         storage_sqlite.DB_PATH = self.original_db_path
@@ -73,8 +82,12 @@ class SpotAllocationTests(unittest.TestCase):
         self.assertFalse(result["execution_created"])
         self.assertEqual([order["side"] for order in run["plan"]], ["buy", "buy"])
         self.assertEqual(run["metrics"]["orders_total"], 2)
+        self.assertTrue(run["metrics"]["risk_ready"])
+        self.assertTrue(all(item["validation_id"] is None for item in run["metrics"]["risk_preview"]))
         self.assertLess(run["metrics"]["expected_drift_pct_points"], run["metrics"]["current_drift_pct_points"])
         self.assertEqual(portfolio_snapshot()["transactions"], [])
+        with connect() as connection:
+            self.assertEqual(connection.execute("SELECT COUNT(*) FROM risk_validation_log").fetchone()[0], 0)
 
     def test_apply_is_idempotent_and_uses_rebalance_origin(self) -> None:
         run = create_rebalance_run(self.policy()["id"])["run"]
@@ -85,6 +98,10 @@ class SpotAllocationTests(unittest.TestCase):
         self.assertEqual(len(applied["snapshot"]["transactions"]), 2)
         self.assertEqual(len(replay["snapshot"]["transactions"]), 2)
         self.assertTrue(all(row["origin"] == "rebalance_run" for row in replay["snapshot"]["transactions"]))
+        self.assertTrue(all(row["risk_validation_id"] for row in replay["snapshot"]["transactions"]))
+        validation_count = len(replay["run"]["execution"])
+        with connect() as connection:
+            self.assertEqual(connection.execute("SELECT COUNT(*) FROM risk_validation_log").fetchone()[0], validation_count)
 
     def test_changed_portfolio_invalidates_draft(self) -> None:
         run = create_rebalance_run(self.policy()["id"])["run"]
@@ -104,6 +121,11 @@ class SpotAllocationTests(unittest.TestCase):
     def test_applying_run_recovers_written_transaction(self) -> None:
         run = create_rebalance_run(self.policy()["id"])["run"]
         first_order = run["plan"][0]
+        risk = validate_order_intent({
+            "mode": "spot", "symbol": first_order["symbol"], "side": "long",
+            "requested_notional": first_order["planned_notional"], "account_equity": 10_000,
+            "daily_pnl": 0, "current_drawdown_pct": 0,
+        })
         with connect() as connection:
             connection.execute("UPDATE spot_rebalance_runs SET status='applying' WHERE id=?", (run["id"],))
         written = execute_spot_transaction({
@@ -112,12 +134,41 @@ class SpotAllocationTests(unittest.TestCase):
             "quantity": first_order["planned_quantity"],
             "origin": "rebalance_run",
             "origin_reference": f"rebalance:{run['id']}:{first_order['order_index']}:{first_order['symbol']}",
+            "risk_validation_id": risk["validation_id"],
         })
         recovered = apply_rebalance_run(run["id"])
         first_execution = recovered["run"]["execution"][0]
         self.assertTrue(first_execution["recovered"])
         self.assertEqual(first_execution["transaction_id"], written["transaction_id"])
+        self.assertEqual(first_execution["risk_validation_id"], risk["validation_id"])
         self.assertEqual(len(recovered["snapshot"]["transactions"]), 2)
+
+    def test_kill_switch_rejects_buys_with_persisted_risk_evidence(self) -> None:
+        run = create_rebalance_run(self.policy()["id"])["run"]
+        set_kill_switch(True, "Emergency stop fixture")
+        result = apply_rebalance_run(run["id"])
+        self.assertEqual(result["run"]["status"], "partial")
+        self.assertEqual(result["snapshot"]["transactions"], [])
+        self.assertTrue(all(item["status"] == "rejected" for item in result["run"]["execution"]))
+        self.assertTrue(all(item["stage"] == "risk" for item in result["run"]["execution"]))
+        self.assertTrue(all(item["risk_validation_id"] for item in result["run"]["execution"]))
+
+    def test_kill_switch_still_allows_close_only_reduction(self) -> None:
+        execute_spot_transaction({"symbol": "BTCUSDT", "side": "buy", "quantity": 0.1})
+        policy = self.policy([{"symbol": "ETHUSDT", "target_pct": 50}], name="Close BTC under halt")
+        run = create_rebalance_run(policy["id"])["run"]
+        update_risk_limits({
+            "max_position_pct": 100,
+            "max_daily_loss_pct": 100,
+            "max_drawdown_pct": 100,
+            "cooldown_minutes": 0,
+            "symbol_whitelist": ["ETHUSDT"],
+        })
+        set_kill_switch(True, "Close-only fixture")
+        result = apply_rebalance_run(run["id"])
+        self.assertEqual(result["run"]["execution"][0]["side"], "sell")
+        self.assertEqual(result["run"]["execution"][0]["status"], "executed")
+        self.assertEqual(result["run"]["execution"][1]["status"], "rejected")
 
     def test_archive_blocks_new_runs_and_tables_are_in_data_center(self) -> None:
         policy = self.policy()

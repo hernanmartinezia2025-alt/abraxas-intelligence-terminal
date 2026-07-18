@@ -4,10 +4,13 @@ import hashlib
 import json
 from datetime import datetime, timezone
 
+from backend.app.analytics.spot_risk import build_spot_risk_context
+from backend.app.storage.risk import validate_order_intent
 from backend.app.storage.spot_portfolio import (
     DEFAULT_PORTFOLIO_ID,
     FEE_RATE,
     execute_spot_transaction,
+    get_spot_transaction_by_origin,
     latest_mark,
     portfolio_snapshot,
 )
@@ -268,6 +271,28 @@ def _decode_run(run: dict) -> dict:
     return run
 
 
+def _risk_payload(order: dict, snapshot: dict, *, source: str, run_id: int | None = None) -> dict:
+    context = build_spot_risk_context(snapshot)
+    holding = next((item for item in snapshot["holdings"] if item["symbol"] == order["symbol"]), None)
+    return {
+        "mode": "spot",
+        "symbol": order["symbol"],
+        "side": "long",
+        "requested_notional": float(order["planned_notional"]),
+        "current_exposure_notional": float(holding["market_value"]) if holding else 0.0,
+        "account_equity": context["account_equity"],
+        "daily_pnl": context["daily_pnl"],
+        "current_drawdown_pct": context["current_drawdown_pct"],
+        "last_loss_at": context["last_loss_at"],
+        "reduces_exposure": order["side"] == "sell",
+        "source": source,
+        "rebalance_run_id": run_id,
+        "order_index": order["order_index"],
+        "risk_data_coverage": context["coverage"],
+        "risk_observed_since": context["observed_since"],
+    }
+
+
 def create_rebalance_run(policy_id: int) -> dict:
     initialize_database()
     with connect() as connection:
@@ -276,6 +301,21 @@ def create_rebalance_run(policy_id: int) -> dict:
         raise ValueError("Archived allocation policy cannot create a rebalance run")
     snapshot = portfolio_snapshot(policy["portfolio_id"])
     orders, metrics = _build_rebalance_plan(policy, snapshot)
+    risk_preview = []
+    projected_exposure = {item["symbol"]: float(item["market_value"]) for item in snapshot["holdings"]}
+    for order in orders:
+        payload = _risk_payload(order, snapshot, source="spot_rebalance_preview")
+        payload["current_exposure_notional"] = projected_exposure.get(order["symbol"], 0.0)
+        decision = validate_order_intent(payload, persist=False)
+        risk_preview.append({"order_index": order["order_index"], "symbol": order["symbol"], "side": order["side"], **decision})
+        direction = -1 if order["side"] == "sell" else 1
+        projected_exposure[order["symbol"]] = max(
+            0.0,
+            projected_exposure.get(order["symbol"], 0.0) + direction * float(order["planned_notional"]),
+        )
+    metrics["risk_preview"] = risk_preview
+    metrics["risk_ready"] = all(item["approved"] for item in risk_preview)
+    metrics["risk_gate"] = "mandatory_on_apply"
     now = now_iso()
     with connect() as connection:
         run_id = int(connection.execute(
@@ -316,22 +356,49 @@ def apply_rebalance_run(run_id: int) -> dict:
     results = []
     for order in sorted(run["plan"], key=lambda item: (0 if item["side"] == "sell" else 1, item["order_index"])):
         reference = f"rebalance:{run_id}:{order['order_index']}:{order['symbol']}"
+        existing = get_spot_transaction_by_origin("rebalance_run", reference, run["portfolio_id"])
+        if existing:
+            results.append({
+                "order_index": order["order_index"], "symbol": order["symbol"], "side": order["side"],
+                "status": "executed", "transaction_id": existing["id"], "recovered": True,
+                "risk_validation_id": existing.get("risk_validation_id"),
+            })
+            continue
+        current_snapshot = portfolio_snapshot(run["portfolio_id"])
+        risk = validate_order_intent(
+            _risk_payload(order, current_snapshot, source="spot_rebalance_apply", run_id=run_id)
+        )
+        if not risk["approved"]:
+            results.append({
+                "order_index": order["order_index"], "symbol": order["symbol"], "side": order["side"],
+                "status": "rejected", "stage": "risk", "reason": " · ".join(risk["reasons"]),
+                "risk_validation_id": risk["validation_id"], "risk_checks": risk["checks"],
+            })
+            with connect() as connection:
+                connection.execute(
+                    "UPDATE spot_rebalance_runs SET execution_json=?, updated_at=? WHERE id=?",
+                    (json.dumps(results, sort_keys=True), now_iso(), run_id),
+                )
+            continue
         try:
             result = execute_spot_transaction(
                 {
                     "symbol": order["symbol"], "side": order["side"], "quantity": order["planned_quantity"],
                     "notes": f"Rebalance run #{run_id}", "origin": "rebalance_run", "origin_reference": reference,
+                    "risk_validation_id": risk["validation_id"],
                 },
                 portfolio_id=run["portfolio_id"],
             )
             results.append({
                 "order_index": order["order_index"], "symbol": order["symbol"], "side": order["side"],
                 "status": "executed", "transaction_id": result["transaction_id"], "recovered": result["recovered"],
+                "risk_validation_id": risk["validation_id"],
             })
         except ValueError as exc:
             results.append({
                 "order_index": order["order_index"], "symbol": order["symbol"], "side": order["side"],
-                "status": "rejected", "reason": str(exc),
+                "status": "rejected", "stage": "execution", "reason": str(exc),
+                "risk_validation_id": risk["validation_id"],
             })
         with connect() as connection:
             connection.execute(

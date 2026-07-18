@@ -591,8 +591,10 @@ CREATE TABLE IF NOT EXISTS spot_transactions (
     cycle_number INTEGER NOT NULL DEFAULT 1,
     origin TEXT NOT NULL DEFAULT 'manual',
     origin_reference TEXT,
+    risk_validation_id INTEGER,
     executed_at TEXT NOT NULL,
-    FOREIGN KEY(portfolio_id) REFERENCES spot_portfolios(id)
+    FOREIGN KEY(portfolio_id) REFERENCES spot_portfolios(id),
+    FOREIGN KEY(risk_validation_id) REFERENCES risk_validation_log(id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_spot_transactions_portfolio_time
@@ -1261,6 +1263,7 @@ def initialize_database() -> None:
         for name, column_type in {
             "origin": "TEXT NOT NULL DEFAULT 'manual'",
             "origin_reference": "TEXT",
+            "risk_validation_id": "INTEGER",
         }.items():
             if name not in spot_transaction_columns:
                 connection.execute(f"ALTER TABLE spot_transactions ADD COLUMN {name} {column_type}")

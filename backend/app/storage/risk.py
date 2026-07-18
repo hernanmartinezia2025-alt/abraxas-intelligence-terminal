@@ -90,7 +90,7 @@ def get_risk_profile(audit_limit: int = 20) -> dict:
             "reason": state["reason"],
             "updated_at": state["updated_at"],
         },
-        "execution": {"paper": "risk_gated", "live": "blocked"},
+        "execution": {"paper": "risk_gated", "spot_simulation": "risk_gated", "live": "blocked"},
         "audit_log": events,
         "validation_log": validations,
     }
@@ -144,7 +144,7 @@ def set_kill_switch(active: bool, reason: str) -> dict:
     return get_risk_profile()
 
 
-def validate_order_intent(payload: dict) -> dict:
+def validate_order_intent(payload: dict, *, persist: bool = True) -> dict:
     initialize_database()
     now = datetime.now(timezone.utc)
     symbol = str(payload["symbol"]).strip().upper()
@@ -176,10 +176,17 @@ def validate_order_intent(payload: dict) -> dict:
 
         kill_allowed = reduces_exposure or not bool(state["kill_switch_active"])
         check("kill_switch", kill_allowed, "Close-only reduction allowed while kill switch is active" if reduces_exposure and bool(state["kill_switch_active"]) else ("Kill switch inactive" if not bool(state["kill_switch_active"]) else "Kill switch is active"))
-        mode_allowed = mode in {"validation", "paper"}
+        mode_allowed = mode in {"validation", "paper", "spot"}
         check("mode", mode_allowed, f"{mode.title()} mode allowed" if mode_allowed else "Live mode is blocked")
         check("side", side == "long", "Long intent supported" if side == "long" else "Only long intents are supported in this phase")
-        check("symbol_whitelist", symbol in limits["symbol_whitelist"], f"{symbol} is authorized" if symbol in limits["symbol_whitelist"] else f"{symbol} is outside the symbol whitelist")
+        symbol_allowed = reduces_exposure or symbol in limits["symbol_whitelist"]
+        check(
+            "symbol_whitelist",
+            symbol_allowed,
+            "Close-only reduction bypasses symbol whitelist"
+            if reduces_exposure and symbol not in limits["symbol_whitelist"]
+            else (f"{symbol} is authorized" if symbol_allowed else f"{symbol} is outside the symbol whitelist"),
+        )
         position_allowed = reduces_exposure or position_pct <= limits["max_position_pct"]
         position_detail = f"Exposure reduces from {current_position_pct:.2f}% to {position_pct:.2f}%" if reduces_exposure else (f"Projected exposure {position_pct:.2f}% within limit" if position_allowed else f"Projected exposure {position_pct:.2f}% exceeds {limits['max_position_pct']:.2f}%")
         check("max_position", position_allowed, position_detail)
@@ -219,13 +226,17 @@ def validate_order_intent(payload: dict) -> dict:
             "execution_performed": False,
         }
         normalized_request = {**payload, "symbol": symbol, "mode": mode, "side": side}
-        cursor = connection.execute(
-            """
-            INSERT INTO risk_validation_log (
-                mode, symbol, approved, request_json, decision_json, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?)
-            """,
-            (mode, symbol, int(approved), json.dumps(normalized_request, sort_keys=True), json.dumps(decision, sort_keys=True), now.isoformat()),
-        )
-        decision["validation_id"] = cursor.lastrowid
+        if persist:
+            cursor = connection.execute(
+                """
+                INSERT INTO risk_validation_log (
+                    mode, symbol, approved, request_json, decision_json, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (mode, symbol, int(approved), json.dumps(normalized_request, sort_keys=True), json.dumps(decision, sort_keys=True), now.isoformat()),
+            )
+            decision["validation_id"] = cursor.lastrowid
+        else:
+            decision["validation_id"] = None
+            decision["persistence"] = "preview_only"
     return decision

@@ -262,6 +262,21 @@ def quote_spot_transaction(payload: dict, portfolio_id: int = DEFAULT_PORTFOLIO_
         return _transaction_quote(connection, payload, _portfolio_row(connection, portfolio_id))
 
 
+def get_spot_transaction_by_origin(
+    origin: str,
+    origin_reference: str,
+    portfolio_id: int = DEFAULT_PORTFOLIO_ID,
+) -> dict | None:
+    initialize_database()
+    with connect() as connection:
+        row = connection.execute(
+            """SELECT * FROM spot_transactions
+            WHERE portfolio_id = ? AND origin = ? AND origin_reference = ?""",
+            (portfolio_id, origin, origin_reference),
+        ).fetchone()
+    return dict(row) if row else None
+
+
 def execute_spot_transaction(payload: dict, portfolio_id: int = DEFAULT_PORTFOLIO_ID) -> dict:
     initialize_database()
     now = now_iso()
@@ -307,19 +322,21 @@ def execute_spot_transaction(payload: dict, portfolio_id: int = DEFAULT_PORTFOLI
         transaction_id = int(connection.execute(
             """INSERT INTO spot_transactions
             (portfolio_id, symbol, side, quantity, price, notional, fee, realized_pnl,
-             price_timestamp, source, notes, cycle_number, origin, origin_reference, executed_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'market_snapshots', ?, ?, ?, ?, ?)""",
+             price_timestamp, source, notes, cycle_number, origin, origin_reference,
+             risk_validation_id, executed_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'market_snapshots', ?, ?, ?, ?, ?, ?)""",
             (
                 portfolio_id, quote["symbol"], quote["side"], quote["quantity"], quote["price"],
                 quote["notional"], quote["fee"], realized, quote["price_timestamp"],
-                str(payload.get("notes") or ""), int(portfolio.get("active_cycle") or 1), origin, origin_reference, now,
+                str(payload.get("notes") or ""), int(portfolio.get("active_cycle") or 1), origin,
+                origin_reference, payload.get("risk_validation_id"), now,
             ),
         ).lastrowid)
         portfolio["cash_balance"] = quote["cash_balance_after"]
         _insert_ledger(
             connection, portfolio, "spot_transaction", reference_id=transaction_id, symbol=quote["symbol"],
             cash_delta=quote["cash_delta"], quantity_delta=quote["quantity"] if quote["side"] == "buy" else -quote["quantity"],
-            realized_pnl_delta=realized, payload={"side": quote["side"], "price": quote["price"], "fee": quote["fee"], "notes": str(payload.get("notes") or ""), "origin": origin, "origin_reference": origin_reference},
+            realized_pnl_delta=realized, payload={"side": quote["side"], "price": quote["price"], "fee": quote["fee"], "notes": str(payload.get("notes") or ""), "origin": origin, "origin_reference": origin_reference, "risk_validation_id": payload.get("risk_validation_id")},
             created_at=now,
         )
         _insert_equity_snapshot(connection, portfolio_id, "transaction")

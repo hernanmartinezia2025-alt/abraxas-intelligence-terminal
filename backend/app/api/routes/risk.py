@@ -22,7 +22,7 @@ class KillSwitchRequest(BaseModel):
 
 
 class OrderIntentRequest(BaseModel):
-    mode: str = Field(default="validation", pattern="^(validation|paper|live)$")
+    mode: str = Field(default="validation", pattern="^(validation|paper|spot|live)$")
     symbol: str = Field(min_length=2, max_length=30)
     side: str = Field(default="long", pattern="^(long|short)$")
     requested_notional: float = Field(gt=0, le=1_000_000_000)

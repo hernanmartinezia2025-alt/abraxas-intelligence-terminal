@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 from datetime import datetime, timezone
 
 from backend.app.storage.sqlite import connect, initialize_database
@@ -57,6 +58,178 @@ def _limits(row) -> dict:
     }
 
 
+def _normalize_limits(payload: dict) -> dict:
+    normalized = {
+        "max_position_pct": float(payload["max_position_pct"]),
+        "max_daily_loss_pct": float(payload["max_daily_loss_pct"]),
+        "max_drawdown_pct": float(payload["max_drawdown_pct"]),
+        "cooldown_minutes": int(payload["cooldown_minutes"]),
+        "symbol_whitelist": sorted({str(symbol).strip().upper() for symbol in payload["symbol_whitelist"] if str(symbol).strip()}),
+    }
+    for key in ("max_position_pct", "max_daily_loss_pct", "max_drawdown_pct"):
+        if not 0 < normalized[key] <= 100:
+            raise ValueError(f"{key} must be between 0 and 100")
+    if normalized["cooldown_minutes"] < 0:
+        raise ValueError("cooldown_minutes must be zero or greater")
+    if not normalized["symbol_whitelist"]:
+        raise ValueError("Symbol whitelist must contain at least one symbol")
+    return normalized
+
+
+def _policy_from_row(row) -> dict:
+    policy = dict(row)
+    policy["limits"] = {
+        "max_position_pct": float(policy.pop("max_position_pct")),
+        "max_daily_loss_pct": float(policy.pop("max_daily_loss_pct")),
+        "max_drawdown_pct": float(policy.pop("max_drawdown_pct")),
+        "cooldown_minutes": int(policy.pop("cooldown_minutes")),
+        "symbol_whitelist": json.loads(policy.pop("symbol_whitelist")),
+    }
+    return policy
+
+
+def _active_policy(connection, scope_type: str, scope_id: int) -> dict | None:
+    row = connection.execute(
+        """SELECT p.*, v.id AS version_id, v.max_position_pct, v.max_daily_loss_pct,
+        v.max_drawdown_pct, v.cooldown_minutes, v.symbol_whitelist, v.notes,
+        v.created_at AS version_created_at
+        FROM risk_policies AS p JOIN risk_policy_versions AS v
+          ON v.policy_id = p.id AND v.version = p.current_version
+        WHERE p.scope_type = ? AND p.scope_id = ? AND p.status = 'active'""",
+        (scope_type, scope_id),
+    ).fetchone()
+    return _policy_from_row(row) if row else None
+
+
+def _resolve_risk_limits(connection, account_id: int | None, bot_id: int | None) -> tuple[dict, dict]:
+    _seed(connection)
+    global_limits = _limits(connection.execute("SELECT * FROM risk_limits WHERE id = 1").fetchone())
+    effective = {key: value for key, value in global_limits.items() if key != "updated_at"}
+    layers = [{
+        "scope_type": "global", "scope_id": 1, "policy_id": None,
+        "version": global_limits["updated_at"], "name": "Global hard limits",
+        "limits": effective.copy(),
+    }]
+    scoped = []
+    if account_id is not None:
+        scoped.append(("account", account_id))
+    if bot_id is not None:
+        scoped.append(("bot", bot_id))
+    for scope_type, scope_id in scoped:
+        policy = _active_policy(connection, scope_type, scope_id)
+        if not policy:
+            continue
+        limits = policy["limits"]
+        effective["max_position_pct"] = min(effective["max_position_pct"], limits["max_position_pct"])
+        effective["max_daily_loss_pct"] = min(effective["max_daily_loss_pct"], limits["max_daily_loss_pct"])
+        effective["max_drawdown_pct"] = min(effective["max_drawdown_pct"], limits["max_drawdown_pct"])
+        effective["cooldown_minutes"] = max(effective["cooldown_minutes"], limits["cooldown_minutes"])
+        effective["symbol_whitelist"] = sorted(set(effective["symbol_whitelist"]) & set(limits["symbol_whitelist"]))
+        layers.append({
+            "scope_type": scope_type, "scope_id": scope_id, "policy_id": policy["id"],
+            "version_id": policy["version_id"], "version": policy["current_version"],
+            "name": policy["name"], "limits": limits,
+        })
+    fingerprint_payload = {
+        "layers": [{key: layer.get(key) for key in ("scope_type", "scope_id", "policy_id", "version_id", "version")} for layer in layers],
+        "effective_limits": effective,
+    }
+    fingerprint = hashlib.sha256(json.dumps(fingerprint_payload, sort_keys=True).encode("utf-8")).hexdigest()
+    return effective, {"contract": "risk_policy_resolution_v1", "rule": "most_restrictive_wins", "layers": layers, "effective_limits": effective, "fingerprint": fingerprint}
+
+
+def list_risk_policies() -> dict:
+    initialize_database()
+    with connect() as connection:
+        policies = [_policy_from_row(row) for row in connection.execute(
+            """SELECT p.*, v.id AS version_id, v.max_position_pct, v.max_daily_loss_pct,
+            v.max_drawdown_pct, v.cooldown_minutes, v.symbol_whitelist, v.notes,
+            v.created_at AS version_created_at
+            FROM risk_policies AS p JOIN risk_policy_versions AS v
+              ON v.policy_id = p.id AND v.version = p.current_version
+            ORDER BY p.scope_type, p.scope_id"""
+        ).fetchall()]
+        accounts = [dict(row) for row in connection.execute(
+            "SELECT id, initial_balance, cash_balance, created_at FROM simulated_accounts ORDER BY id"
+        ).fetchall()]
+        bots = [dict(row) for row in connection.execute(
+            "SELECT id, name, base_symbol, timeframe, status FROM bots ORDER BY id"
+        ).fetchall()]
+    return {"policies": policies, "targets": {"accounts": accounts, "bots": bots}, "resolution_rule": "most_restrictive_wins"}
+
+
+def save_risk_policy(scope_type: str, scope_id: int, payload: dict) -> dict:
+    initialize_database()
+    scope_type = str(scope_type).strip().lower()
+    scope_id = int(scope_id)
+    if scope_type not in {"account", "bot"}:
+        raise ValueError("Risk policy scope must be account or bot")
+    limits = _normalize_limits(payload)
+    name = str(payload.get("name") or f"{scope_type.title()} #{scope_id} policy").strip()
+    notes = str(payload.get("notes") or "").strip()
+    if len(name) < 3 or len(notes) < 3:
+        raise ValueError("Policy name and auditable notes are required")
+    now = utc_now_iso()
+    with connect() as connection:
+        connection.execute("BEGIN IMMEDIATE")
+        target_table = "simulated_accounts" if scope_type == "account" else "bots"
+        if not connection.execute(f"SELECT 1 FROM {target_table} WHERE id = ?", (scope_id,)).fetchone():
+            raise ValueError(f"{scope_type.title()} {scope_id} does not exist")
+        existing = connection.execute(
+            "SELECT * FROM risk_policies WHERE scope_type = ? AND scope_id = ?", (scope_type, scope_id)
+        ).fetchone()
+        if existing:
+            policy_id = int(existing["id"])
+            version = int(existing["current_version"]) + 1
+            connection.execute(
+                "UPDATE risk_policies SET name = ?, status = 'active', current_version = ?, updated_at = ? WHERE id = ?",
+                (name, version, now, policy_id),
+            )
+        else:
+            version = 1
+            policy_id = int(connection.execute(
+                "INSERT INTO risk_policies (scope_type, scope_id, name, status, current_version, created_at, updated_at) VALUES (?, ?, ?, 'active', 1, ?, ?)",
+                (scope_type, scope_id, name, now, now),
+            ).lastrowid)
+        version_id = int(connection.execute(
+            """INSERT INTO risk_policy_versions (
+            policy_id, version, max_position_pct, max_daily_loss_pct, max_drawdown_pct,
+            cooldown_minutes, symbol_whitelist, notes, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (policy_id, version, limits["max_position_pct"], limits["max_daily_loss_pct"],
+             limits["max_drawdown_pct"], limits["cooldown_minutes"],
+             json.dumps(limits["symbol_whitelist"]), notes, now),
+        ).lastrowid)
+        audit_payload = {"policy_id": policy_id, "version_id": version_id, "version": version, "scope_type": scope_type, "scope_id": scope_id, "name": name, "limits": limits, "notes": notes}
+        connection.execute(
+            "INSERT INTO risk_audit_log (event_type, payload_json, created_at) VALUES ('policy_version_created', ?, ?)",
+            (json.dumps(audit_payload, sort_keys=True), now),
+        )
+    return list_risk_policies()
+
+
+def archive_risk_policy(scope_type: str, scope_id: int, reason: str) -> dict:
+    initialize_database()
+    scope_type = str(scope_type).strip().lower()
+    clean_reason = str(reason).strip()
+    if scope_type not in {"account", "bot"} or len(clean_reason) < 3:
+        raise ValueError("Valid scope and auditable reason are required")
+    now = utc_now_iso()
+    with connect() as connection:
+        connection.execute("BEGIN IMMEDIATE")
+        policy = connection.execute(
+            "SELECT id FROM risk_policies WHERE scope_type = ? AND scope_id = ?", (scope_type, int(scope_id))
+        ).fetchone()
+        if not policy:
+            raise ValueError("Risk policy not found")
+        connection.execute("UPDATE risk_policies SET status = 'archived', updated_at = ? WHERE id = ?", (now, policy["id"]))
+        connection.execute(
+            "INSERT INTO risk_audit_log (event_type, payload_json, created_at) VALUES ('policy_archived', ?, ?)",
+            (json.dumps({"policy_id": policy["id"], "scope_type": scope_type, "scope_id": int(scope_id), "reason": clean_reason}, sort_keys=True), now),
+        )
+    return list_risk_policies()
+
+
 def get_risk_profile(audit_limit: int = 20) -> dict:
     initialize_database()
     with connect() as connection:
@@ -68,7 +241,8 @@ def get_risk_profile(audit_limit: int = 20) -> dict:
             (audit_limit,),
         ).fetchall()]
         validations = [dict(row) for row in connection.execute(
-            """SELECT validation.id, validation.mode, validation.symbol, validation.approved,
+            """SELECT validation.id, validation.mode, validation.symbol, validation.account_id,
+            validation.bot_id, validation.policy_fingerprint, validation.policy_resolution_json, validation.approved,
             validation.request_json, validation.decision_json, validation.created_at,
             intent.id AS execution_intent_id, intent.status AS execution_status,
             intent.result_reference
@@ -83,6 +257,9 @@ def get_risk_profile(audit_limit: int = 20) -> dict:
         validation["approved"] = bool(validation["approved"])
         validation["request"] = json.loads(validation.pop("request_json"))
         validation["decision"] = json.loads(validation.pop("decision_json"))
+        resolution_json = validation.pop("policy_resolution_json", None)
+        validation["policy_resolution"] = json.loads(resolution_json) if resolution_json else validation["decision"].get("policy_resolution")
+    policy_registry = list_risk_policies()
     return {
         "limits": limits,
         "kill_switch": {
@@ -93,16 +270,17 @@ def get_risk_profile(audit_limit: int = 20) -> dict:
         "execution": {"paper": "risk_gated", "spot_simulation": "risk_gated", "live": "blocked"},
         "audit_log": events,
         "validation_log": validations,
+        "policies": policy_registry["policies"],
+        "policy_targets": policy_registry["targets"],
+        "policy_resolution_rule": policy_registry["resolution_rule"],
     }
 
 
 def update_risk_limits(payload: dict) -> dict:
     initialize_database()
     now = utc_now_iso()
-    symbols = sorted({str(symbol).strip().upper() for symbol in payload["symbol_whitelist"] if str(symbol).strip()})
-    if not symbols:
-        raise ValueError("Symbol whitelist must contain at least one symbol")
-    normalized = {**payload, "symbol_whitelist": symbols}
+    normalized = _normalize_limits(payload)
+    symbols = normalized["symbol_whitelist"]
     with connect() as connection:
         _seed(connection)
         connection.execute(
@@ -157,6 +335,8 @@ def get_risk_validation(validation_id: int) -> dict:
     validation["approved"] = bool(validation["approved"])
     validation["request"] = json.loads(validation.pop("request_json"))
     validation["decision"] = json.loads(validation.pop("decision_json"))
+    resolution_json = validation.pop("policy_resolution_json", None)
+    validation["policy_resolution"] = json.loads(resolution_json) if resolution_json else validation["decision"].get("policy_resolution")
     return validation
 
 
@@ -168,13 +348,15 @@ def validate_order_intent(payload: dict, *, persist: bool = True) -> dict:
     side = str(payload["side"]).strip().lower()
     account_equity = float(payload["account_equity"])
     requested_notional = float(payload["requested_notional"])
+    account_id = int(payload["account_id"]) if payload.get("account_id") is not None else None
+    bot_id = int(payload["bot_id"]) if payload.get("bot_id") is not None else None
     current_exposure_notional = max(0.0, float(payload.get("current_exposure_notional") or 0))
     daily_pnl = float(payload["daily_pnl"])
     current_drawdown_pct = float(payload["current_drawdown_pct"])
 
     with connect() as connection:
         _seed(connection)
-        limits = _limits(connection.execute("SELECT * FROM risk_limits WHERE id = 1").fetchone())
+        limits, policy_resolution = _resolve_risk_limits(connection, account_id, bot_id)
         state = dict(connection.execute("SELECT * FROM risk_state WHERE id = 1").fetchone())
 
         reduces_exposure = bool(payload.get("reduces_exposure"))
@@ -237,7 +419,9 @@ def validate_order_intent(payload: dict, *, persist: bool = True) -> dict:
                 "cooldown_remaining_minutes": cooldown_remaining,
                 "close_only": reduces_exposure,
             },
-            "limits_version": limits["updated_at"],
+            "limits_version": policy_resolution["fingerprint"],
+            "policy_fingerprint": policy_resolution["fingerprint"],
+            "policy_resolution": policy_resolution,
             "evaluated_at": now.isoformat(),
             "execution_performed": False,
         }
@@ -246,10 +430,13 @@ def validate_order_intent(payload: dict, *, persist: bool = True) -> dict:
             cursor = connection.execute(
                 """
                 INSERT INTO risk_validation_log (
-                    mode, symbol, approved, request_json, decision_json, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?)
+                    mode, symbol, account_id, bot_id, policy_fingerprint, policy_resolution_json,
+                    approved, request_json, decision_json, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (mode, symbol, int(approved), json.dumps(normalized_request, sort_keys=True), json.dumps(decision, sort_keys=True), now.isoformat()),
+                (mode, symbol, account_id, bot_id, policy_resolution["fingerprint"],
+                 json.dumps(policy_resolution, sort_keys=True), int(approved),
+                 json.dumps(normalized_request, sort_keys=True), json.dumps(decision, sort_keys=True), now.isoformat()),
             )
             decision["validation_id"] = cursor.lastrowid
         else:

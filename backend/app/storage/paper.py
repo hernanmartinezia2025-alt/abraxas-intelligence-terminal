@@ -248,6 +248,9 @@ def account_snapshot() -> dict:
     protections = {
         "risk_required": True,
         "kill_switch_active": risk_profile["kill_switch"]["active"],
+        "account_policy": next((policy for policy in risk_profile["policies"] if policy["scope_type"] == "account" and policy["scope_id"] == ACCOUNT_ID and policy["status"] == "active"), None),
+        "bot_policy_count": sum(policy["scope_type"] == "bot" and policy["status"] == "active" for policy in risk_profile["policies"]),
+        "policy_resolution_rule": risk_profile["policy_resolution_rule"],
         "price_max_age_seconds": PRICE_MAX_AGE_SECONDS,
         "proposal_ttl_seconds": PROPOSAL_TTL_SECONDS,
         "max_price_drift_pct": MAX_PRICE_DRIFT_PCT,
@@ -382,6 +385,7 @@ def _execute_market_intent_serialized(intent: OrderIntent) -> dict:
         ).fetchone()
     decision = validate_order_intent({
         "mode": "paper", "symbol": symbol, "side": "long", "requested_notional": notional,
+        "account_id": ACCOUNT_ID, "bot_id": bot_id, "source": "paper_market_execution",
         "account_equity": snapshot["equity"], "daily_pnl": snapshot["daily_realized_pnl"],
         "current_drawdown_pct": snapshot["drawdown_pct"],
         "current_exposure_notional": existing_exposure_notional,

@@ -512,6 +512,39 @@ CREATE TABLE IF NOT EXISTS risk_limits (
     updated_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS risk_policies (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    scope_type TEXT NOT NULL CHECK (scope_type IN ('account', 'bot')),
+    scope_id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('active', 'archived')),
+    current_version INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE(scope_type, scope_id)
+);
+
+CREATE TABLE IF NOT EXISTS risk_policy_versions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    policy_id INTEGER NOT NULL,
+    version INTEGER NOT NULL,
+    max_position_pct REAL NOT NULL CHECK (max_position_pct > 0 AND max_position_pct <= 100),
+    max_daily_loss_pct REAL NOT NULL CHECK (max_daily_loss_pct > 0 AND max_daily_loss_pct <= 100),
+    max_drawdown_pct REAL NOT NULL CHECK (max_drawdown_pct > 0 AND max_drawdown_pct <= 100),
+    cooldown_minutes INTEGER NOT NULL CHECK (cooldown_minutes >= 0),
+    symbol_whitelist TEXT NOT NULL,
+    notes TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    UNIQUE(policy_id, version),
+    FOREIGN KEY(policy_id) REFERENCES risk_policies(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_risk_policies_scope_status
+ON risk_policies(scope_type, scope_id, status);
+
+CREATE INDEX IF NOT EXISTS idx_risk_policy_versions_policy_version
+ON risk_policy_versions(policy_id, version);
+
 CREATE TABLE IF NOT EXISTS risk_state (
     id INTEGER PRIMARY KEY CHECK (id = 1),
     kill_switch_active INTEGER NOT NULL CHECK (kill_switch_active IN (0, 1)),
@@ -533,6 +566,10 @@ CREATE TABLE IF NOT EXISTS risk_validation_log (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     mode TEXT NOT NULL,
     symbol TEXT NOT NULL,
+    account_id INTEGER,
+    bot_id INTEGER,
+    policy_fingerprint TEXT,
+    policy_resolution_json TEXT,
     approved INTEGER NOT NULL CHECK (approved IN (0, 1)),
     request_json TEXT NOT NULL,
     decision_json TEXT NOT NULL,
@@ -1198,6 +1235,20 @@ def initialize_database() -> None:
                 connection.execute(f"ALTER TABLE simulated_orders ADD COLUMN {name} {column_type}")
         connection.execute(
             "CREATE UNIQUE INDEX IF NOT EXISTS idx_simulated_orders_proposal ON simulated_orders(proposal_id) WHERE proposal_id IS NOT NULL"
+        )
+        validation_columns = {
+            row["name"] for row in connection.execute("PRAGMA table_info(risk_validation_log)").fetchall()
+        }
+        for name, column_type in {
+            "account_id": "INTEGER",
+            "bot_id": "INTEGER",
+            "policy_fingerprint": "TEXT",
+            "policy_resolution_json": "TEXT",
+        }.items():
+            if name not in validation_columns:
+                connection.execute(f"ALTER TABLE risk_validation_log ADD COLUMN {name} {column_type}")
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_risk_validation_scope_created ON risk_validation_log(account_id, bot_id, created_at)"
         )
         version_columns = {
             row["name"] for row in connection.execute("PRAGMA table_info(bot_versions)").fetchall()

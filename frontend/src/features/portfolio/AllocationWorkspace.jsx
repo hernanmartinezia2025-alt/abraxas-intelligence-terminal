@@ -17,6 +17,8 @@ export default function AllocationWorkspace({ data, busy, onSave, onArchive, onP
     [form.targets],
   );
   const latestRun = data.runs?.[0] || null;
+  const riskPreview = latestRun?.metrics?.risk_preview || [];
+  const riskReady = latestRun?.metrics?.risk_ready;
 
   function updateTarget(index, field, value) {
     setForm((current) => ({
@@ -83,7 +85,7 @@ export default function AllocationWorkspace({ data, busy, onSave, onArchive, onP
     </div>
 
     <section className="exchange-panel spot-rebalance-run">
-      <div className="exchange-panel-head compact"><div><p className="eyebrow">Persisted rebalance run</p><h2>{latestRun ? `Plan #${latestRun.id} · ${latestRun.status}` : "Sin plan calculado"}</h2></div>{latestRun && <span>POLÍTICA #{latestRun.policy_id} · VERSIÓN #{latestRun.policy_version_id}</span>}</div>
+      <div className="exchange-panel-head compact"><div><p className="eyebrow">Persisted rebalance run</p><h2>{latestRun ? `Plan #${latestRun.id} · ${latestRun.status}` : "Sin plan calculado"}</h2></div>{latestRun && <span className={riskReady === false ? "negative" : "positive"}>{riskReady === false ? "RISK BLOQUEA" : riskReady === true ? "RISK READY" : "RISK AL APLICAR"}</span>}</div>
       {latestRun ? <>
         <div className="rebalance-metrics">
           <article><span>Patrimonio al plan</span><strong>{money(latestRun.equity_at_plan)}</strong><small>mark {latestRun.source_timestamp ? new Date(latestRun.source_timestamp).toLocaleString() : "sin timestamp"}</small></article>
@@ -95,8 +97,14 @@ export default function AllocationWorkspace({ data, busy, onSave, onArchive, onP
           <div className="table-head"><span>#</span><span>Lado</span><span>Activo</span><span>Cantidad</span><span>Notional</span><span>Mark</span></div>
           {latestRun.plan.map((order) => <div key={`${latestRun.id}-${order.order_index}`}><span>{order.order_index}</span><b className={order.side === "buy" ? "positive" : "negative"}>{order.side.toUpperCase()}</b><strong>{order.symbol}</strong><span>{Number(order.planned_quantity).toFixed(8)}</span><span>{money(order.planned_notional)}</span><span>{money(order.reference_price)}</span></div>)}
         </div>
-        <footer className="rebalance-apply-bar"><div><strong>{latestRun.status === "draft" ? "Plan listo para revisión" : `Estado ${latestRun.status}`}</strong><small>Si la cartera cambió desde el plan, el backend obliga a recalcular.</small></div>{["draft", "applying", "partial"].includes(latestRun.status) && <button disabled={busy} onClick={() => onApply(latestRun.id)}>Aplicar en simulación Spot</button>}</footer>
-        {latestRun.execution?.length ? <div className="rebalance-execution-log">{latestRun.execution.map((item) => <span key={item.order_index}><b>#{item.order_index} {item.symbol}</b><strong className={item.status === "executed" ? "positive" : "negative"}>{item.status}</strong><small>{item.transaction_id ? `tx #${item.transaction_id}${item.recovered ? " · recuperada" : ""}` : item.reason}</small></span>)}</div> : null}
+        {riskPreview.length ? <div className="rebalance-risk-preview">{riskPreview.map((decision) => <article className={decision.approved ? "approved" : "rejected"} key={decision.order_index}>
+          <header><span>RISK PREVIEW · ORDEN #{decision.order_index}</span><b>{decision.approved ? "READY" : "BLOCKED"}</b></header>
+          <strong>{decision.symbol} · {decision.side.toUpperCase()}</strong>
+          <div>{decision.checks.map((check) => <small className={check.passed ? "pass" : "fail"} key={check.code}>{check.passed ? "PASS" : "FAIL"} · {check.code}</small>)}</div>
+          <p>{decision.approved ? "Todos los guardrails aprobaron el preview." : decision.reasons.join(" · ")}</p>
+        </article>)}</div> : null}
+        <footer className="rebalance-apply-bar"><div><strong>{riskReady === false ? "Resolver Risk y recalcular" : latestRun.status === "draft" ? "Plan listo para revisión" : `Estado ${latestRun.status}`}</strong><small>La aplicación revalida con el estado vigente y persiste cada validation_id.</small></div>{["draft", "applying", "partial"].includes(latestRun.status) && <button disabled={busy || riskReady === false} onClick={() => onApply(latestRun.id)}>Aplicar en simulación Spot</button>}</footer>
+        {latestRun.execution?.length ? <div className="rebalance-execution-log">{latestRun.execution.map((item) => <span key={item.order_index}><b>#{item.order_index} {item.symbol}</b><strong className={item.status === "executed" ? "positive" : "negative"}>{item.status}</strong><small>{item.transaction_id ? `tx #${item.transaction_id}${item.recovered ? " · recuperada" : ""}` : item.reason}{item.risk_validation_id ? ` · risk #${item.risk_validation_id}` : ""}</small></span>)}</div> : null}
       </> : <div className="chart-state">Selecciona “Planificar rebalanceo” en una política activa para calcular con los marks actuales.</div>}
     </section>
   </>;

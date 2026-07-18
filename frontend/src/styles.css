@@ -4196,6 +4196,19 @@ button, a, input, select, textarea {
 .rebalance-order-table > div { min-width: 680px; display: grid; grid-template-columns: 34px .7fr 1fr 1.25fr 1fr 1fr; gap: 10px; align-items: center; padding: 8px 4px; border-bottom: 1px solid rgba(255,255,255,.06); }
 .rebalance-order-table .table-head { color: var(--muted); font-size: 8px; text-transform: uppercase; }
 .rebalance-order-table span,.rebalance-order-table b,.rebalance-order-table strong { font: 700 10px var(--font-num); }
+.rebalance-risk-preview { display: grid; grid-template-columns: repeat(auto-fit,minmax(230px,1fr)); gap: 7px; padding: 0 14px 12px; }
+.rebalance-risk-preview article { display: grid; gap: 7px; padding: 10px; border: 1px solid rgba(255,255,255,.08); border-radius: 6px; background: #0b1218; }
+.rebalance-risk-preview article.approved { border-color: rgba(61,205,165,.24); }
+.rebalance-risk-preview article.rejected { border-color: rgba(228,91,112,.35); }
+.rebalance-risk-preview header { display: flex; justify-content: space-between; gap: 10px; color: var(--muted); font-size: 8px; }
+.rebalance-risk-preview article.approved header b { color: #3dcda5; }
+.rebalance-risk-preview article.rejected header b { color: #e45b70; }
+.rebalance-risk-preview > article > strong { color: #e8edef; font: 800 11px var(--font-num); }
+.rebalance-risk-preview article > div { display: flex; flex-wrap: wrap; gap: 4px; }
+.rebalance-risk-preview small { padding: 4px 6px; border-radius: 3px; background: rgba(255,255,255,.04); color: var(--muted); font-size: 7px; }
+.rebalance-risk-preview small.pass { color: #67d9b9; }
+.rebalance-risk-preview small.fail { color: #ff7284; }
+.rebalance-risk-preview p { margin: 0; color: var(--muted); font-size: 8px; line-height: 1.45; }
 .rebalance-apply-bar { display: flex; justify-content: space-between; gap: 14px; align-items: center; padding: 12px 14px; border-top: 1px solid rgba(223,192,122,.13); background: rgba(223,192,122,.03); }
 .rebalance-apply-bar > div { display: grid; gap: 3px; }
 .rebalance-apply-bar strong { color: #e9edef; font-size: 11px; }

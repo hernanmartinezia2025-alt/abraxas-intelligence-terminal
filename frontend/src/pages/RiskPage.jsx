@@ -66,7 +66,7 @@ export default function RiskPage() {
         <div>
           <p className="eyebrow">Risk Engine · backend enforced</p>
           <h2>{killActive ? "Ejecucion detenida" : "Motor habilitado para validacion"}</h2>
-          <span>Los limites y cada cambio quedan persistidos en SQLite. Paper pasa por este motor; live permanece bloqueado.</span>
+          <span>Los límites y cada cambio quedan persistidos en SQLite. Paper y rebalanceos Spot pasan por este motor; live permanece bloqueado.</span>
         </div>
         <strong>{killActive ? "KILL SWITCH ON" : "KILL SWITCH OFF"}</strong>
       </section>
@@ -85,9 +85,9 @@ export default function RiskPage() {
       {!profile ? <div className="chart-state">Cargando estado real del backend…</div> : <>
         {activeTab === "overview" && <section className="risk-overview-grid">
           <article><span>Kill switch</span><strong className={killActive ? "negative" : "positive"}>{killActive ? "ACTIVE" : "INACTIVE"}</strong><small>{profile.kill_switch.reason}</small></article>
-          <article><span>Paper execution</span><strong>RISK GATED</strong><small>Toda orden pasa por validacion backend.</small></article>
+          <article><span>Paper + Spot simulation</span><strong>RISK GATED</strong><small>Toda orden pasa por validación backend.</small></article>
           <article><span>Live execution</span><strong className="negative">BLOCKED</strong><small>Sin adapters privados ni API keys.</small></article>
-          <article><span>Position limit</span><strong>{Number(profile.limits.max_position_pct).toFixed(2)}%</strong><small>Maximo por intencion.</small></article>
+          <article><span>Position limit</span><strong>{Number(profile.limits.max_position_pct).toFixed(2)}%</strong><small>Exposición proyectada máxima por activo.</small></article>
           <article><span>Daily loss</span><strong>{Number(profile.limits.max_daily_loss_pct).toFixed(2)}%</strong><small>Corte por perdida diaria.</small></article>
           <article><span>Max drawdown</span><strong>{Number(profile.limits.max_drawdown_pct).toFixed(2)}%</strong><small>Guardrail sobre equity.</small></article>
         </section>}
@@ -148,7 +148,7 @@ export default function RiskPage() {
         </section>}
       </>}
 
-      <section className="exchange-panel ops-panel"><div className="ops-warning"><strong>Live execution remains locked.</strong><p>No se gestionan claves reales. Paper Trading ya consume obligatoriamente esta validacion backend antes de crear fills simulados.</p></div></section>
+      <section className="exchange-panel ops-panel"><div className="ops-warning"><strong>Live execution remains locked.</strong><p>No se gestionan claves reales. Paper Trading y los rebalanceos Spot consumen obligatoriamente esta validación antes de registrar operaciones simuladas.</p></div></section>
     </section>
   );
 }

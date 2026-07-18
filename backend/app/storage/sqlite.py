@@ -589,6 +589,8 @@ CREATE TABLE IF NOT EXISTS spot_transactions (
     source TEXT NOT NULL,
     notes TEXT,
     cycle_number INTEGER NOT NULL DEFAULT 1,
+    origin TEXT NOT NULL DEFAULT 'manual',
+    origin_reference TEXT,
     executed_at TEXT NOT NULL,
     FOREIGN KEY(portfolio_id) REFERENCES spot_portfolios(id)
 );
@@ -651,6 +653,50 @@ ON spot_portfolio_ledger(portfolio_id, cycle_number, created_at);
 
 CREATE INDEX IF NOT EXISTS idx_spot_equity_cycle_time
 ON spot_equity_snapshots(portfolio_id, cycle_number, recorded_at);
+
+CREATE TABLE IF NOT EXISTS spot_dca_plans (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    portfolio_id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    symbol TEXT NOT NULL,
+    budget_amount REAL NOT NULL,
+    frequency TEXT NOT NULL CHECK(frequency IN ('weekly', 'monthly')),
+    interval_count INTEGER NOT NULL DEFAULT 1,
+    allocation_limit_pct REAL NOT NULL,
+    status TEXT NOT NULL CHECK(status IN ('active', 'paused', 'archived')),
+    next_run_at TEXT NOT NULL,
+    last_run_at TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY(portfolio_id) REFERENCES spot_portfolios(id)
+);
+
+CREATE TABLE IF NOT EXISTS spot_dca_executions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    plan_id INTEGER NOT NULL,
+    portfolio_id INTEGER NOT NULL,
+    cycle_number INTEGER NOT NULL,
+    scheduled_for TEXT NOT NULL,
+    status TEXT NOT NULL CHECK(status IN ('executed', 'rejected')),
+    transaction_id INTEGER,
+    quantity REAL,
+    price REAL,
+    notional REAL,
+    reason TEXT,
+    payload_json TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY(plan_id) REFERENCES spot_dca_plans(id),
+    FOREIGN KEY(portfolio_id) REFERENCES spot_portfolios(id),
+    FOREIGN KEY(transaction_id) REFERENCES spot_transactions(id),
+    UNIQUE(plan_id, scheduled_for)
+);
+
+CREATE INDEX IF NOT EXISTS idx_spot_dca_plans_status_due
+ON spot_dca_plans(status, next_run_at);
+
+CREATE INDEX IF NOT EXISTS idx_spot_dca_executions_plan_time
+ON spot_dca_executions(plan_id, created_at);
 
 CREATE TABLE IF NOT EXISTS simulated_orders (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1160,6 +1206,17 @@ def initialize_database() -> None:
         }
         if "cycle_number" not in spot_transaction_columns:
             connection.execute("ALTER TABLE spot_transactions ADD COLUMN cycle_number INTEGER NOT NULL DEFAULT 1")
+        for name, column_type in {
+            "origin": "TEXT NOT NULL DEFAULT 'manual'",
+            "origin_reference": "TEXT",
+        }.items():
+            if name not in spot_transaction_columns:
+                connection.execute(f"ALTER TABLE spot_transactions ADD COLUMN {name} {column_type}")
+        connection.execute(
+            """CREATE UNIQUE INDEX IF NOT EXISTS idx_spot_transactions_origin_reference
+            ON spot_transactions(portfolio_id, origin, origin_reference)
+            WHERE origin_reference IS NOT NULL"""
+        )
         signal_columns = {
             row["name"] for row in connection.execute("PRAGMA table_info(strategy_signal_evaluations)").fetchall()
         }

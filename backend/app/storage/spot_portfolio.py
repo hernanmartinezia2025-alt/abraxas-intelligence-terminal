@@ -265,6 +265,28 @@ def quote_spot_transaction(payload: dict, portfolio_id: int = DEFAULT_PORTFOLIO_
 def execute_spot_transaction(payload: dict, portfolio_id: int = DEFAULT_PORTFOLIO_ID) -> dict:
     initialize_database()
     now = now_iso()
+    origin = str(payload.get("origin") or "manual").strip().lower()
+    origin_reference = str(payload.get("origin_reference") or "").strip() or None
+    if origin not in {"manual", "dca_plan"}:
+        raise ValueError("Unsupported spot transaction origin")
+    if origin_reference and len(origin_reference) > 200:
+        raise ValueError("Spot transaction origin reference is too long")
+    if origin_reference:
+        with connect() as connection:
+            existing = connection.execute(
+                """SELECT * FROM spot_transactions
+                WHERE portfolio_id = ? AND origin = ? AND origin_reference = ?""",
+                (portfolio_id, origin, origin_reference),
+            ).fetchone()
+        if existing:
+            transaction = dict(existing)
+            return {
+                "transaction_id": transaction["id"],
+                "transaction": transaction,
+                "quote": None,
+                "recovered": True,
+                "snapshot": portfolio_snapshot(portfolio_id),
+            }
     with connect() as connection:
         portfolio = _portfolio_row(connection, portfolio_id)
         quote = _transaction_quote(connection, payload, portfolio)
@@ -285,23 +307,24 @@ def execute_spot_transaction(payload: dict, portfolio_id: int = DEFAULT_PORTFOLI
         transaction_id = int(connection.execute(
             """INSERT INTO spot_transactions
             (portfolio_id, symbol, side, quantity, price, notional, fee, realized_pnl,
-             price_timestamp, source, notes, cycle_number, executed_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'market_snapshots', ?, ?, ?)""",
+             price_timestamp, source, notes, cycle_number, origin, origin_reference, executed_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'market_snapshots', ?, ?, ?, ?, ?)""",
             (
                 portfolio_id, quote["symbol"], quote["side"], quote["quantity"], quote["price"],
                 quote["notional"], quote["fee"], realized, quote["price_timestamp"],
-                str(payload.get("notes") or ""), int(portfolio.get("active_cycle") or 1), now,
+                str(payload.get("notes") or ""), int(portfolio.get("active_cycle") or 1), origin, origin_reference, now,
             ),
         ).lastrowid)
         portfolio["cash_balance"] = quote["cash_balance_after"]
         _insert_ledger(
             connection, portfolio, "spot_transaction", reference_id=transaction_id, symbol=quote["symbol"],
             cash_delta=quote["cash_delta"], quantity_delta=quote["quantity"] if quote["side"] == "buy" else -quote["quantity"],
-            realized_pnl_delta=realized, payload={"side": quote["side"], "price": quote["price"], "fee": quote["fee"], "notes": str(payload.get("notes") or "")},
+            realized_pnl_delta=realized, payload={"side": quote["side"], "price": quote["price"], "fee": quote["fee"], "notes": str(payload.get("notes") or ""), "origin": origin, "origin_reference": origin_reference},
             created_at=now,
         )
         _insert_equity_snapshot(connection, portfolio_id, "transaction")
-    return {"transaction_id": transaction_id, "quote": quote, "snapshot": portfolio_snapshot(portfolio_id)}
+        transaction = dict(connection.execute("SELECT * FROM spot_transactions WHERE id = ?", (transaction_id,)).fetchone())
+    return {"transaction_id": transaction_id, "transaction": transaction, "quote": quote, "recovered": False, "snapshot": portfolio_snapshot(portfolio_id)}
 
 
 def apply_cash_flow(payload: dict, portfolio_id: int = DEFAULT_PORTFOLIO_ID) -> dict:

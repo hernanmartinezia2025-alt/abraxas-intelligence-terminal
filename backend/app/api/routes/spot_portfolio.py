@@ -7,6 +7,13 @@ from backend.app.analytics.spot_analysis import analyze_spot_candles
 from backend.app.services.candle_service import get_candles
 from backend.app.services.radar_service import get_radar
 from backend.app.storage.risk import get_risk_profile
+from backend.app.storage.spot_dca import (
+    create_dca_plan,
+    execute_due_dca_plan,
+    list_dca_plans,
+    preview_dca_plan,
+    set_dca_plan_status,
+)
 from backend.app.storage.spot_portfolio import (
     apply_cash_flow,
     execute_spot_transaction,
@@ -36,6 +43,20 @@ class SpotCashFlowRequest(BaseModel):
 class SpotResetRequest(BaseModel):
     initial_cash: float = Field(default=10_000, ge=100, le=1_000_000_000)
     reason: str = Field(min_length=3, max_length=500)
+
+
+class DcaPlanRequest(BaseModel):
+    name: str = Field(min_length=3, max_length=100)
+    symbol: str = Field(min_length=3, max_length=30)
+    budget_amount: float = Field(ge=1, le=10_000_000)
+    frequency: str = Field(pattern="^(weekly|monthly)$")
+    interval_count: int = Field(default=1, ge=1, le=52)
+    allocation_limit_pct: float = Field(gt=0, le=100)
+    next_run_at: str | None = None
+
+
+class DcaPlanStatusRequest(BaseModel):
+    status: str = Field(pattern="^(active|paused|archived)$")
 
 
 def values(model: BaseModel) -> dict:
@@ -87,6 +108,43 @@ def spot_reset(payload: SpotResetRequest) -> dict:
     try:
         body = values(payload)
         return reset_spot_portfolio(body["initial_cash"], body["reason"])
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.get("/dca-plans")
+def spot_dca_plans(limit: int = Query(default=100, ge=1, le=500)) -> dict:
+    return list_dca_plans(limit=limit)
+
+
+@router.post("/dca-plans")
+def spot_create_dca_plan(payload: DcaPlanRequest) -> dict:
+    try:
+        return create_dca_plan(values(payload))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.get("/dca-plans/{plan_id}/preview")
+def spot_preview_dca_plan(plan_id: int) -> dict:
+    try:
+        return preview_dca_plan(plan_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.patch("/dca-plans/{plan_id}/status")
+def spot_update_dca_plan_status(plan_id: int, payload: DcaPlanStatusRequest) -> dict:
+    try:
+        return set_dca_plan_status(plan_id, values(payload)["status"])
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/dca-plans/{plan_id}/execute")
+def spot_execute_dca_plan(plan_id: int) -> dict:
+    try:
+        return execute_due_dca_plan(plan_id)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 

@@ -102,6 +102,8 @@ SOURCE_CATALOG = [
             "spot_cash_flows",
             "spot_portfolio_ledger",
             "spot_equity_snapshots",
+            "spot_dca_plans",
+            "spot_dca_executions",
         ],
         "purpose": "Base local para cache, auditoria y datasets analiticos.",
     },
@@ -395,6 +397,8 @@ DATASET_CATALOG = [
             ("spot_cash_flows", "Aportes y retiros simulados separados del rendimiento de mercado."),
             ("spot_portfolio_ledger", "Ledger append-only de transacciones, caja y reinicios de ciclo."),
             ("spot_equity_snapshots", "Curva patrimonial persistida con fuente, motivo y fingerprint idempotente."),
+            ("spot_dca_plans", "Planes de acumulacion spot con frecuencia, presupuesto y limite de asignacion."),
+            ("spot_dca_executions", "Intentos DCA ejecutados o rechazados con referencia idempotente y evidencia."),
         ]
     ],
     {

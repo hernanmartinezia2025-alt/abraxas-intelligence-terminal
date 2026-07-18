@@ -343,6 +343,14 @@ export function updateKillSwitch(payload) {
   return request("/api/risk/kill-switch", { method: "POST", body: JSON.stringify(payload) });
 }
 
+export function saveRiskPolicy(scopeType, scopeId, payload) {
+  return request(`/api/risk/policies/${scopeType}/${scopeId}`, { method: "PUT", body: JSON.stringify(payload) });
+}
+
+export function archiveRiskPolicy(scopeType, scopeId, payload) {
+  return request(`/api/risk/policies/${scopeType}/${scopeId}/archive`, { method: "POST", body: JSON.stringify(payload) });
+}
+
 export function validateRiskIntent(payload) {
   return request("/api/risk/validate", { method: "POST", body: JSON.stringify(payload) });
 }

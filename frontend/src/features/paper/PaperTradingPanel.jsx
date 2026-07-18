@@ -42,6 +42,7 @@ export default function PaperTradingPanel({ defaultSymbol = "BTCUSDT" }) {
     <section className="paper-runtime-strip">
       <article><span>Mode</span><strong>PAPER</strong><small>live {snapshot.live_execution}</small></article>
       <article><span>Risk gate</span><strong>{protections.risk_required ? "REQUIRED" : "SIN DATO"}</strong><small>kill {protections.kill_switch_active ? "active" : "clear"}</small></article>
+      <article><span>Policy hierarchy</span><strong>{protections.account_policy ? `ACCOUNT V${protections.account_policy.current_version}` : "GLOBAL"}</strong><small>{protections.bot_policy_count || 0} bot policies · restrictive</small></article>
       <article><span>Price freshness</span><strong>{protections.price_max_age_seconds ?? "--"}s</strong><small>máximo permitido</small></article>
       <article><span>Proposal TTL</span><strong>{protections.proposal_ttl_seconds ?? "--"}s</strong><small>drift {protections.max_price_drift_pct ?? "--"}%</small></article>
     </section>

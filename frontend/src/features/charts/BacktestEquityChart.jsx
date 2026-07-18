@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef } from "react";
 import { AreaSeries, ColorType, createChart, LineSeries } from "lightweight-charts";
+import { initialChartSize, observeChartSize } from "./chartSize.js";
 
 function normalizePoints(points) {
   const byTime = new Map();
@@ -34,7 +35,7 @@ export default function BacktestEquityChart({ points = [] }) {
     if (!container) return undefined;
 
     const chart = createChart(container, {
-      autoSize: true,
+      ...initialChartSize(container),
       layout: {
         background: { type: ColorType.Solid, color: "#0d0f12" },
         textColor: "rgba(246, 248, 251, 0.68)",
@@ -72,12 +73,14 @@ export default function BacktestEquityChart({ points = [] }) {
       priceFormat: { type: "price", precision: 2, minMove: 0.01 },
     });
     chartRef.current = chart;
+    const disconnectResize = observeChartSize(container, chart);
 
     return () => {
-      chart.remove();
+      disconnectResize();
       chartRef.current = null;
       equitySeriesRef.current = null;
       benchmarkSeriesRef.current = null;
+      chart.remove();
     };
   }, []);
 

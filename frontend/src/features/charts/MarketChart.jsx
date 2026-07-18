@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { CandlestickSeries, ColorType, createChart, createSeriesMarkers, HistogramSeries, LineSeries } from "lightweight-charts";
+import { initialChartSize, observeChartSize } from "./chartSize.js";
 import {
   archiveChartIndicatorPreset,
   computeChartIndicators,
@@ -229,7 +230,7 @@ export default function MarketChart({ symbol = "BTCUSDT", interval = "15m", expa
     if (!container) return;
 
     const chart = createChart(container, {
-      autoSize: true,
+      ...initialChartSize(container, 520),
       layout: {
         background: { type: ColorType.Solid, color: "#0d0f12" },
         textColor: "rgba(246, 248, 251, 0.68)",
@@ -274,16 +275,18 @@ export default function MarketChart({ symbol = "BTCUSDT", interval = "15m", expa
     candleSeriesRef.current = candleSeries;
     volumeSeriesRef.current = volumeSeries;
     markersRef.current = createSeriesMarkers(candleSeries);
+    const disconnectResize = observeChartSize(container, chart);
 
     return () => {
-      chart.remove();
+      disconnectResize();
+      markersRef.current?.detach();
       chartRef.current = null;
       candleSeriesRef.current = null;
       volumeSeriesRef.current = null;
       overlaysRef.current = {};
       indicatorSeriesRef.current = [];
-      markersRef.current?.detach();
       markersRef.current = null;
+      chart.remove();
     };
   }, []);
 

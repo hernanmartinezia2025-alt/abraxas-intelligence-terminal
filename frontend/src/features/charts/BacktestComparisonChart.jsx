@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef } from "react";
 import { ColorType, createChart, LineSeries } from "lightweight-charts";
+import { initialChartSize, observeChartSize } from "./chartSize.js";
 
 function normalizedReturnSeries(run) {
   const initialEquity = Number(run?.initial_equity);
@@ -32,7 +33,7 @@ export default function BacktestComparisonChart({ runA, runB }) {
     if (!container) return undefined;
 
     const chart = createChart(container, {
-      autoSize: true,
+      ...initialChartSize(container),
       layout: {
         background: { type: ColorType.Solid, color: "#0d0f12" },
         textColor: "rgba(246, 248, 251, 0.68)",
@@ -71,12 +72,14 @@ export default function BacktestComparisonChart({ runA, runB }) {
       priceFormat: { type: "custom", minMove: 0.01, formatter: (value) => `${value.toFixed(2)}%` },
     });
     chartRef.current = chart;
+    const disconnectResize = observeChartSize(container, chart);
 
     return () => {
-      chart.remove();
+      disconnectResize();
       chartRef.current = null;
       seriesARef.current = null;
       seriesBRef.current = null;
+      chart.remove();
     };
   }, []);
 

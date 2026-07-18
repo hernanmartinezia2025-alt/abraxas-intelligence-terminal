@@ -12,6 +12,7 @@ import {
   getSpotPortfolio,
   getSpotProjection,
   getSpotDcaPlans,
+  getSpotDcaPreview,
   quoteSpotTransaction,
   recordSpotValuation,
   resetSpotPortfolio,
@@ -136,6 +137,7 @@ export default function SpotPortfolioPage({ selectedSymbol = "BTCUSDT" }) {
   const [dca, setDca] = useState({ plans: [], executions: [], due_count: 0 });
   const [dcaForm, setDcaForm] = useState({ name: `${selectedSymbol} acumulación`, symbol: selectedSymbol, budget_amount: "250", frequency: "monthly", interval_count: "1", allocation_limit_pct: "40", next_run_at: new Date(Date.now() + 86_400_000).toISOString().slice(0, 16) });
   const [dcaBusy, setDcaBusy] = useState(false);
+  const [dcaPreview, setDcaPreview] = useState(null);
   const [allocationData, setAllocationData] = useState({ policies: [], runs: [] });
   const [allocationBusy, setAllocationBusy] = useState(false);
   const [scenario, setScenario] = useState({ monthly_contribution: 250, years: 4, annual_return_pct: 0 });
@@ -170,7 +172,7 @@ export default function SpotPortfolioPage({ selectedSymbol = "BTCUSDT" }) {
     try {
       const result = await createSpotTransaction({ ...ticket, quantity: Number(ticket.quantity) });
       setSnapshot(result.snapshot);
-      setMessage(`Operación #${result.transaction_id} persistida.`);
+      setMessage(`Operación #${result.transaction_id} persistida · Risk #${result.transaction.risk_validation_id}.`);
     } catch (error) { setMessage(error.message); }
   }
 
@@ -217,6 +219,7 @@ export default function SpotPortfolioPage({ selectedSymbol = "BTCUSDT" }) {
       };
       const result = await createSpotDcaPlan(payload);
       setDca(await getSpotDcaPlans());
+      setDcaPreview(result.preview);
       setMessage(`Plan DCA #${result.plan.id} creado. No se ejecutó ninguna compra.`);
     } catch (error) { setMessage(error.message); } finally { setDcaBusy(false); }
   }
@@ -236,8 +239,19 @@ export default function SpotPortfolioPage({ selectedSymbol = "BTCUSDT" }) {
     try {
       const result = await executeSpotDcaPlan(planId);
       setSnapshot(result.snapshot);
+      setDcaPreview(result.preview || null);
       setDca(await getSpotDcaPlans());
       setMessage(result.status === "executed" ? `Cuota DCA #${planId} ejecutada en simulación spot.` : `Cuota rechazada: ${result.execution.reason}`);
+    } catch (error) { setMessage(error.message); } finally { setDcaBusy(false); }
+  }
+
+  async function inspectDcaPlan(planId) {
+    setDcaBusy(true);
+    setMessage(`Calculando preview DCA #${planId}...`);
+    try {
+      const preview = await getSpotDcaPreview(planId);
+      setDcaPreview(preview);
+      setMessage(`Preview DCA #${planId}: ${preview.allowed ? "listo" : "bloqueado"}. No se creó una validación ni una compra.`);
     } catch (error) { setMessage(error.message); } finally { setDcaBusy(false); }
   }
 
@@ -318,7 +332,13 @@ export default function SpotPortfolioPage({ selectedSymbol = "BTCUSDT" }) {
           <label>Nota<input value={ticket.notes} onChange={(event) => setTicket({ ...ticket, notes: event.target.value })} placeholder="tesis o motivo" /></label>
           <div className={`spot-quote ${quote?.allowed ? "allowed" : "blocked"}`}>
             <span>PREVIEW · SIN EJECUCIÓN</span>
-            {quote ? <><strong>{money(quote.notional)} + {money(quote.fee)} fee</strong><small>Mark {money(quote.price)} · caja posterior {money(quote.cash_balance_after)}</small>{!quote.allowed && <b>{quote.rejection_reason}</b>}</> : <small>{quoteError || "Esperando una cantidad válida."}</small>}
+            {quote ? <>
+              <div className="spot-quote-head"><strong>{money(quote.notional)} + {money(quote.fee)} fee</strong><b className={quote.risk_allowed ? "ready" : "blocked"}>{quote.risk_allowed ? "RISK READY" : "RISK BLOCKED"}</b></div>
+              <small>Mark {money(quote.price)} · caja posterior {money(quote.cash_balance_after)}</small>
+              {quote.risk && <div className="spot-risk-checks">{quote.risk.checks.map((check) => <span className={check.passed ? "passed" : "failed"} key={check.code}>{check.passed ? "PASS" : "FAIL"} · {check.code.replaceAll("_", " ")}</span>)}</div>}
+              <small className="spot-preview-proof">Preview only · no crea validación ni movimiento</small>
+              {!quote.allowed && <b>{quote.rejection_reason}</b>}
+            </> : <small>{quoteError || "Esperando una cantidad válida."}</small>}
           </div>
           <button type="submit" disabled={!quote?.allowed}>Registrar operación spot</button>
           <small>Precio desde market_snapshots; fee 0.10%; ejecución real bloqueada.</small>
@@ -374,14 +394,24 @@ export default function SpotPortfolioPage({ selectedSymbol = "BTCUSDT" }) {
             <header><div><span>#{plan.id} · {plan.symbol}</span><strong>{plan.name}</strong></div><b>{plan.due ? "VENCIDO" : plan.status.toUpperCase()}</b></header>
             <div className="spot-dca-metrics"><span><small>Cuota</small><strong>{money(plan.budget_amount)}</strong></span><span><small>Frecuencia</small><strong>{plan.interval_count}× {plan.frequency}</strong></span><span><small>Límite</small><strong>{Number(plan.allocation_limit_pct).toFixed(1)}%</strong></span></div>
             <p>Próxima: {new Date(plan.next_run_at).toLocaleString()}</p>
-            <footer>{plan.status === "active" ? <button disabled={dcaBusy || !plan.due} onClick={() => runDcaPlan(plan.id)}>Ejecutar cuota</button> : null}{plan.status === "active" ? <button disabled={dcaBusy} onClick={() => changeDcaStatus(plan.id, "paused")}>Pausar</button> : plan.status === "paused" ? <button disabled={dcaBusy} onClick={() => changeDcaStatus(plan.id, "active")}>Reactivar</button> : null}{plan.status !== "archived" && <button disabled={dcaBusy} onClick={() => changeDcaStatus(plan.id, "archived")}>Archivar</button>}</footer>
+            <footer><button disabled={dcaBusy} onClick={() => inspectDcaPlan(plan.id)}>Revisar Risk</button>{plan.status === "active" ? <button disabled={dcaBusy || !plan.due} onClick={() => runDcaPlan(plan.id)}>Ejecutar cuota</button> : null}{plan.status === "active" ? <button disabled={dcaBusy} onClick={() => changeDcaStatus(plan.id, "paused")}>Pausar</button> : plan.status === "paused" ? <button disabled={dcaBusy} onClick={() => changeDcaStatus(plan.id, "active")}>Reactivar</button> : null}{plan.status !== "archived" && <button disabled={dcaBusy} onClick={() => changeDcaStatus(plan.id, "archived")}>Archivar</button>}</footer>
           </article>)}</div> : <div className="chart-state">Todavía no hay planes DCA. El formulario crea el contrato, no una compra.</div>}
         </section>
       </div>
 
+      {dcaPreview && <section className={`exchange-panel spot-dca-risk-preview ${dcaPreview.allowed ? "allowed" : "blocked"}`}>
+        <div className="exchange-panel-head compact"><div><p className="eyebrow">Risk preview · no persistence</p><h2>Plan #{dcaPreview.plan.id} · {dcaPreview.plan.symbol}</h2></div><strong>{dcaPreview.allowed ? "READY" : "BLOCKED"}</strong></div>
+        <div className="spot-dca-risk-body">
+          <div className="spot-dca-risk-metrics"><span><small>Cuota</small><b>{money(dcaPreview.quote.notional)}</b></span><span><small>Peso proyectado</small><b>{Number(dcaPreview.projected_weight_pct).toFixed(2)}%</b></span><span><small>Límite DCA</small><b>{Number(dcaPreview.allocation_limit_pct).toFixed(2)}%</b></span><span><small>Exposición Risk</small><b>{Number(dcaPreview.quote.risk?.metrics?.position_pct || 0).toFixed(2)}%</b></span></div>
+          {dcaPreview.quote.risk && <div className="spot-risk-checks">{dcaPreview.quote.risk.checks.map((check) => <span className={check.passed ? "passed" : "failed"} key={check.code}>{check.passed ? "PASS" : "FAIL"} · {check.code.replaceAll("_", " ")}</span>)}</div>}
+          <p>{dcaPreview.reason || "Cash, asignación y Risk Engine autorizan esta cuota con el estado actual."}</p>
+          <small>PREVIEW ONLY · validation_id no persistido · execution_created: false</small>
+        </div>
+      </section>}
+
       <section className="exchange-panel spot-dca-executions">
         <div className="exchange-panel-head compact"><div><p className="eyebrow">Execution evidence</p><h2>Cuotas ejecutadas y rechazadas</h2></div><span>{dca.executions.length} INTENTOS</span></div>
-        {dca.executions.length ? <div>{dca.executions.map((execution) => <article key={execution.id}><span>Plan #{execution.plan_id}</span><strong className={execution.status === "executed" ? "positive" : "negative"}>{execution.status.toUpperCase()}</strong><b>{execution.notional ? money(execution.notional) : "SIN COMPRA"}</b><small>{execution.reason || new Date(execution.created_at).toLocaleString()}</small></article>)}</div> : <div className="chart-state">Sin cuotas ejecutadas o rechazadas.</div>}
+        {dca.executions.length ? <div>{dca.executions.map((execution) => <article key={execution.id}><span>Plan #{execution.plan_id}</span><strong className={execution.status === "executed" ? "positive" : "negative"}>{execution.status.toUpperCase()}</strong><b>{execution.notional ? money(execution.notional) : "SIN COMPRA"}</b><small>{execution.reason || new Date(execution.created_at).toLocaleString()} {execution.payload?.risk_validation_id ? `· Risk #${execution.payload.risk_validation_id}` : ""}</small></article>)}</div> : <div className="chart-state">Sin cuotas ejecutadas o rechazadas.</div>}
       </section>
     </>}
 

@@ -4,11 +4,19 @@ import hashlib
 import json
 from datetime import datetime, timezone
 
+from backend.app.analytics.spot_risk import build_spot_risk_context
+from backend.app.storage.risk import get_risk_validation, validate_order_intent
 from backend.app.storage.sqlite import connect, initialize_database
 
 DEFAULT_PORTFOLIO_ID = 1
 DEFAULT_CASH = 10_000.0
 FEE_RATE = 0.001
+
+
+class SpotRiskRejected(ValueError):
+    def __init__(self, decision: dict):
+        self.decision = decision
+        super().__init__("Risk Engine rejected spot transaction: " + " · ".join(decision["reasons"]))
 
 
 def now_iso() -> str:
@@ -259,7 +267,54 @@ def _transaction_quote(connection, payload: dict, portfolio: dict) -> dict:
 def quote_spot_transaction(payload: dict, portfolio_id: int = DEFAULT_PORTFOLIO_ID) -> dict:
     initialize_database()
     with connect() as connection:
-        return _transaction_quote(connection, payload, _portfolio_row(connection, portfolio_id))
+        quote = _transaction_quote(connection, payload, _portfolio_row(connection, portfolio_id))
+    quote["market_allowed"] = quote["allowed"]
+    if quote["market_allowed"]:
+        risk = _validate_spot_quote_risk(
+            quote,
+            portfolio_snapshot(portfolio_id),
+            source=str(payload.get("risk_source") or "spot_manual_quote"),
+            persist=False,
+        )
+        quote["risk"] = risk
+        quote["risk_allowed"] = risk["approved"]
+        quote["allowed"] = risk["approved"]
+        if not risk["approved"]:
+            quote["rejection_reason"] = "Risk Engine: " + " · ".join(risk["reasons"])
+    else:
+        quote["risk"] = None
+        quote["risk_allowed"] = False
+    return quote
+
+
+def _validate_spot_quote_risk(
+    quote: dict,
+    snapshot: dict,
+    *,
+    source: str,
+    persist: bool,
+    origin_reference: str | None = None,
+) -> dict:
+    context = build_spot_risk_context(snapshot)
+    return validate_order_intent(
+        {
+            "mode": "spot",
+            "symbol": quote["symbol"],
+            "side": "long",
+            "requested_notional": quote["notional"],
+            "current_exposure_notional": quote["current_quantity"] * quote["price"],
+            "account_equity": context["account_equity"],
+            "daily_pnl": context["daily_pnl"],
+            "current_drawdown_pct": context["current_drawdown_pct"],
+            "last_loss_at": context["last_loss_at"],
+            "reduces_exposure": quote["side"] == "sell",
+            "source": source,
+            "origin_reference": origin_reference,
+            "risk_data_coverage": context["coverage"],
+            "risk_observed_since": context["observed_since"],
+        },
+        persist=persist,
+    )
 
 
 def get_spot_transaction_by_origin(
@@ -305,6 +360,48 @@ def execute_spot_transaction(payload: dict, portfolio_id: int = DEFAULT_PORTFOLI
     with connect() as connection:
         portfolio = _portfolio_row(connection, portfolio_id)
         quote = _transaction_quote(connection, payload, portfolio)
+    if not quote["allowed"]:
+        raise ValueError(str(quote["rejection_reason"]))
+    risk_validation_id = payload.get("risk_validation_id")
+    risk = None
+    if risk_validation_id is not None:
+        if origin != "rebalance_run":
+            raise ValueError("Prevalidated Risk evidence is reserved for rebalance execution")
+        validation = get_risk_validation(int(risk_validation_id))
+        request = validation["request"]
+        same_notional = abs(float(request.get("requested_notional") or 0) - float(quote["notional"])) <= max(0.01, quote["notional"] * 1e-9)
+        current_exposure = float(quote["current_quantity"]) * float(quote["price"])
+        same_exposure = abs(float(request.get("current_exposure_notional") or 0) - current_exposure) <= max(0.01, current_exposure * 1e-9)
+        with connect() as connection:
+            validation_used = connection.execute(
+                "SELECT 1 FROM spot_transactions WHERE risk_validation_id = ? LIMIT 1",
+                (int(risk_validation_id),),
+            ).fetchone()
+        if not (
+            validation["approved"]
+            and validation["mode"] == "spot"
+            and validation["symbol"] == quote["symbol"]
+            and same_notional
+            and same_exposure
+            and not validation_used
+            and bool(request.get("reduces_exposure")) == (quote["side"] == "sell")
+        ):
+            raise ValueError("Risk validation does not authorize this spot transaction")
+        risk = {**validation["decision"], "validation_id": validation["id"], "recovered": True}
+    else:
+        risk = _validate_spot_quote_risk(
+            quote,
+            portfolio_snapshot(portfolio_id),
+            source=f"spot_{origin}_execute",
+            persist=True,
+            origin_reference=origin_reference,
+        )
+        risk_validation_id = risk["validation_id"]
+        if not risk["approved"]:
+            raise SpotRiskRejected(risk)
+    with connect() as connection:
+        portfolio = _portfolio_row(connection, portfolio_id)
+        quote = _transaction_quote(connection, payload, portfolio)
         if not quote["allowed"]:
             raise ValueError(str(quote["rejection_reason"]))
         realized = float(quote["realized_pnl"])
@@ -329,19 +426,19 @@ def execute_spot_transaction(payload: dict, portfolio_id: int = DEFAULT_PORTFOLI
                 portfolio_id, quote["symbol"], quote["side"], quote["quantity"], quote["price"],
                 quote["notional"], quote["fee"], realized, quote["price_timestamp"],
                 str(payload.get("notes") or ""), int(portfolio.get("active_cycle") or 1), origin,
-                origin_reference, payload.get("risk_validation_id"), now,
+                origin_reference, risk_validation_id, now,
             ),
         ).lastrowid)
         portfolio["cash_balance"] = quote["cash_balance_after"]
         _insert_ledger(
             connection, portfolio, "spot_transaction", reference_id=transaction_id, symbol=quote["symbol"],
             cash_delta=quote["cash_delta"], quantity_delta=quote["quantity"] if quote["side"] == "buy" else -quote["quantity"],
-            realized_pnl_delta=realized, payload={"side": quote["side"], "price": quote["price"], "fee": quote["fee"], "notes": str(payload.get("notes") or ""), "origin": origin, "origin_reference": origin_reference, "risk_validation_id": payload.get("risk_validation_id")},
+            realized_pnl_delta=realized, payload={"side": quote["side"], "price": quote["price"], "fee": quote["fee"], "notes": str(payload.get("notes") or ""), "origin": origin, "origin_reference": origin_reference, "risk_validation_id": risk_validation_id},
             created_at=now,
         )
         _insert_equity_snapshot(connection, portfolio_id, "transaction")
         transaction = dict(connection.execute("SELECT * FROM spot_transactions WHERE id = ?", (transaction_id,)).fetchone())
-    return {"transaction_id": transaction_id, "transaction": transaction, "quote": quote, "recovered": False, "snapshot": portfolio_snapshot(portfolio_id)}
+    return {"transaction_id": transaction_id, "transaction": transaction, "quote": quote, "risk": risk, "recovered": False, "snapshot": portfolio_snapshot(portfolio_id)}
 
 
 def apply_cash_flow(payload: dict, portfolio_id: int = DEFAULT_PORTFOLIO_ID) -> dict:

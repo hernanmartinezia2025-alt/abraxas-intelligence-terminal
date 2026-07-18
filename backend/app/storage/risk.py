@@ -144,6 +144,22 @@ def set_kill_switch(active: bool, reason: str) -> dict:
     return get_risk_profile()
 
 
+def get_risk_validation(validation_id: int) -> dict:
+    initialize_database()
+    with connect() as connection:
+        row = connection.execute(
+            "SELECT * FROM risk_validation_log WHERE id = ?",
+            (validation_id,),
+        ).fetchone()
+    if not row:
+        raise ValueError("Risk validation not found")
+    validation = dict(row)
+    validation["approved"] = bool(validation["approved"])
+    validation["request"] = json.loads(validation.pop("request_json"))
+    validation["decision"] = json.loads(validation.pop("decision_json"))
+    return validation
+
+
 def validate_order_intent(payload: dict, *, persist: bool = True) -> dict:
     initialize_database()
     now = datetime.now(timezone.utc)

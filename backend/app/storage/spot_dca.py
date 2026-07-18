@@ -7,6 +7,7 @@ from datetime import datetime, timedelta, timezone
 from backend.app.storage.spot_portfolio import (
     DEFAULT_PORTFOLIO_ID,
     FEE_RATE,
+    SpotRiskRejected,
     execute_spot_transaction,
     latest_mark,
     portfolio_snapshot,
@@ -87,6 +88,12 @@ def _decorate_plan(plan: dict, now: datetime | None = None) -> dict:
     return plan
 
 
+def _decode_execution(execution: dict) -> dict:
+    payload_json = execution.pop("payload_json", None)
+    execution["payload"] = json.loads(payload_json) if payload_json else {}
+    return execution
+
+
 def create_dca_plan(payload: dict, portfolio_id: int = DEFAULT_PORTFOLIO_ID) -> dict:
     initialize_database()
     normalized = _validate_plan(payload)
@@ -118,7 +125,7 @@ def list_dca_plans(portfolio_id: int = DEFAULT_PORTFOLIO_ID, limit: int = 100) -
                 (portfolio_id, limit),
             ).fetchall()
         ]
-        executions = [dict(row) for row in connection.execute(
+        executions = [_decode_execution(dict(row)) for row in connection.execute(
             """SELECT * FROM spot_dca_executions WHERE portfolio_id = ?
             ORDER BY id DESC LIMIT 100""",
             (portfolio_id,),
@@ -158,7 +165,7 @@ def preview_dca_plan(plan_id: int) -> dict:
     snapshot = portfolio_snapshot(plan["portfolio_id"])
     quantity = float(plan["budget_amount"]) / (mark["price"] * (1 + FEE_RATE))
     quote = quote_spot_transaction(
-        {"symbol": plan["symbol"], "side": "buy", "quantity": quantity},
+        {"symbol": plan["symbol"], "side": "buy", "quantity": quantity, "risk_source": "spot_dca_preview"},
         portfolio_id=plan["portfolio_id"],
     )
     holding = next((item for item in snapshot["holdings"] if item["symbol"] == plan["symbol"]), None)
@@ -205,7 +212,12 @@ def _save_rejection(plan: dict, scheduled_for: str, preview: dict, reason: str) 
             (
                 plan["id"], plan["portfolio_id"], int(snapshot["portfolio"]["active_cycle"]), scheduled_for,
                 preview["quote"]["quantity"], preview["quote"]["price"], preview["quote"]["notional"], reason,
-                json.dumps({"projected_weight_pct": preview["projected_weight_pct"], "allocation_limit_pct": preview["allocation_limit_pct"]}, sort_keys=True),
+                json.dumps({
+                    "projected_weight_pct": preview["projected_weight_pct"],
+                    "allocation_limit_pct": preview["allocation_limit_pct"],
+                    "risk_validation_id": (preview["quote"].get("risk") or {}).get("validation_id"),
+                    "risk_checks": (preview["quote"].get("risk") or {}).get("checks", []),
+                }, sort_keys=True),
                 now, now,
             ),
         )
@@ -237,7 +249,11 @@ def _finalize_dca_execution(plan: dict, scheduled_for: str, transaction: dict, r
             (
                 plan_id, plan["portfolio_id"], int(current_portfolio["active_cycle"]), scheduled_for,
                 transaction["id"], transaction["quantity"], transaction["price"], transaction["notional"],
-                json.dumps({"origin_reference": origin_reference, "recovered_transaction": recovered}, sort_keys=True),
+                json.dumps({
+                    "origin_reference": origin_reference,
+                    "recovered_transaction": recovered,
+                    "risk_validation_id": transaction.get("risk_validation_id"),
+                }, sort_keys=True),
                 now, now,
             ),
         )
@@ -281,19 +297,28 @@ def execute_due_dca_plan(plan_id: int) -> dict:
         return _finalize_dca_execution(plan, scheduled_for, dict(recovered_row), recovered=True)
 
     preview = preview_dca_plan(plan_id)
-    if not preview["allowed"]:
+    structural_allowed = bool(preview["quote"].get("market_allowed") and preview["allocation_allowed"])
+    if not structural_allowed:
         execution = _save_rejection(plan, scheduled_for, preview, str(preview["reason"]))
         return {"status": "rejected", "execution": execution, "preview": preview, "plan": plan, "snapshot": portfolio_snapshot(plan["portfolio_id"])}
 
-    result = execute_spot_transaction(
-        {
-            "symbol": plan["symbol"],
-            "side": "buy",
-            "quantity": preview["quote"]["quantity"],
-            "notes": f"DCA plan #{plan_id} · {plan['name']}",
-            "origin": "dca_plan",
-            "origin_reference": origin_reference,
-        },
-        portfolio_id=plan["portfolio_id"],
-    )
+    try:
+        result = execute_spot_transaction(
+            {
+                "symbol": plan["symbol"],
+                "side": "buy",
+                "quantity": preview["quote"]["quantity"],
+                "notes": f"DCA plan #{plan_id} · {plan['name']}",
+                "origin": "dca_plan",
+                "origin_reference": origin_reference,
+            },
+            portfolio_id=plan["portfolio_id"],
+        )
+    except SpotRiskRejected as exc:
+        preview["quote"]["risk"] = exc.decision
+        preview["quote"]["risk_allowed"] = False
+        preview["allowed"] = False
+        preview["reason"] = str(exc)
+        execution = _save_rejection(plan, scheduled_for, preview, str(exc))
+        return {"status": "rejected", "execution": execution, "preview": preview, "plan": plan, "snapshot": portfolio_snapshot(plan["portfolio_id"])}
     return _finalize_dca_execution(plan, scheduled_for, result["transaction"], recovered=result["recovered"])

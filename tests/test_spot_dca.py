@@ -3,6 +3,7 @@ from __future__ import annotations
 import tempfile
 import unittest
 import sqlite3
+import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -17,6 +18,7 @@ from backend.app.storage.spot_dca import (
     set_dca_plan_status,
 )
 from backend.app.storage.spot_portfolio import execute_spot_transaction
+from backend.app.storage.risk import set_kill_switch, update_risk_limits
 from backend.app.storage.sqlite import connect, initialize_database
 
 
@@ -33,6 +35,11 @@ class SpotDcaTests(unittest.TestCase):
                 VALUES (?, 'BTCUSDT', 50000, 0, 1000000, 50, 'Neutral', 'NORMAL', 'fixture')""",
                 (datetime.now(timezone.utc).isoformat(),),
             )
+        update_risk_limits({
+            "max_position_pct": 100, "max_daily_loss_pct": 100, "max_drawdown_pct": 100,
+            "cooldown_minutes": 0, "symbol_whitelist": ["BTCUSDT"],
+        })
+        set_kill_switch(False, "Spot DCA test")
 
     def tearDown(self) -> None:
         storage_sqlite.DB_PATH = self.original_db_path
@@ -61,6 +68,7 @@ class SpotDcaTests(unittest.TestCase):
         result = execute_due_dca_plan(plan["id"])
         self.assertEqual(result["status"], "executed")
         self.assertEqual(result["transaction"]["origin"], "dca_plan")
+        self.assertIsNotNone(result["transaction"]["risk_validation_id"])
         self.assertTrue(result["transaction"]["origin_reference"].startswith(f"dca:{plan['id']}:"))
         self.assertEqual(len(result["snapshot"]["transactions"]), 1)
         self.assertGreater(result["plan"]["next_run_at"], plan["next_run_at"])
@@ -72,6 +80,21 @@ class SpotDcaTests(unittest.TestCase):
         self.assertEqual(plans["executions"][0]["status"], "executed")
         self.assertEqual(len(get_dataset_preview("spot_dca_plans", 10)["rows"]), 1)
         self.assertEqual(len(get_dataset_preview("spot_dca_executions", 10)["rows"]), 1)
+
+    def test_kill_switch_rejection_is_persisted_without_advancing(self) -> None:
+        plan = self.create_plan(next_run_at=(datetime.now(timezone.utc) - timedelta(days=1)).isoformat())
+        set_kill_switch(True, "DCA emergency fixture")
+        preview = preview_dca_plan(plan["id"])
+        self.assertFalse(preview["allowed"])
+        self.assertIsNone(preview["quote"]["risk"]["validation_id"])
+        with connect() as connection:
+            self.assertEqual(connection.execute("SELECT COUNT(*) FROM risk_validation_log").fetchone()[0], 0)
+        result = execute_due_dca_plan(plan["id"])
+        self.assertEqual(result["status"], "rejected")
+        self.assertEqual(result["plan"]["next_run_at"], plan["next_run_at"])
+        evidence = json.loads(result["execution"]["payload_json"])
+        self.assertIsNotNone(evidence["risk_validation_id"])
+        self.assertEqual(result["snapshot"]["transactions"], [])
 
     def test_allocation_limit_rejects_without_advancing_schedule(self) -> None:
         plan = self.create_plan(budget_amount=5000, allocation_limit_pct=10)
@@ -153,6 +176,7 @@ class SpotDcaTests(unittest.TestCase):
             indexes = {row["name"] for row in connection.execute("PRAGMA index_list(spot_transactions)").fetchall()}
         self.assertIn("origin", columns)
         self.assertIn("origin_reference", columns)
+        self.assertIn("risk_validation_id", columns)
         self.assertIn("idx_spot_transactions_origin_reference", indexes)
 
 

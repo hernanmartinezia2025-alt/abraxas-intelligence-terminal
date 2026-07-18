@@ -558,6 +558,7 @@ CREATE TABLE IF NOT EXISTS spot_portfolios (
     base_currency TEXT NOT NULL DEFAULT 'USDT',
     initial_cash REAL NOT NULL,
     cash_balance REAL NOT NULL,
+    active_cycle INTEGER NOT NULL DEFAULT 1,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
@@ -587,12 +588,69 @@ CREATE TABLE IF NOT EXISTS spot_transactions (
     price_timestamp TEXT NOT NULL,
     source TEXT NOT NULL,
     notes TEXT,
+    cycle_number INTEGER NOT NULL DEFAULT 1,
     executed_at TEXT NOT NULL,
     FOREIGN KEY(portfolio_id) REFERENCES spot_portfolios(id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_spot_transactions_portfolio_time
 ON spot_transactions(portfolio_id, executed_at);
+
+CREATE TABLE IF NOT EXISTS spot_cash_flows (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    portfolio_id INTEGER NOT NULL,
+    cycle_number INTEGER NOT NULL,
+    flow_type TEXT NOT NULL CHECK(flow_type IN ('deposit', 'withdrawal')),
+    amount REAL NOT NULL,
+    cash_delta REAL NOT NULL,
+    cash_balance REAL NOT NULL,
+    notes TEXT,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY(portfolio_id) REFERENCES spot_portfolios(id)
+);
+
+CREATE TABLE IF NOT EXISTS spot_portfolio_ledger (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    portfolio_id INTEGER NOT NULL,
+    cycle_number INTEGER NOT NULL,
+    event_type TEXT NOT NULL,
+    reference_id INTEGER,
+    symbol TEXT,
+    cash_delta REAL NOT NULL DEFAULT 0,
+    quantity_delta REAL NOT NULL DEFAULT 0,
+    realized_pnl_delta REAL NOT NULL DEFAULT 0,
+    cash_balance REAL NOT NULL,
+    payload_json TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY(portfolio_id) REFERENCES spot_portfolios(id)
+);
+
+CREATE TABLE IF NOT EXISTS spot_equity_snapshots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    portfolio_id INTEGER NOT NULL,
+    cycle_number INTEGER NOT NULL,
+    equity REAL NOT NULL,
+    cash_balance REAL NOT NULL,
+    market_value REAL NOT NULL,
+    cost_basis REAL NOT NULL,
+    unrealized_pnl REAL NOT NULL,
+    realized_pnl REAL NOT NULL,
+    source_timestamp TEXT,
+    fingerprint TEXT NOT NULL,
+    reason TEXT NOT NULL,
+    recorded_at TEXT NOT NULL,
+    FOREIGN KEY(portfolio_id) REFERENCES spot_portfolios(id),
+    UNIQUE(portfolio_id, cycle_number, fingerprint)
+);
+
+CREATE INDEX IF NOT EXISTS idx_spot_cash_flows_cycle_time
+ON spot_cash_flows(portfolio_id, cycle_number, created_at);
+
+CREATE INDEX IF NOT EXISTS idx_spot_ledger_cycle_time
+ON spot_portfolio_ledger(portfolio_id, cycle_number, created_at);
+
+CREATE INDEX IF NOT EXISTS idx_spot_equity_cycle_time
+ON spot_equity_snapshots(portfolio_id, cycle_number, recorded_at);
 
 CREATE TABLE IF NOT EXISTS simulated_orders (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1092,6 +1150,16 @@ def initialize_database() -> None:
         protection_columns = {row["name"] for row in connection.execute("PRAGMA table_info(paper_position_protections)").fetchall()}
         if protection_columns and "highest_price" not in protection_columns:
             connection.execute("ALTER TABLE paper_position_protections ADD COLUMN highest_price REAL")
+        spot_portfolio_columns = {
+            row["name"] for row in connection.execute("PRAGMA table_info(spot_portfolios)").fetchall()
+        }
+        if "active_cycle" not in spot_portfolio_columns:
+            connection.execute("ALTER TABLE spot_portfolios ADD COLUMN active_cycle INTEGER NOT NULL DEFAULT 1")
+        spot_transaction_columns = {
+            row["name"] for row in connection.execute("PRAGMA table_info(spot_transactions)").fetchall()
+        }
+        if "cycle_number" not in spot_transaction_columns:
+            connection.execute("ALTER TABLE spot_transactions ADD COLUMN cycle_number INTEGER NOT NULL DEFAULT 1")
         signal_columns = {
             row["name"] for row in connection.execute("PRAGMA table_info(strategy_signal_evaluations)").fetchall()
         }

@@ -7,9 +7,18 @@ from pathlib import Path
 
 from backend.app.storage import sqlite as storage_sqlite
 from backend.app.analytics.spot_analysis import analyze_spot_candles
+from backend.app.services.data_center_service import get_dataset_preview
 from backend.app.strategies.market_modes import build_market_mode_policy
 from backend.app.storage.sqlite import connect, initialize_database
-from backend.app.storage.spot_portfolio import execute_spot_transaction, portfolio_snapshot, project_contributions
+from backend.app.storage.spot_portfolio import (
+    apply_cash_flow,
+    execute_spot_transaction,
+    portfolio_snapshot,
+    project_contributions,
+    quote_spot_transaction,
+    record_portfolio_valuation,
+    reset_spot_portfolio,
+)
 
 
 class SpotPortfolioTests(unittest.TestCase):
@@ -37,6 +46,54 @@ class SpotPortfolioTests(unittest.TestCase):
         self.assertAlmostEqual(snapshot["holdings"][0]["quantity"], 0.1)
         self.assertAlmostEqual(snapshot["portfolio"]["cash_balance"], 4995.0)
         self.assertEqual(snapshot["transactions"][0]["source"], "market_snapshots")
+        self.assertEqual(snapshot["ledger"][0]["event_type"], "spot_transaction")
+        self.assertEqual(len(snapshot["equity_history"]), 1)
+
+    def test_quote_is_read_only_and_exposes_full_cost(self) -> None:
+        quote = quote_spot_transaction({"symbol": "BTCUSDT", "side": "buy", "quantity": 0.1})
+        self.assertTrue(quote["allowed"])
+        self.assertFalse(quote["execution_created"])
+        self.assertAlmostEqual(quote["notional"], 5000.0)
+        self.assertAlmostEqual(quote["fee"], 5.0)
+        self.assertEqual(portfolio_snapshot()["transactions"], [])
+
+    def test_cash_flow_is_not_counted_as_market_profit(self) -> None:
+        result = apply_cash_flow({"flow_type": "deposit", "amount": 500, "notes": "monthly DCA"})
+        snapshot = result["snapshot"]
+        self.assertAlmostEqual(snapshot["equity"], 10_500.0)
+        self.assertAlmostEqual(snapshot["net_contributions"], 10_500.0)
+        self.assertAlmostEqual(snapshot["total_pnl"], 0.0)
+        self.assertEqual(snapshot["cash_flows"][0]["flow_type"], "deposit")
+        self.assertEqual(len(get_dataset_preview("spot_cash_flows", limit=10)["rows"]), 1)
+        self.assertEqual(len(get_dataset_preview("spot_portfolio_ledger", limit=10)["rows"]), 1)
+        self.assertEqual(len(get_dataset_preview("spot_equity_snapshots", limit=10)["rows"]), 1)
+
+    def test_valuation_is_idempotent_until_market_mark_changes(self) -> None:
+        execute_spot_transaction({"symbol": "BTCUSDT", "side": "buy", "quantity": 0.1})
+        duplicate = record_portfolio_valuation()
+        self.assertFalse(duplicate["recorded"])
+        with connect() as connection:
+            connection.execute(
+                """INSERT INTO market_snapshots (timestamp, symbol, price, change_24h, volume_24h,
+                fear_greed_value, fear_greed_label, risk_level, abraxas_reading)
+                VALUES (?, 'BTCUSDT', 51000, 0, 1000000, 50, 'Neutral', 'NORMAL', 'fixture 2')""",
+                (datetime.now(timezone.utc).isoformat(),),
+            )
+        changed = record_portfolio_valuation()
+        self.assertTrue(changed["recorded"])
+        self.assertEqual(len(changed["snapshot"]["equity_history"]), 2)
+
+    def test_reset_starts_new_cycle_without_deleting_audit_history(self) -> None:
+        execute_spot_transaction({"symbol": "BTCUSDT", "side": "buy", "quantity": 0.1})
+        reset = reset_spot_portfolio(20_000, "new allocation mandate")
+        snapshot = reset["snapshot"]
+        self.assertEqual(reset["cycle_number"], 2)
+        self.assertEqual(snapshot["portfolio"]["active_cycle"], 2)
+        self.assertEqual(snapshot["holdings"], [])
+        self.assertEqual(snapshot["transactions"], [])
+        self.assertAlmostEqual(snapshot["equity"], 20_000.0)
+        self.assertEqual(snapshot["ledger"][0]["event_type"], "portfolio_reset")
+        self.assertTrue(any(row["event_type"] == "spot_transaction" for row in snapshot["ledger"]))
 
     def test_projection_is_explicit_user_assumption(self) -> None:
         projection = project_contributions(1000, 100, 2, 0)

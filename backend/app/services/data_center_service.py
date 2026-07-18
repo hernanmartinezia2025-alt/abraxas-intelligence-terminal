@@ -96,6 +96,12 @@ SOURCE_CATALOG = [
             "microstructure_collector_runs",
             "chart_indicator_presets",
             "chart_indicator_preset_versions",
+            "spot_portfolios",
+            "spot_holdings",
+            "spot_transactions",
+            "spot_cash_flows",
+            "spot_portfolio_ledger",
+            "spot_equity_snapshots",
         ],
         "purpose": "Base local para cache, auditoria y datasets analiticos.",
     },
@@ -386,6 +392,9 @@ DATASET_CATALOG = [
             ("spot_portfolios", "Cuentas simuladas de acumulacion spot a largo plazo."),
             ("spot_holdings", "Tenencias spot, costo promedio y PnL realizado."),
             ("spot_transactions", "Compras y ventas spot simuladas con precio y timestamp auditables."),
+            ("spot_cash_flows", "Aportes y retiros simulados separados del rendimiento de mercado."),
+            ("spot_portfolio_ledger", "Ledger append-only de transacciones, caja y reinicios de ciclo."),
+            ("spot_equity_snapshots", "Curva patrimonial persistida con fuente, motivo y fingerprint idempotente."),
         ]
     ],
     {
